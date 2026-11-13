@@ -5,11 +5,8 @@ import { COMPANY } from "@/lib/company";
 import { FEATURE_NEEDS } from "@/lib/scope-groups";
 import { NEEDS_PERMISSION } from "@/lib/meeting-wording";
 import { HIDEABLE_MODULES } from "@/lib/settings2";
-import type { BrandId } from "@/lib/brand-marks";
-import { BrandIcon } from "../ds/brand-icon";
 import { useData } from "../session";
-import { Badge, Btn, Card, ErrorBox, Loading, timeAgo, type Tone } from "../ui";
-import { ConnectionsSlot } from "./settings-slot-connections";
+import { Badge, Btn, Card, ErrorBox, Loading } from "../ui";
 import { WriteAccessCard } from "./write-access";
 import { useStState } from "./st-state";
 import type { PermissionGroup } from "./settings-parts";
@@ -33,70 +30,7 @@ export function PlanCard({ home }: { home: Home }) {
 }
 
 // ---------------- Connections ----------------
-type Conn = {
-  slack: { connected: boolean; label: string | null; canChange: boolean };
-  fathom: { status: string; lastEventAt: string | null; saved: number; waiting: number; team: { people: number; working: number } | null };
-  email: { address: boolean }; calendars: { count: number };
-};
-
-function ToolCard({ brand, name, tone, status, line, what, owner, children }: { brand: BrandId; name: string; tone: Tone; status: string; line: string; what: string; owner: string; children?: React.ReactNode }) {
-  return (
-    <li className="flex gap-3 py-4" data-testid={`tool-${brand}`}>
-      <BrandIcon id={brand} size={26} />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-semibold">{name}</h3><Badge tone={tone}>{status}</Badge></div>
-        <p className="mt-0.5 text-sm">{line}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">{what}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">Owned by: {owner}</p>
-        {children && <div className="mt-2 flex flex-wrap gap-2 max-sm:[&_button]:min-h-11">{children}</div>}
-      </div>
-    </li>
-  );
-}
-
-export function ConnectionsSection() {
-  const { data, error, loading, reload } = useData<Conn>("st/connections");
-  const [open, setOpen] = useState(false);
-  if (loading && !data) return <Loading />;
-  if (error) return <ErrorBox error={error} onRetry={reload} />;
-  if (!data) return null;
-  const f = data.fathom;
-  const fOk = f.status === "connected";
-  const manage = () => { setOpen(true); setTimeout(() => document.getElementById("connection-details")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); };
-  return (
-    <div className="space-y-4">
-      <Card title="Your tools">
-        <ul className="divide-y" aria-label="Connected tools">
-          <ToolCard brand="slack" name="Slack" tone={data.slack.connected ? "good" : "neutral"} status={data.slack.connected ? "Connected" : "Not connected"}
-            line={data.slack.connected ? `Alerts and the daily brief go to ${data.slack.label ?? "your Slack channel"}.` : "No Slack channel yet."}
-            what="Posts alerts and the daily brief to one channel. SubSync only posts there; it never reads your Slack messages." owner="Your workspace. One channel for the whole team, set up by an administrator.">
-            {data.slack.canChange ? <Btn variant={data.slack.connected ? "secondary" : "primary"} onClick={manage}>{data.slack.connected ? "Change or disconnect" : "Connect Slack"}</Btn> : !data.slack.connected && <span className="text-xs text-muted-foreground">Ask your administrator to connect it.</span>}
-          </ToolCard>
-          <ToolCard brand="fathom" name="Fathom" tone={fOk ? "good" : f.status === "needs_reconnect" ? "warn" : "neutral"} status={fOk ? "Connected" : f.status === "needs_reconnect" ? "Reconnect" : "Not connected"}
-            line={fOk ? (f.lastEventAt ? `Last call received ${timeAgo(f.lastEventAt)}. ${f.saved} added to contacts, ${f.waiting} waiting or not matched.` : "Connected. No calls received yet.") : "You have not connected your Fathom."}
-            what="Receives the summary and action items of YOUR recorded calls and adds them to the right contact only when the match is certain. Otherwise they wait in your private inbox."
-            owner={`You. Each person connects their own; nobody else can see your tokens or your calls.${f.team ? ` ${f.team.working} of ${f.team.people} on your team ${f.team.people === 1 ? "has" : "have"} connected.` : ""}`}>
-            <Btn variant={fOk ? "secondary" : "primary"} onClick={manage}>{fOk ? "Test or disconnect" : "Connect Fathom"}</Btn>
-          </ToolCard>
-          <ToolCard brand="gmail" name="Email" tone={data.email.address ? "good" : "neutral"} status={data.email.address ? "Address saved" : "No address yet"}
-            line={data.email.address ? "Alert and summary emails go to the address you saved under Alerts and notifications." : "No address saved, so no emails are sent."}
-            what="Alert emails and the weekly summary. The sending domain's health (SPF, DKIM, DMARC) is checked from public records, with no sign-in." owner="Your company account.">
-            <a className="text-sm font-medium underline underline-offset-4 max-sm:py-3" href="#email">Open email sender health</a>
-          </ToolCard>
-          <ToolCard brand="google_calendar" name="Calendars" tone={data.calendars.count > 0 ? "good" : "neutral"} status={data.calendars.count > 0 ? "Read from your CRM" : "None read yet"}
-            line={data.calendars.count > 0 ? `${data.calendars.count} calendar${data.calendars.count === 1 ? "" : "s"} found.` : "No calendars found yet. They appear after the first sync."}
-            what="SubSync reads the calendars and bookings in your CRM, whatever tool feeds them. Nothing to connect here; the Calendars permission controls it." owner="Your company account." />
-        </ul>
-      </Card>
-      <div id="connection-details" className="scroll-mt-4">
-        <details open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)} className="rounded-lg border">
-          <summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-medium">Connect, test or disconnect</summary>
-          <div className="p-3"><ConnectionsSlot /></div>
-        </details>
-      </div>
-    </div>
-  );
-}
+export { ConnectionsSection } from "./connections-section";
 
 // ---------------- Permissions ----------------
 type Settings = { permissions?: PermissionGroup[] };

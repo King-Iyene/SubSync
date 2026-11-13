@@ -6,7 +6,7 @@ import { summaryText } from "@/lib/analytics/speed-v2";
 import { measuringSentence } from "@/lib/design/speed-text";
 import { useData } from "../session";
 import type { GoFn } from "../nav";
-import { EmptyState, ErrorState, HeadlineBlock, HowTo, InlineAlert, ModuleTabs, PopMenu, SkeletonRows, useCardRange, type MenuItem } from "../ds";
+import { EmptyState, ErrorState, HeadlineBlock, HowTo, InlineAlert, ModuleTabs, ActionRow, SkeletonRows, useCardRange, type MenuItem } from "../ds";
 import { focusClient } from "../ds/global-filter";
 import "./today-theme.css";
 import { CaptureTab, PaceTab, PeopleTab } from "./speed-insights";
@@ -119,8 +119,9 @@ export function SpeedView({ go, unanswered = false, start }: { go: GoFn; unanswe
           <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">Speed to lead</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground" data-testid="page-subtitle">How long new leads wait for a first reply. SubSync measures this; it never sends a reply.</p>
         </div>
+        {d.measuring.canChange && <button type="button" className="ds-press inline-flex h-9 items-center rounded-md px-2 text-sm font-medium text-primary underline underline-offset-4" onClick={() => goTab("rules")} data-testid="speed-reply-target">Reply target</button>}
         <GuideButton onClick={() => setGuide(true)} />
-        <PopMenu label="More" items={menu} testId="speed-more" triggerClassName={MORE_TRIGGER}>More<ChevronDown aria-hidden className="size-3.5" /></PopMenu>
+        <ActionRow items={menu} testId="speed-more" />
       </header>
 
       {d.access.needsPermission.length > 0 && (
@@ -136,7 +137,7 @@ export function SpeedView({ go, unanswered = false, start }: { go: GoFn; unanswe
       ) : (
         <FilterProvider range={r ? { from: r.current.from, to: r.current.to, label: r.current.label, sentence: r.sentence } : null}>{(bar) => (<>{FILTER_TABS.has(tabId) && bar}<TipHost /><ModuleTabs pill label="Speed to lead sections" value={Math.max(0, order.indexOf(tabId))} onChange={(n) => goTab(order[n])} tabs={[
           { label: "Race", icon: ic(Zap), node: <RaceTab multi={multi} onCall={() => goTab("call")} /> },
-          { label: "Pace", icon: ic(Gauge), node: <PaceTab6 multi={multi} slow={slow} old={<><JourneyCard multi={multi} /><BookingCard /><PaceTab multi={multi} /></>} /> },
+          { label: "Pace", icon: ic(Gauge), node: <PaceTab6 multi={multi} slow={slow} old={<><SourceCard showAccount={multi} /><JourneyCard multi={multi} /><BookingCard /><PaceTab multi={multi} /></>} /> },
           { label: "Coverage", icon: ic(PhoneMissed), node: <Fold keep={3} testId="coverage-fold"><CoverageTab multi={multi} /></Fold> },
           ...(d.ignoredOn ? [{ label: "Waiting on the client", tip: "Client accounts that are not answering the leads sent to them: leads nobody answered, customers who got no reply, and missed calls nobody returned.", icon: ic(UserX), node: <IgnoredTab multi={multi} /> }] : []),
           ...(unanswered ? [{ label: "Unanswered", tip: UNANSWERED_TIP, icon: ic(MessageSquareWarning), node: <InboxView go={go} embedded={{ onRace: () => goTab("race") }} /> }] : []),
@@ -201,7 +202,6 @@ export function SpeedView({ go, unanswered = false, start }: { go: GoFn; unanswe
             </button>
             {more && (
               <div className="mt-3">
-                <SourceCard showAccount={multi} />
                 {d.leftOut.length > 0 && <p className="mt-4 text-xs text-muted-foreground" data-testid="left-out">{d.leftOut.reduce((s, x) => s + x.n, 0).toLocaleString("en-US")} new contacts in this range were not counted as leads: {d.leftOut.map((x) => `${x.n.toLocaleString("en-US")} ${x.label}`).join(", ")}.</p>}
               </div>
             )}

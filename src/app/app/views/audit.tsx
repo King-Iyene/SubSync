@@ -1,9 +1,8 @@
 "use client";
 
-import { MoreHorizontal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useApiClient, useData } from "../session";
-import { EmptyState, ErrorState, InlineAlert, Page, PopMenu, RecordsPanel, Section, SkeletonCards, type MenuItem } from "../ds";
+import { EmptyState, ErrorState, InlineAlert, Page, ActionRow, RecordsPanel, Section, SkeletonCards, type MenuItem } from "../ds";
 import { Btn, Card } from "../ui";
 import type { Finding, FindingKey, Grade, Verdict } from "@/lib/analytics/audit-v2";
 import type { ClientPage, ProgressLine, Reading } from "@/lib/analytics/audit-clients";
@@ -114,7 +113,6 @@ export function AuditView() {
 
   const menu: MenuItem[] = [
     { key: "again", label: "Run the audit again", onSelect: () => setRuns((n) => n + 1) },
-    ...(data.canShare ? [{ key: "share", label: sharing ? "Creating link..." : data.au?.onepager ? "Make a one-pager link for a client" : "Share a link with a client", onSelect: () => { void share(); }, disabled: sharing }] : []),
     { key: "copy", label: copied === "summary" ? "Copied" : "Copy a summary", onSelect: () => { void copy(data.summary, "summary"); } },
     { key: "print", label: "Print", onSelect: () => window.print() },
     ...(data.demo ? [{ key: "sample", label: "See a sample to send a client", onSelect: () => { window.open(`/audit/${SAMPLE_AUDIT_ID}`, "_blank", "noopener"); } }] : []),
@@ -126,8 +124,12 @@ export function AuditView() {
     <Page
       title="Account audit"
       subtitle={data.focus ? `Only ${data.focus.name}.` : data.scope === "all" ? "What is leaking across your client accounts, and what to fix first." : "What is leaking in your account, and what to fix first."}
-      actions={<PopMenu label="More: share, print or run again" items={menu} testId="audit-more" triggerClassName="ds-press inline-flex h-11 items-center gap-1.5 rounded-lg border bg-card px-3 text-sm font-medium hover:border-primary/40 sm:h-9"><MoreHorizontal aria-hidden className="size-4" /><span>More</span></PopMenu>}
+      actions={<div className="flex flex-wrap items-center gap-2">
+        {data.canShare && <Btn variant="primary" onClick={() => { void share(); }} disabled={sharing} testId="audit-send-client" title="Share a link with a client">{sharing ? "Creating link..." : "Send this audit to a client"}</Btn>}
+        <ActionRow items={menu} testId="audit-more" />
+      </div>}
     >
+      {data.au?.monthly && (!data.demo || fxOn) && <MonthlyCard sample={fxOn} />}
       <div className="audit-print">
         <style dangerouslySetInnerHTML={{ __html: printCss(data.brand.color) }} />
         {/* The printed page opens with the sender's own name and colour. Nothing else carries a product name. */}
@@ -240,7 +242,6 @@ export function AuditView() {
           </ul>
         </Card>
       )}
-      {data.au?.monthly && (!data.demo || fxOn) && <MonthlyCard sample={fxOn} />}
       {spec && <RecordsPanel key={spec.key} spec={spec} onClose={() => setSpec(null)} now={data.now} canExport={data.canShare || data.demo} />}
     </Page>
   );

@@ -177,7 +177,7 @@ function SlackSection({ data, reload }: { data: Data; reload: () => Promise<void
       {data.mode === "agency" && <p className="mt-1 text-xs text-muted-foreground">A channel limited to one client account only ever receives that account&apos;s messages, never another client&apos;s.</p>}
       {!data.flags.slackAvailable && <p className="mt-1 text-xs text-muted-foreground" data-testid="slack-not-set-up">Add to Slack needs the Slack app to be set up for SubSync first. You can still add a channel with its address under Advanced.</p>}
       {note && <div className="mt-3"><InlineAlert tone={note.ok ? "success" : "danger"}>{note.text}</InlineAlert></div>}
-      <details className="mt-4 text-sm" data-testid="slack-advanced">
+      <details open className="mt-4 text-sm" data-testid="slack-advanced">
         <summary className="cursor-pointer text-muted-foreground">Advanced: add a channel by pasting its address</summary>
         <div className="mt-2 grid max-w-xl gap-2">
           <label htmlFor="slack-url" className="text-xs font-medium text-muted-foreground">Channel address (starts with https://hooks.slack.com/services/)</label>

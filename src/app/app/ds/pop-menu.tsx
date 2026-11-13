@@ -68,3 +68,15 @@ export function PopMenu({ label, items, testId, triggerClassName, children }: { 
     </>
   );
 }
+
+/** The same items as a PopMenu, but every one is a visible button in the page (nothing hides behind a "More"). Used for a page's actions. */
+export function ActionRow({ items, testId, className }: { items: MenuItem[]; testId?: string; className?: string }) {
+  return (
+    <div className={className ?? "flex flex-wrap items-center gap-2 print:hidden"} role="group" aria-label="Actions" data-testid={testId}>
+      {items.map((i) => (
+        <button key={i.key} type="button" disabled={i.disabled} title={i.hint} data-testid={`${testId ?? "action"}-${i.key}`} onClick={i.onSelect}
+          className={`ds-press inline-flex min-h-9 items-center rounded-md border bg-card px-2.5 text-sm font-medium hover:border-primary/40 hover:bg-accent disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-1 ${i.danger ? "text-destructive" : ""}`}>{i.label}</button>
+      ))}
+    </div>
+  );
+}

@@ -156,7 +156,7 @@ function Editor({ data, cfg, scope, name, own, canEdit, canSave, onSaved }: { da
             <span className="text-muted-foreground"> {effect.with.groups === effect.now.groups ? "the same as now" : `instead of ${fmtInt(effect.now.groups)} now`}.</span></p>
         )}
         {preset === "custom" && <p className="mt-2 text-sm text-muted-foreground" data-testid="rules-custom">Your own mix: {describeRules(rules)}</p>}
-        <details className="mt-3" data-testid="rules-custom-box">
+        <details open className="mt-3" data-testid="rules-custom-box">
           <summary className="min-h-11 cursor-pointer text-sm font-medium">Choose the fields yourself</summary>
           <div className="mt-2 grid gap-3 sm:grid-cols-3">
             <SelectField label="Email" value={rules.email} words={FIELD_WORDS.email} disabled={!canEdit} onChange={(v) => set("email", v as MatchRules["email"])} />

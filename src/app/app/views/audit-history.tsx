@@ -138,7 +138,7 @@ export function MonthlyCard({ sample }: { sample: boolean }) {
           Send the monthly message
         </label>
         {p.accounts.length > 1 && p.monthly && (
-          <details className="mt-2 text-sm">
+          <details open className="mt-2 text-sm">
             <summary className="min-h-8 cursor-pointer text-primary underline-offset-4 hover:underline max-sm:min-h-11">Leave out a client account ({num(p.accounts.filter((a) => a.muted).length)} left out)</summary>
             <input type="search" aria-label="Search client accounts" placeholder="Search by name" value={q} onChange={(e) => setQ(e.target.value)} className="mt-2 h-11 w-full rounded-lg border bg-background px-3 text-sm sm:h-9 sm:w-64" />
             <ul className="mt-2 divide-y border-y">

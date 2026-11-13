@@ -98,7 +98,7 @@ function CalPop({ r, onDrill }: { r: ApPersonRow; onDrill: SectionProps["onDrill
   if (!list.length) return null;
   const calOf = (cid: string | null, field: "booker" | "owner", n: number, nm: string | null) => onDrill({ title: `${r.name}, ${nm ?? "calendar"}`, count: n, extra: { [field]: r.id, ...(cid ? { calendar: cid } : {}), outcome: "booked", expect: n }, labels: { [field]: r.name } });
   return (
-    <details className="ap-bycal ap-calpop" onClick={(e) => e.stopPropagation()} data-testid="ap-share-cals">
+    <details data-allow-collapsed="calendar picker popover: its labelled button is always visible" className="ap-bycal ap-calpop" onClick={(e) => e.stopPropagation()} data-testid="ap-share-cals">
       <summary>{list.length} calendar{list.length === 1 ? "" : "s"}</summary>
       <div>{list.map((c) => <div key={c.calendarId ?? "none"} className="ap-bycal-row">{calChip(c.name, c.groupName)}
         {c.booked > 0 && <><Hit n={c.booked} label={`Open ${c.booked} booked by ${r.name} on ${c.name ?? "this calendar"}`} onClick={() => calOf(c.calendarId, "booker", c.booked, c.name)} /><span className="ap-sub"> booked</span></>}

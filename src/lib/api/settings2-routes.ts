@@ -1,5 +1,13 @@
 import { sql } from "../db";
-import { groupStatus } from "../scope-groups";
+import { groupStatus, parseGranted } from "../scope-groups";
+import { saveDomainCheck } from "../analytics/queries";
+import { validEmail } from "../analytics/weekly-email";
+import { demoDomainReport } from "../demo/seed";
+import { checkDomain, extractDomain, type DomainReport } from "../dns/email-auth";
+import { emailConfigured } from "../email";
+import { sendConnectionsTest } from "../notifications/transports";
+import { isLive } from "../live-flags";
+import { testResultText } from "../connections/tools-status";
 import { GUIDE_IDS } from "../guides";
 import { HIDEABLE_IDS, STATE_KINDS, type StateKind } from "../settings2";
 import { NEWS_IDS } from "../whats-new";
@@ -12,7 +20,9 @@ import { viewerOf } from "./people3-routes";
 //   GET  state         this person's dismissed badges, read guides and hidden pages
 //   POST state         { kind, key, on }: set or clear one of those marks; the key must be one of the fixed lists, so no id from the browser is ever used
 //   GET  connections   one status line per tool (Slack, Fathom, email, calendars)
-//   GET  progress      the facts the Getting started checklist ticks from
+//   POST email-verify  checks the SPF, DKIM and DMARC records of the saved address's domain (public records, no sign-in) and returns them
+//   POST email-test    "Send me a test" to the SAVED address only (never an address from the request); a dry run while SEND_EMAIL_LIVE is off
+//   GET  progress     the facts the Getting started checklist ticks from
 // Who is asking comes from the verified session (`ctx`), never from the request. A request that carries a location, user or other id is not read for it.
 
 type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
@@ -29,6 +39,8 @@ export async function handleSettings2(ctx: Ctx): Promise<Response> {
   if (m === "GET" && part === "state") return state(ctx);
   if (m === "POST" && part === "state") return setState(ctx);
   if (m === "GET" && part === "connections") return connections(ctx);
+  if (m === "POST" && part === "email-verify") return emailVerify(ctx);
+  if (m === "POST" && part === "email-test") return emailTest(ctx);
   if (m === "GET" && part === "progress") return progress(ctx);
   return json({ error: "Unknown action" }, 404);
 }
@@ -73,12 +85,75 @@ async function connections(ctx: Ctx) {
     ? await sql()`select count(*)::int n from cached_calendars where installation_id = ${inst} and location_id = ${one}`
     : await sql()`select count(*)::int n from cached_calendars where installation_id = ${inst}`;
   const [set] = await sql()`select digest_email from settings where installation_id = ${inst}`;
+  const address = (set?.digest_email as string | null) || null;
+  const domain = extractDomain(address);
+  const [check] = domain ? await sql()`select status, checked_at, result from domain_checks where installation_id = ${inst} and domain = ${domain} limit 1` : [];
+  // Calendars: names only for an administrator (a staff member's list could name accounts they cannot open). The permission is read from what this install approved.
+  const [instRow] = await sql()`select scope from installations where id = ${inst}`;
+  const granted = ctx.demo || typeof instRow?.scope !== "string" || instRow.scope.trim() === "" ? null : parseGranted(instRow.scope as string);
+  const mappedSql = sql()`exists (select 1 from calendar_members m where m.installation_id = c.installation_id and m.location_id = c.location_id and m.calendar_id = c.calendar_id)`;
+  const calList = level === "self" ? [] : await (one
+    ? sql()`select c.name, c.is_active, ${mappedSql} mapped from cached_calendars c where c.installation_id = ${inst} and c.location_id = ${one} order by lower(coalesce(c.name, '')) limit 8`
+    : sql()`select c.name, c.is_active, ${mappedSql} mapped from cached_calendars c where c.installation_id = ${inst} order by lower(coalesce(c.name, '')) limit 8`);
+  const [mappedN] = one
+    ? await sql()`select count(*)::int n from cached_calendars c where c.installation_id = ${inst} and c.location_id = ${one} and ${mappedSql}`
+    : await sql()`select count(*)::int n from cached_calendars c where c.installation_id = ${inst} and ${mappedSql}`;
+  // Slack chat: from the recorded links and the events the bot has handled (kept 2 days). A client account sees only a link made for that account.
+  const chatOn = ctx.entitlements.features.slack_chat === true && !ctx.entitlements.locked.includes("slack_chat");
+  const links = chatOn ? await (one
+    ? sql()`select team_id from slack_chat_links where installation_id = ${inst} and status = 'connected' and location_id = ${one}`
+    : sql()`select team_id from slack_chat_links where installation_id = ${inst} and status = 'connected'`).catch(() => []) : [];
+  const teams = [...new Set(links.map((l) => l.team_id as string))];
+  const [ev] = teams.length ? await sql()`select count(*)::int n, max(created_at) last from slack_chat_events where team_id = any(${teams})`.catch(() => [null]) : [null];
   return json({
     slack: { connected: (slack?.n ?? 0) > 0 || webhook?.set === true, label: slack?.label ?? null, canChange: level === "all" },
+    slackChat: { on: chatOn, links: links.length, recentEvents: Number(ev?.n ?? 0), lastEventAt: ev?.last ?? null },
     fathom: { status: (mine[0]?.status as string | undefined) ?? "not_connected", lastEventAt: mine[0]?.last_event_at ?? null, saved: mine[0]?.saved_count ?? 0, waiting: mine[0]?.skipped_count ?? 0, team: team ? { people: team.people, working: team.working } : null },
-    email: { address: Boolean(set?.digest_email) },
-    calendars: { count: cal?.n ?? 0 },
+    email: {
+      // The address itself goes only to a person who can change it; everyone else learns only whether one is saved.
+      address: level === "self" ? null : address, hasAddress: Boolean(address), canManage: level !== "self", sendingLive: isLive("SEND_EMAIL_LIVE"), mailReady: emailConfigured(),
+      check: check ? { status: check.status, checkedAt: check.checked_at, domain, findings: (check.result as DomainReport | null)?.findings ?? [] } : null,
+    },
+    calendars: { count: cal?.n ?? 0, mapped: mappedN?.n ?? 0, permissionMissing: granted !== null && !granted.includes("calendars.readonly"), items: calList.map((r) => ({ name: (r.name as string | null) ?? "Unnamed calendar", active: r.is_active !== false, mapped: r.mapped === true })) },
   });
+}
+
+// Email: the address comes from the saved setting only. A request can never name the address, so this cannot be used to send to someone else.
+async function emailAddress(ctx: Ctx): Promise<string | null> {
+  const [set] = await sql()`select digest_email from settings where installation_id = ${ctx.installationId}`;
+  const a = (set?.digest_email as string | null) ?? null;
+  return a && validEmail(a) ? a : null;
+}
+
+async function emailVerify(ctx: Ctx) {
+  if (viewerOf(ctx).level === "self") return json({ error: "Only an administrator can do this." }, 403);
+  const address = await emailAddress(ctx);
+  const domain = extractDomain(address);
+  if (!address || !domain) return json({ error: "Save an email address first." }, 400);
+  const report = ctx.demo ? await demoDomainReport(domain) : await checkDomain(domain);
+  await saveDomainCheck(ctx.installationId, null, domain, report.status, report);
+  return json({ check: { status: report.status, checkedAt: new Date().toISOString(), domain, findings: report.findings } });
+}
+
+const testHits = new Map<string, number[]>();
+async function emailTest(ctx: Ctx) {
+  if (viewerOf(ctx).level === "self") return json({ error: "Only an administrator can do this." }, 403);
+  if (ctx.demo) return json({ error: "Sending a test is not available in the demo. It needs a real install." }, 400);
+  const address = await emailAddress(ctx);
+  if (!address) return json({ error: "Save an email address first." }, 400);
+  const now = Date.now(), key = ctx.installationId, list = (testHits.get(key) ?? []).filter((t) => now - t < 60_000);
+  if (list.length >= 3) return json({ error: "Too many tests. Wait a minute." }, 429);
+  list.push(now); testHits.set(key, list);
+  const mail = {
+    subject: "[TEST] SubSync email check",
+    text: "This is a test from SubSync. If you can read this, alert and summary emails can reach this address. You do not need to do anything.",
+    html: "<p>This is a test from SubSync. If you can read this, alert and summary emails can reach this address. You do not need to do anything.</p>",
+  };
+  // Through the one switch: with SEND_EMAIL_LIVE off nothing leaves the server and only a "WOULD SEND" line is recorded.
+  const r = await sendConnectionsTest(ctx.installationId, address, mail);
+  if (!r.ok) return json({ ok: false, text: `The test email could not be sent. If it happens again, send us this code: ${r.code}.` }, 502);
+  const dryRun = r.dryRun === true;
+  return json({ ok: true, dryRun, text: testResultText({ dryRun, to: address }), preview: dryRun ? { to: address, subject: mail.subject, body: mail.text } : null });
 }
 
 async function progress(ctx: Ctx) {

@@ -252,7 +252,7 @@ export function AlertsTab({ who, waiting, dollars, typical, canChange, targetMin
       <Card id="alerts-config">
         <H title="When to be told" tip="Reply target, quiet hours and who gets email or Slack are kept in Settings and Alerts. A late lead raises one alert, not one per sync." />
         <p className="text-sm">Reply target: <span className="t-num font-semibold">{targetMinutes} minutes</span>. {canChange ? <button type="button" className={BTN} onClick={() => go("settings")}>Change the target</button> : "Ask the person who manages your account to change it."}</p>
-        <p className="text-sm"><button type="button" className={BTN} onClick={() => go("alerts")}>Choose who is told and when</button></p>
+        <p className="text-sm"><button type="button" className={BTN} onClick={() => go("notifications")}>Choose who is told and when</button> <button type="button" className="ds-press ml-2 text-sm font-medium text-primary underline underline-offset-4" onClick={() => go("alerts")} data-testid="open-alerts-list">See the alerts list</button></p>
       </Card>
       <Card id="digest">
         <H title="The digest, as a preview" tip="What the daily or weekly email would say right now. This is a preview: nothing is sent from this page.">

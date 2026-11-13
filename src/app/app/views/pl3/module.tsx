@@ -133,7 +133,7 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
 
   return (
     <div className="s6 ap pl ds-enter" ref={top} data-testid="pl-module" key={version}>
-      <Page title="Pipeline" subtitle="Where your deal money sits, and what is stuck." actions={null}>
+      <Page title="Pipeline" subtitle="Where your deal money sits, and what is stuck." actions={<button type="button" className="s6-btn" onClick={() => { setTab("stale"); setDrill(null); }} data-testid="pl-export">Stale deals and CSV export</button>}>
         <div className="ap-head" role="search" aria-label="Filter deals" hidden={tab === "classic" || tab === "stale"}>
           <label className="ap-search"><Search aria-hidden className="size-4" /><span className="sr-only">Search by deal or contact</span><input ref={search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a deal (press /)" data-testid="pl-search" /></label>
           <span className="ap-fine" data-testid="pl-days">Dates: {bar.label}, {zoneWord()} time, from the bar above. Open money, stuck and open counts are as of now.</span>

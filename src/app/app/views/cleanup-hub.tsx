@@ -32,7 +32,7 @@ export function CleanupModule({ kind, start, duplicatesOn, cleanupOn, fixOn = fa
   const node: Record<CleanupTabId, React.ReactNode> = {
     duplicates: <DuplicatesView embedded />,
     fix: <FixTab />,
-    health: <><HealthTab />{legacyHealth && <details className="mt-6 rounded-xl border bg-card p-3"><summary className="cursor-pointer text-sm font-medium">More data health tools (alerts, imports, safe fixes)</summary><div className="mt-3">{legacyHealth}</div></details>}</>,
+    health: <><HealthTab />{legacyHealth && <details open className="mt-6 rounded-xl border bg-card p-3"><summary className="cursor-pointer text-sm font-medium">More data health tools (alerts, imports, safe fixes)</summary><div className="mt-3">{legacyHealth}</div></details>}</>,
     quality: <QualityTab canFix={kind !== "client"} />,
     history: <HistoryTab />,
     rules: <RulesTab canEdit={kind !== "client"} />,

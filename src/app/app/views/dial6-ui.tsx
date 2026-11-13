@@ -165,7 +165,7 @@ const NEXT_LABEL: Record<NextStep, string> = { next: "Go to the next lead", redi
 export function DispositionEditor({ value, onChange, accountName }: { value: Disposition[]; onChange: (d: Disposition[]) => void; accountName: string | null }) {
   const upd = (i: number, p: Partial<Disposition>) => onChange(value.map((d, k) => (k === i ? { ...d, ...p } : d)));
   return (
-    <details className="mt-4 border-t border-[color-mix(in_srgb,var(--s6-line)_90%,transparent)] pt-3" data-testid="dispo-editor">
+    <details open className="mt-4 border-t border-[color-mix(in_srgb,var(--s6-line)_90%,transparent)] pt-3" data-testid="dispo-editor">
       <summary className="min-h-9 cursor-pointer text-sm font-medium">Customize the outcomes{accountName ? ` for ${accountName}` : ""}</summary>
       <ul className="mt-3 grid gap-3">
         {value.map((d, i) => (

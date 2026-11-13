@@ -121,7 +121,7 @@ export function AppointmentInsights() {
         </p>
         {w.problem && <p className="mt-1 border-l-2 border-warning pl-2 text-xs" role="status">{w.problem}</p>}
         <div className="mt-3"><TargetEditor key={d.target.showRate} value={d.target.showRate} isDefault={d.target.isDefault} canEdit={d.canEditTargets} onSaved={reload} /></div>
-        <details className="mt-3 text-xs">
+        <details open className="mt-3 text-xs">
           <summary className="cursor-pointer select-none font-medium text-muted-foreground hover:text-foreground">Choose what to show ({WIDGETS.length - hidden.length} of {WIDGETS.length})</summary>
           <ul className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
             {WIDGETS.map((x) => <li key={x.id}><label className="flex min-h-9 items-center gap-2"><input type="checkbox" className="size-4" checked={!hidden.includes(x.id)} onChange={() => toggle(x.id)} />{x.label}</label></li>)}
@@ -213,7 +213,7 @@ export function AppointmentInsights() {
         </Card>
       )}
 
-      <details className="group space-y-6 rounded-xl border p-4" data-testid="insights-more">
+      <details className="group space-y-6 rounded-xl border p-4" data-testid="insights-more" open>
         <summary className="cursor-pointer select-none text-sm font-medium">More: recovery, sources, speed, fairness, follow-up and what is next</summary>
       {(ready("recovery") || ready("repeat")) && (
         <div className="mt-4 grid gap-4 xl:grid-cols-2">

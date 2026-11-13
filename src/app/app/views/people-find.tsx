@@ -239,7 +239,7 @@ export function FindTab({ plus = false, bulk = false }: { plus?: boolean; bulk?:
               )}
 
               {(saved.data?.lists ?? []).length > 0 && (
-                <details className="text-sm" data-testid="manage-lists">
+                <details open className="text-sm" data-testid="manage-lists">
                   <summary className="min-h-9 cursor-pointer text-muted-foreground">Manage your saved lists</summary>
                   <div className="mt-2"><ManageLists lists={saved.data!.lists} names={names} onOpen={(f) => { replaceFilter(f); setFiltersOpen(true); }} onChanged={() => void saved.reload()} /></div>
                 </details>

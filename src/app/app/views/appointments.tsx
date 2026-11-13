@@ -8,7 +8,7 @@ import { windowQuery } from "@/lib/design/appt-ui";
 import { shareChange } from "@/lib/design/range";
 import type { GoFn } from "../nav";
 import { useData } from "../session";
-import { CardRange, Distribution, EmptyState, ErrorState, HowTo, InlineAlert, Page, PopMenu, SkeletonCards, useCardRange, type MenuItem } from "../ds";
+import { CardRange, Distribution, EmptyState, ErrorState, HowTo, InlineAlert, Page, ActionRow, SkeletonCards, useCardRange, type MenuItem } from "../ds";
 import { CountUp } from "../ds/count-up";
 import { fmtInt } from "../ui";
 import { Explainer, pct, TargetEditor } from "./appointment-parts";
@@ -48,7 +48,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
   const wq = windowQuery(range.resolved);
   const { data, error, loading, reload } = useData<Data>(range.resolved ? `appointments/work?${wq}` : null);
   const [drill, setDrill] = useState<{ title: string; kind: "all" | "window"; fixed: Record<string, string>; id: string } | null>(null);
-  const [chart, setChart] = useState(false);
+  const [chart, setChart] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 8000); return () => clearTimeout(t); }, [toast]);
@@ -93,7 +93,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
   };
 
   return (
-    <Page title="Appointments" subtitle="Who missed, who was never marked, and who may not show." actions={<PopMenu label="More" items={menu} testId="appt-more" triggerClassName={`${BTN} px-3`}><span>More</span></PopMenu>}>
+    <Page title="Appointments" subtitle="Who missed, who was never marked, and who may not show." actions={<ActionRow items={menu} testId="appt-more" />}>
       {waiting > 0 && (
         <InlineAlert tone="warning" className="mb-5" title={waiting === d.access.total ? "Needs permission: reconnect. SubSync cannot read appointments yet." : `Needs permission: reconnect. ${plural(waiting, "account", "accounts")} cannot show appointments yet.`}>
           <p>The app needs one more read-only permission. Open the app in the marketplace and choose Reinstall (or ask the account owner), then approve. Nothing else changes.{d.canSeeAccounts && waiting <= 6 ? ` Waiting: ${d.access.needsPermission.map((a) => a.name ?? "Unnamed").join(", ")}.` : ""}</p>
@@ -141,7 +141,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
               </div>
               <div className="md:col-span-2 lg:col-span-1"><CardRange state={range} label="Show rate" /></div>
             </div>
-            <details className="mt-3 text-sm" onToggle={(e) => setChart((e.currentTarget as HTMLDetailsElement).open)}>
+            <details open className="mt-3 text-sm" onToggle={(e) => setChart((e.currentTarget as HTMLDetailsElement).open)}>
               <summary className="min-h-11 cursor-pointer select-none py-2 text-muted-foreground hover:text-foreground sm:min-h-9" data-testid="appt-chart-toggle">What happened to them, and your target</summary>
               {chart && (
                 <div className="mt-2 max-w-2xl" data-testid="appt-outcome-chart">

@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { diffFields, guardrails, REASON_LABELS, SORT_LABELS } from "@/lib/analytics/dedupe-review";
 import type { FieldPick } from "@/lib/analytics/cleanup-rules";
-import { EmptyState, ErrorState, HowTo, InlineAlert, LeadDrawer, Page, PopMenu, RowButton, Section, SkeletonCards } from "../ds";
+import { EmptyState, ErrorState, HowTo, InlineAlert, LeadDrawer, Page, ActionRow, RowButton, Section, SkeletonCards } from "../ds";
 import { ArrivalsCard, MatchWhy, PersonCard, type Pair, type Workflow } from "./duplicates-extra";
 import { MatchMeter, ProgressBar } from "./cleanup-parts";
 import { useApiClient, useData } from "../session";
@@ -189,7 +189,7 @@ export function DuplicatesView({ embedded = false }: { embedded?: boolean } = {}
   ].filter(Boolean).join(" · ");
 
   return shell(
-    <PopMenu label="More" items={menu} testId="dup-more" triggerClassName={`${BTN} px-3`}><span>More</span></PopMenu>,
+    <ActionRow items={menu} testId="dup-more" />,
     <>
       <HowTo id="duplicates-review" title="How this works">
         Each screen is one group of contacts that look like the same person. The best record to keep is already picked. Press Merge, finish in your CRM with one click, then say you did. Arrow keys move between groups.

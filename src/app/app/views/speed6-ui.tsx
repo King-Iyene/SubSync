@@ -231,7 +231,7 @@ const GUIDE: Array<[string, string]> = [
   ["Who is slow?", "Pace and People: the slowest people and client accounts."],
   ["Who should I reply to first?", "Pace: waiting leads, open deals first."],
   ["Where do my leads go?", "Pace: the animated lead journey, with drop-offs."],
-  ["Which source loses leads?", "Pace, under More: cost per source."],
+  ["Which source loses leads?", "Pace: cost per source."],
   ["Who was not called back?", "Coverage: missed calls with no callback."],
   ["Who do I call next?", "Call mode: a ranked list, one lead at a time."],
   ["When is someone told?", "Rules: reply target, escalation and the digest."],

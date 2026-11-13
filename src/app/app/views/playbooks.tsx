@@ -102,7 +102,7 @@ export function PlaybooksView({ go, embedded = false }: { go: GoFn; embedded?: b
         <div className="space-y-4">{present.map(card)}</div>
       )}
       {others.length > 0 && (
-        <details className="mt-6">
+        <details open className="mt-6">
           <summary className="cursor-pointer text-sm text-muted-foreground">Other playbooks ({others.length})</summary>
           <div className="mt-3 space-y-4">{others.map(card)}</div>
         </details>
