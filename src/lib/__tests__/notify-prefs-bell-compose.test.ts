@@ -130,7 +130,8 @@ const alertItem = (title: string, severity: Item["severity"] = "warning"): Item 
 test("an email for one alert uses its words as the subject; several are one email with a count; a test is marked; the stop link is always there", () => {
   const one = composeEmail([alertItem("Sample Dental: 9 leads waiting")], { company: "Acme", appUrl: "https://app.test/", stopUrl: "https://app.test/stop?t=1" });
   assert.equal(one.subject, "Sample Dental: 9 leads waiting");
-  assert.match(one.text, /Open it: https:\/\/app\.test\/app#speed/);
+  assert.match(one.text, /Open your CRM, then SubSync > Speed to lead: https:\/\/app\.gohighlevel\.com\//); // no single account on this item: the CRM start page plus words, never the app address
+  assert.doesNotMatch(one.text + one.html, /app\.test\/app#/);
   assert.match(one.text, /Stop these emails: https:\/\/app\.test\/stop\?t=1/);
   assert.match(one.html, /Stop these emails/);
   const many = composeEmail([alertItem("A"), alertItem("B", "critical"), alertItem("C")], { company: "Acme", appUrl: "https://app.test", stopUrl: null });

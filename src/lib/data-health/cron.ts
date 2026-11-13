@@ -3,6 +3,7 @@ import { dispatchAlerts } from "../notifications/service";
 import { resolveEntitlements } from "../flags";
 import { outward } from "../live-flags";
 import { unsubscribeUrl } from "../unsubscribe";
+import { getSettings } from "../analytics/queries";
 import type { AlertRow } from "../analytics/queries";
 import { dueToday } from "../workflows/proof-email";
 import { accountNames, isMissing } from "../workflows/store";
@@ -81,11 +82,11 @@ async function sendDigest(installationId: string, accounts: Array<{ locationId: 
   const snaps = await loadSnapshots(installationId, null, dayOf(now.getTime() - 9 * 86_400_000));
   const view = accounts.map((a) => {
     const h = snaps.filter((x) => x.locationId === a.locationId), l = h[h.length - 1], p = h[0];
-    return { name: a.name, score: l?.score ?? null, weekAgo: p && p !== l ? p.score : null, top: (l?.components ?? []).filter((c) => c.count > 0).sort((x, y) => y.penalty - x.penalty).slice(0, 3).map((c) => ({ label: ruleOf(c.id)?.label ?? c.id, count: c.count })) };
+    return { name: a.name, locationId: a.locationId, score: l?.score ?? null, weekAgo: p && p !== l ? p.score : null, top: (l?.components ?? []).filter((c) => c.count > 0).sort((x, y) => y.penalty - x.penalty).slice(0, 3).map((c) => ({ label: ruleOf(c.id)?.label ?? c.id, count: c.count })) };
   });
   if (!view.some((v) => v.score !== null)) return false;
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
-  const mail = digestMail({ brand: (s.brand_name as string | null) ?? "Your data health", accounts: view, appUrl: `${appUrl}/app#data-health`, stopUrl: unsubscribeUrl(appUrl, installationId, s.digest_email as string) });
+  const mail = digestMail({ brand: (s.brand_name as string | null) ?? "Your data health", accounts: view, crmDomain: (await getSettings(installationId)).appDomain, stopUrl: unsubscribeUrl(appUrl, installationId, s.digest_email as string) });
   void mail;
   // A rehearsal even with the live switch on: the dispatcher is the only sender and it has no data health digest type yet.
   const done = await outward({ flag: "SEND_EMAIL_LIVE", verb: "SEND", what: "data_health.digest.email", installationId }, async () => false);

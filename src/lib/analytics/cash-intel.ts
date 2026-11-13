@@ -1,7 +1,10 @@
 // Cash features, pure rules (no database, unit tested): the morning "save this account" digest, the missed-lead recovery list and the stale / lost deal alerts.
 // Definitions: docs/METRICS.md "Cash features". Every dollar figure here is an ESTIMATE and carries its formula; under the minimums there is no figure, only "not enough data".
 
-// Time zones: "today" is the business's own day. Kept here (not imported) so this file has no imports and runs in the plain unit test runner.
+import type { DomainSource } from "../links.ts";
+import { resolveTarget, wordsLink, linkText, linkHtml } from "../notifications/crm-links.ts";
+
+// Time zones: "today" is the business's own day. Kept here (not imported) so this file runs in the plain unit test runner.
 export function validZone(tz: string | null | undefined): string {
   if (!tz) return "UTC";
   try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return tz; } catch { return "UTC"; }
@@ -143,22 +146,25 @@ const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export type DigestDeals = { staleCount: number; staleValue: number | null; soonCount: number; lostNoReason: number; lostCount: number } | null;
 
 /** The one morning email: accounts most at risk (evidence, dollar line, one button each), the week's deals list on Mondays. No vendor words, nothing about leads' messages. */
-export function digestEmail(i: { scope: string; accounts: SaveAccount[]; more: number; appUrl: string; stopUrl: string; deals: DigestDeals; monday: boolean }): { subject: string; text: string; html: string } {
-  const link = (a: SaveAccount) => (a.list === "deals" ? `${i.appUrl}/app#pipeline` : a.list === "recover" ? `${i.appUrl}/app#today?tab=recover&account=${encodeURIComponent(a.locationId)}` : `${i.appUrl}/app#${a.list === "speed" ? "speed" : "clients"}`);
+export function digestEmail(i: { scope: string; accounts: SaveAccount[]; more: number; /** The company's CRM domain (settings.appDomain / white-label); the default host is used only when none is known. */ crmDomain?: DomainSource; stopUrl: string; deals: DigestDeals; monday: boolean }): { subject: string; text: string; html: string } {
+  // Every account opens its own CRM page: deals -> that account's deals, people to win back and slow replies -> its conversations, anything else -> its CRM dashboard with words.
+  const target = (a: SaveAccount) => resolveTarget(i.crmDomain, { view: a.list === "deals" ? "deals" : a.list === "clients" ? "clients" : "speed", locationId: a.locationId }, "Open the list");
+  const homeToday = wordsLink(i.crmDomain, "SubSync > Today");
+  const homeDeals = wordsLink(i.crmDomain, "SubSync > Pipeline and deals");
   const names = i.accounts.slice(0, 2).map((a) => a.name).join(", ");
   const subject = i.accounts.length ? `${i.accounts.length}${i.more ? "+" : ""} client account${i.accounts.length === 1 && !i.more ? "" : "s"} to save today: ${names}${i.accounts.length > 2 ? "..." : ""}` : "Save this account: nothing at risk today";
   const text: string[] = [i.scope, ""];
   const html: string[] = [`<p style="margin:0 0 12px;color:#555555">${esc(i.scope)}</p>`];
   if (!i.accounts.length) { text.push("No client account looks at risk this morning."); html.push("<p>No client account looks at risk this morning.</p>"); }
   i.accounts.forEach((a, n) => {
-    text.push(`${n + 1}. ${a.name}`, ...a.evidence.slice(0, 3).map((e) => `   - ${e.text}`), `   ${a.dollarText}`, `   Open the list: ${link(a)}`, "");
-    html.push(`<div style="margin:0 0 16px;padding:12px;border:1px solid #dddddd;border-radius:8px"><b>${n + 1}. ${esc(a.name)}</b><ul style="margin:6px 0;padding-left:18px">${a.evidence.slice(0, 3).map((e) => `<li>${esc(e.text)}</li>`).join("")}</ul><p style="margin:6px 0;color:#555555">${esc(a.dollarText)}</p><a href="${esc(link(a))}" style="display:inline-block;padding:8px 14px;background:#5b789a;color:#ffffff;border-radius:6px;text-decoration:none">Open the list</a></div>`);
+    text.push(`${n + 1}. ${a.name}`, ...a.evidence.slice(0, 3).map((e) => `   - ${e.text}`), `   ${a.dollarText}`, `   ${linkText(target(a))}`, "");
+    html.push(`<div style="margin:0 0 16px;padding:12px;border:1px solid #dddddd;border-radius:8px"><b>${n + 1}. ${esc(a.name)}</b><ul style="margin:6px 0;padding-left:18px">${a.evidence.slice(0, 3).map((e) => `<li>${esc(e.text)}</li>`).join("")}</ul><p style="margin:6px 0;color:#555555">${esc(a.dollarText)}</p>${linkHtml(target(a), "display:inline-block;padding:8px 14px;background:#5b789a;color:#ffffff;border-radius:6px;text-decoration:none")}</div>`);
   });
-  if (i.more > 0) { text.push(`And ${i.more} more. Open your list: ${i.appUrl}/app#today`, ""); html.push(`<p>And ${i.more} more. <a href="${esc(i.appUrl)}/app#today">Open your list</a>.</p>`); }
+  if (i.more > 0) { text.push(`And ${i.more} more.`, linkText(homeToday), ""); html.push(`<p>And ${i.more} more. ${linkHtml(homeToday)}.</p>`); }
   if (i.monday && i.deals) {
     const d = i.deals;
     const line = `Deals slipping this week: ${d.staleCount} past their usual time in a stage${d.staleValue !== null ? ` (about ${money(d.staleValue)}, estimate)` : ""}, ${d.soonCount} about to go quiet, ${d.lostCount} lost in the last 2 weeks${d.lostNoReason ? ` (${d.lostNoReason} with no reason recorded)` : ""}.`;
-    text.push(line, `Open the deals: ${i.appUrl}/app#pipeline`, ""); html.push(`<p>${esc(line)} <a href="${esc(i.appUrl)}/app#pipeline">Open the deals</a>.</p>`);
+    text.push(line, linkText(homeDeals), ""); html.push(`<p>${esc(line)} ${linkHtml(homeDeals)}.</p>`);
   }
   text.push("You get one email a day. Dollar figures are estimates. Nothing here changes your CRM or messages your leads.", `Stop these emails: ${i.stopUrl}`);
   html.push(`<p style="color:#777777;font-size:12px">You get one email a day. Dollar figures are estimates. Nothing here changes your CRM or messages your leads. <a href="${esc(i.stopUrl)}">Stop these emails</a>.</p>`);

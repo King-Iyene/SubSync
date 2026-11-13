@@ -1,5 +1,5 @@
 import { sql } from "../db";
-import { deepLinks } from "../links";
+import { crmUrl, deepLinks } from "../links";
 import { realTransports } from "../notifications/transports";
 import { loadCore, type AuditBase } from "../api/audit-api";
 import { appointmentView } from "./appointment-queries";
@@ -58,11 +58,10 @@ export async function sendMonthlyAudit(installationId: string, now: number): Pro
   const ok = pairs.filter((p) => p.then.rulesVersion === p.now.rulesVersion && !p.then.partial && !p.now.partial && Date.parse(`${p.now.runDay}T00:00:00Z`) - Date.parse(`${p.then.runDay}T00:00:00Z`) >= 14 * DAY);
   if (ok.length === 0) return { sent: false, reason: "not enough history" };
   const sum = (c2: Pair["then"]["counts"]) => Object.values(c2).reduce<number>((s, v) => s + (v ?? 0), 0);
-  const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
   const msg = monthlyMessage({
     who: settings.brandName ?? "your company", fromDay: ok.map((p) => p.then.runDay).sort()[0], toDay: ok.map((p) => p.now.runDay).sort().slice(-1)[0],
-    accounts: ok.map((p) => ({ name: names.get(p.now.locationId) ?? "Client account", then: sum(p.then.counts), now: sum(p.now.counts) })),
-    link: `${base}/app#audit`, estimate: c.estimate,
+    accounts: ok.map((p) => ({ name: names.get(p.now.locationId) ?? "Client account", then: sum(p.then.counts), now: sum(p.now.counts), crmLink: /^[A-Za-z0-9_-]{1,64}$/.test(p.now.locationId) ? deepLinks(settings.appDomain).account(p.now.locationId) : undefined })),
+    link: crmUrl(settings.appDomain, "/"), estimate: c.estimate,
   });
   if (!msg) return { sent: false, reason: "nothing to say" };
   const key = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}`;

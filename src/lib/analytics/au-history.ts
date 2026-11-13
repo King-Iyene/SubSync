@@ -193,7 +193,8 @@ export function buildHistory(i: { today: string; now: RunRow[]; stored: Stored; 
 
 // ---------- the monthly email ----------
 
-export type MonthlyAccount = { name: string; then: number; now: number };
+/** `crmLink`: that account's own page in the CRM (built with deepLinks on the company's CRM domain), so each line opens its own account. */
+export type MonthlyAccount = { name: string; then: number; now: number; crmLink?: string };
 export type Monthly = { subject: string; text: string; better: number; worse: number } | null;
 
 /** The monthly re-audit message: what got better, what got worse, one button. Accounts need a run at least 14 days before today and counts that are not cut short. */
@@ -203,7 +204,7 @@ export function monthlyMessage(i: { who: string; fromDay: string; toDay: string;
   const better = moved.filter((a) => a.now < a.then).sort((a, b) => (a.now - a.then) - (b.now - b.then));
   const worse = moved.filter((a) => a.now > a.then).sort((a, b) => (b.now - b.then) - (a.now - a.then));
   const total = (k: "then" | "now") => i.accounts.reduce((s, a) => s + a[k], 0);
-  const line = (a: MonthlyAccount) => `- ${a.name}: ${a.then.toLocaleString("en-US")} to ${a.now.toLocaleString("en-US")}`;
+  const line = (a: MonthlyAccount) => `- ${a.name}: ${a.then.toLocaleString("en-US")} to ${a.now.toLocaleString("en-US")}${a.crmLink ? `\n  Open the account in your CRM: ${a.crmLink}` : ""}`;
   const head = total("now") === total("then")
     ? `Across ${plural(i.accounts.length, "client account", "client accounts")}, the number of things to fix is the same as on ${shortDay(i.fromDay)} (${total("now").toLocaleString("en-US")}).`
     : `Across ${plural(i.accounts.length, "client account", "client accounts")}, things to fix went from ${total("then").toLocaleString("en-US")} on ${shortDay(i.fromDay)} to ${total("now").toLocaleString("en-US")} on ${shortDay(i.toDay)}.`;
@@ -211,7 +212,7 @@ export function monthlyMessage(i: { who: string; fromDay: string; toDay: string;
   if (better.length) parts.push("", "Got better:", ...better.slice(0, 5).map(line));
   if (worse.length) parts.push("", "Got worse:", ...worse.slice(0, 5).map(line));
   if (i.estimate) parts.push("", `Estimate (not a fact): the monthly leak was about $${i.estimate.thenLow.toLocaleString("en-US")} to $${i.estimate.thenHigh.toLocaleString("en-US")}, now about $${i.estimate.nowLow.toLocaleString("en-US")} to $${i.estimate.nowHigh.toLocaleString("en-US")}.`);
-  parts.push("", `See the rows behind every number: ${i.link}`, "", "You can turn this message off, or mute one client account, on the Account audit page.");
+  parts.push("", `See the rows behind every number: open your CRM, then SubSync > Account audit. ${i.link}`, "", "You can turn this message off, or mute one client account, on the Account audit page.");
   const subject = better.length === 0 && worse.length === 0 ? "Monthly audit: no change" : `Monthly audit: ${plural(better.length, "client got better", "clients got better")}, ${worse.length} got worse`;
   return { subject, text: parts.join("\n"), better: better.length, worse: worse.length };
 }

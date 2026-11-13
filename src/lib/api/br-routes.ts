@@ -1,6 +1,7 @@
 import { briefSlack, briefText, SECTION_LABEL, SECTIONS } from "../analytics/br-core";
 import { briefFor, getPrefs, history, recordActed, recordSeen, savePrefs, sendTest, forgetBrief, type BriefFlags } from "../analytics/br-queries";
 import { localDay, validZone } from "../analytics/cash-intel";
+import { getSettings } from "../analytics/queries";
 import type { Feature } from "../entitlements";
 import { resolveEntitlements } from "../flags";
 import { isLive } from "../live-flags";
@@ -30,7 +31,6 @@ export async function handleBr(ctx: Ctx): Promise<Response> {
   if (level !== "all" || ctx.limitTo !== null) return isAct ? json({ error: "Ask the owner of your account to do this." }, 403) : wrap({ brief: null });
   if (!user) return json({ error: "Please sign in again" }, 401);
   const f: BriefFlags = { cf_save: on("cf_save"), cf_recover: on("cf_recover"), cf_deals: on("cf_deals"), wg_wallet: on("wg_wallet"), pm_module: on("pm_module"), td_today: on("td_today"), fn_today: on("fn_today"), sp_ignored: on("sp_ignored_leads") };
-  const base = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
 
   if (isAct) return act(ctx, ctx.segments[2], user, f, on("br_email"), on("br_record"));
 
@@ -42,7 +42,8 @@ export async function handleBr(ctx: Ctx): Promise<Response> {
     }
     case "text": {
       const b = await briefFor(ctx.installationId, prefs, f);
-      return wrap({ text: briefText(b, base), slack: briefSlack(b, base) });
+      const crm = (await getSettings(ctx.installationId)).appDomain; // the company's own CRM domain: the brief opens the CRM, never SubSync
+      return wrap({ text: briefText(b, crm), slack: briefSlack(b, crm) });
     }
     case "settings": {
       return wrap({ prefs: { ...prefs, lastSentKey: undefined }, labels: SECTION_LABEL, allSections: SECTIONS, emailAvailable: on("br_email"), sendingNote: isLive("SEND_EMAIL_LIVE") ? NOTE_ON : NOTE_OFF });

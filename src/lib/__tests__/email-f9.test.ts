@@ -38,7 +38,7 @@ test("the stop link is in the text and the html of both emails, and is escaped",
 
 test("the emails use no platform name and none of our internal words", () => {
   const stop = unsubscribeUrl("https://x.test", INST, "o@example.com");
-  const all = [weeklyEmail({ who: "Acme Marketing", appUrl: "https://x.test", stopUrl: stop, fine: 2, headlines: [{ label: "Open pipeline", money: true, today: 5, vsAvg: 1 }], attention: [{ name: "A", title: "t" }], facts: ["a fact"] }), alertEmail("Acme Marketing", [{ severity: "critical", title: "t" }], "https://x.test", stop)];
+  const all = [weeklyEmail({ who: "Acme Marketing", crmDomain: "crm.mybrand.com", stopUrl: stop, fine: 2, headlines: [{ label: "Open pipeline", money: true, today: 5, vsAvg: 1 }], attention: [{ name: "A", title: "t" }], facts: ["a fact"] }), alertEmail("Acme Marketing", [{ severity: "critical", title: "t" }], "crm.mybrand.com", stop)];
   for (const m of all) assert.ok(!/gohighlevel|highlevel|leadconnector|\bghl\b|agenc(y|ies)|sub-?account|\blocations?\b/i.test(m.subject + m.text + m.html));
 });
 

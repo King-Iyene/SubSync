@@ -1,6 +1,8 @@
 import { sql } from "../db";
 import { realTransports } from "../notifications/transports";
 import { unsubscribeUrl } from "../unsubscribe";
+import { linkText, wordsLink } from "../notifications/crm-links";
+import { getSettings } from "./queries";
 import { emailDue, emailText, validZone } from "./today3-intel";
 import { today } from "./today3-queries";
 
@@ -21,10 +23,11 @@ export async function runTodayEmail(inst: string, now = Date.now()): Promise<num
   if (!claimed.length) return 0;
   const board = await today({ inst, allowed: null, level: "all", selfId: null }, null, now);
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+  const crmDomain = (await getSettings(inst)).appDomain; // the company's own CRM domain: the email opens the CRM, never SubSync
   let sent = 0;
   for (const to of p.recipients as string[]) {
     const stop = unsubscribeUrl(appUrl, inst, to);
-    const m = emailText(board, `${appUrl}/app#today`, stop);
+    const m = emailText(board, linkText(wordsLink(crmDomain, "SubSync > Today")), stop);
     const mailer = realTransports(inst, () => stop);
     await mailer.email(to, { subject: m.subject, text: m.text, html: `<p>${esc(m.text).replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>")}</p>` }, []);
     sent++;

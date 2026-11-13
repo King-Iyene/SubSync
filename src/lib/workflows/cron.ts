@@ -3,6 +3,7 @@ import { dispatchAlerts } from "../notifications/service";
 import { resolveEntitlements } from "../flags";
 import { outward } from "../live-flags";
 import { unsubscribeUrl } from "../unsubscribe";
+import { getSettings } from "../analytics/queries";
 import { locationAccessToken } from "../sync/engine";
 import { parseGranted } from "../scope-groups";
 import { applyMarks, proofOf } from "./detail";
@@ -76,7 +77,7 @@ async function sendProof(installationId: string, now: Date): Promise<boolean> {
   const p = proofOf(alerts, now.getTime(), 7);
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
   const stop = unsubscribeUrl(appUrl, installationId, s.digest_email as string);
-  const mail = proofEmail({ brand: (s.brand_name as string | null) ?? "Your workflows", caught: p.raised.length, cleared: p.cleared.length, open: p.open.length, openTitles: p.open.map((a) => a.title), appUrl: `${appUrl}/app#workflows`, stopUrl: stop });
+  const mail = proofEmail({ brand: (s.brand_name as string | null) ?? "Your workflows", caught: p.raised.length, cleared: p.cleared.length, open: p.open.length, openTitles: p.open.map((a) => a.title), crmDomain: (await getSettings(installationId)).appDomain, stopUrl: stop });
   const done = await outward({ flag: "SEND_EMAIL_LIVE", verb: "SEND", what: "workflows.proof.email", installationId }, async () => false /* Sending needs its own notification type in the dispatcher (the one place allowed to send). Until then this is a rehearsal even with the live switch on. */);
   // Marked sent even as a dry run, so a rehearsal is not repeated every hour of the morning.
   await sql()`insert into saved_views (installation_id, owner, page, name, filters) values (${installationId}, 'system', 'workflows_proof', 'sent', ${sql().json({ day: due.day } as never)})

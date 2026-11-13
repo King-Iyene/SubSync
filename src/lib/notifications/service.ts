@@ -291,7 +291,7 @@ export function sampleItem(type: NotificationType, pref: Pref): Item {
 
 export async function sendEmailTest(installationId: string, l: Loaded, type: NotificationType, to: string): Promise<TestOutcome> {
   const pref = l.prefs[type];
-  const mail = composeEmail([sampleItem(type, pref)], { company: l.company, logoUrl: l.ctx.logoUrl, appUrl: appUrl(), stopUrl: l.ctx.stopUrl(to), test: true });
+  const mail = composeEmail([sampleItem(type, pref)], { company: l.company, logoUrl: l.ctx.logoUrl, appUrl: appUrl(), crmDomain: l.ctx.crmDomain, stopUrl: l.ctx.stopUrl(to), test: true });
   return sendTestMail(to, pref.recipients, mail, testSendDeps(installationId, l.ctx.stopUrl, () => isLive("SEND_EMAIL_LIVE")));
 }
 

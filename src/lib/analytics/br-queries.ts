@@ -11,6 +11,7 @@ import { headline as financeHeadline } from "./finance-queries";
 import { today } from "./today3-queries";
 import { summary as walletSummary } from "./wg-queries";
 import { briefIgnored } from "./ignored-leads-alerts";
+import { getSettings } from "./queries";
 
 // The database side of the 7 am brief. It READS what SubSync already computes (Today, missed leads, slipping deals, save-this-account, wallet, payments) and keeps its own record of each brief
 // (br_history: shown or sent, opened, acted). The email goes through the one outward gate (realTransports, then the SEND_EMAIL_LIVE switch): with the switch off it writes a "WOULD SEND" line
@@ -153,7 +154,7 @@ const appBase = () => (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, ""
 /** The email of one brief to the person's own saved address, through the outward gate. Returns whether it was really sent or only rehearsed (dry run). */
 export async function emailBrief(inst: string, email: string, b: Brief, ai: string | null = null): Promise<{ dryRun: boolean; subject: string; text: string }> {
   const base = appBase(), stop = unsubscribeUrl(base, inst, email);
-  const m = briefEmail(b, { appUrl: base, stopUrl: stop, settingsUrl: `${base}/app#today?brief=settings`, ai });
+  const m = briefEmail(b, { crmDomain: (await getSettings(inst)).appDomain, stopUrl: stop, ai });
   const r = await realTransports(inst, () => stop).email(email, { subject: m.subject, text: m.text, html: m.html }, []);
   const dry = r.ok ? r.dryRun === true : !isLive("SEND_EMAIL_LIVE");
   return { dryRun: dry, subject: m.subject, text: m.text };

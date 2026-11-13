@@ -210,7 +210,7 @@ export async function drain(ctx: Context, ledger: Ledger, transports: Transports
       let result: SendResult;
       try {
         if (first.channel === "in_app") result = await transports.inApp(first);
-        else if (first.channel === "email") result = await transports.email(first.target, composeEmail(batch.map((b) => b.payload), { company: ctx.company, logoUrl: ctx.logoUrl, appUrl: ctx.appUrl, stopUrl: ctx.stopUrl(first.target) }), batch);
+        else if (first.channel === "email") result = await transports.email(first.target, composeEmail(batch.map((b) => b.payload), { company: ctx.company, logoUrl: ctx.logoUrl, appUrl: ctx.appUrl, crmDomain: ctx.crmDomain, stopUrl: ctx.stopUrl(first.target) }), batch);
         else {
           const dest = ctx.destinations.find((d) => d.id === first.target);
           result = dest ? await transports.slack(dest, composeSlack(batch.map((b) => b.payload), { company: ctx.company, appUrl: ctx.appUrl, crmDomain: ctx.crmDomain }), batch) : { ok: false, permanent: true, code: "channel_not_available" };

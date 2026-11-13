@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { getSettings } from "./queries";
 import { realTransports } from "../notifications/transports";
 import { unsubscribeUrl } from "../unsubscribe";
 import { digestDue, digestEmail, localWeekday, validZone, type DigestDeals } from "./cash-intel";
@@ -27,12 +28,13 @@ export async function runSaveDigest(inst: string, now = Date.now()): Promise<num
     deals = { staleCount: d.stale.count, staleValue: d.stale.value, soonCount: d.soon.count, lostNoReason: d.lost.noReason, lostCount: d.lost.count };
   }
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+  const crmDomain = (await getSettings(inst)).appDomain; // the company's own CRM domain, so links open the CRM and never SubSync
   // Nothing at risk and nothing to say on a normal day: no email (one useful digest, not a ping that says nothing).
   if (!board.accounts.length && !(monday && deals && deals.staleCount + deals.soonCount > 0)) return 0;
   let sent = 0;
   for (const to of p.recipients as string[]) {
     const stop = unsubscribeUrl(appUrl, inst, to);
-    const m = digestEmail({ scope: `${board.checked} client accounts checked`, accounts: board.accounts, more: board.more, appUrl, stopUrl: stop, deals, monday });
+    const m = digestEmail({ scope: `${board.checked} client accounts checked`, accounts: board.accounts, more: board.more, crmDomain, stopUrl: stop, deals, monday });
     await realTransports(inst, () => stop).email(to, { subject: m.subject, text: m.text, html: m.html }, []);
     sent++;
   }
