@@ -228,8 +228,13 @@ export function Dashboard() {
     const mine = epoch.current;
     const payload = await new Promise<string | null>((resolve) => {
       pending.current = resolve;
-      window.parent.postMessage({ message: "REQUEST_USER_DATA" }, "*");
+      // Perf round: the host page may not be listening yet when the first message goes out (it answers only once its own page is ready), so the request is repeated every 700 ms until it answers;
+      // a lost first message no longer costs the whole wait. The first answer wins; later ones find nothing waiting and are ignored.
+      const ask = () => { if (pending.current === resolve) window.parent.postMessage({ message: "REQUEST_USER_DATA" }, "*"); };
+      ask();
+      const again = setInterval(() => { if (pending.current !== resolve) clearInterval(again); else ask(); }, 700);
       setTimeout(() => {
+        clearInterval(again);
         if (pending.current === resolve) {
           pending.current = null;
           resolve(null);

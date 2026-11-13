@@ -12,6 +12,7 @@ import { signSession } from "@/lib/session";
 import { MAINTENANCE_MESSAGE, maintenanceOn } from "@/lib/runtime-guards";
 import { safeError } from "@/lib/safe-log";
 import { sql } from "@/lib/db";
+import { runAfter } from "@/lib/run-after";
 
 // The agency's own name and colour, shown in place of ours. Only a plain hex colour is passed on.
 async function brandOf(installationId: string) {
@@ -112,14 +113,9 @@ export async function POST(request: Request) {
           name = excluded.name, role = excluded.role, seen_at = now()`.then(() => undefined, (error) => { console.error("Saving verified account role failed", safeError(error)); })
     : Promise.resolve();
   // An agency that resells the platform under its own domain gets links on that domain.
-  const [entitlements, brand] = await Promise.all([
-    resolveEntitlements(installation.plan, installationId),
-    brandOf(installationId),
-    saveRole,
-    logIdentity(installationId, identity, "ok"),
-    user.whitelabelDomain ? captureWhitelabelDomain(installationId, user.whitelabelDomain, "sso").catch(() => undefined) : Promise.resolve(),
-    user.whitelabelLogoUrl ? captureWhitelabelLogo(installationId, user.whitelabelLogoUrl).catch(() => undefined) : Promise.resolve(),
-  ]);
+  // Perf round: only the plan and the brand are needed for the answer; the sign-in log, the saved role and the captured domain and logo are written after the response is sent (they never failed a sign-in anyway).
+  runAfter(async () => { await Promise.all([saveRole, logIdentity(installationId, identity, "ok"), user.whitelabelDomain ? captureWhitelabelDomain(installationId, user.whitelabelDomain, "sso").catch(() => undefined) : Promise.resolve(), user.whitelabelLogoUrl ? captureWhitelabelLogo(installationId, user.whitelabelLogoUrl).catch(() => undefined) : Promise.resolve()]); });
+  const [entitlements, brand] = await Promise.all([resolveEntitlements(installation.plan, installationId), brandOf(installationId)]);
   const session = signSession({
     companyId: decision.companyKey, userId: user.userId, role: user.role, userName: user.userName, demo: false,
     kind: decision.kind, locationId: decision.locationId, dataOwner: mayDeleteData(identity, decision.kind), personRole: identity.role,

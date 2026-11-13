@@ -2,8 +2,8 @@ import { sql } from "../db";
 import type { StoredAnswer } from "./read-answers";
 
 export async function readAnswer(installationId: string, key: string): Promise<StoredAnswer | null> {
-  const r = await sql()`select body, dirty, extract(epoch from now() - computed_at) * 1000 age_ms from read_answers where installation_id = ${installationId} and answer_key = ${key}`;
-  return r.length ? { body: r[0].body as string, dirty: r[0].dirty as boolean, ageMs: Number(r[0].age_ms) } : null;
+  const r = await sql()`select body, dirty, extract(epoch from now() - computed_at) * 1000 age_ms, extract(epoch from computed_at) * 1000 at_ms from read_answers where installation_id = ${installationId} and answer_key = ${key}`;
+  return r.length ? { body: r[0].body as string, dirty: r[0].dirty as boolean, ageMs: Number(r[0].age_ms), computedAtMs: Number(r[0].at_ms) } : null;
 }
 
 export async function storeAnswer(installationId: string, key: string, body: string): Promise<void> {
