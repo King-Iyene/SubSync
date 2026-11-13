@@ -16,7 +16,7 @@ import { personFromSession } from "../connections/person";
 import { ownedLocation } from "./tenant-guard";
 
 // /api/app/ai-team?part=status|prefs|report|leads|coach|anomalies|one-thing|meeting and POST /api/app/ai-team/act/<prefs|report-summary|report-summary-all|save-summary|lead-stories|coach|anomaly|one-thing|meeting>.
-// The team and client jobs (docs/AI_AGENTS_PLAN.md section 9). Who is asking and which accounts they may read come ONLY from the signed session (`personFromSession`, `allowed`); an account id in a request
+// The team and client jobs (docs/AI_AGENTS_PLAN.md section 10). Who is asking and which accounts they may read come ONLY from the signed session (`personFromSession`, `allowed`); an account id in a request
 // goes through ownedLocation and only narrows inside `allowed`. Each job has its own feature flag on top of ai_byo. Suggest only: nothing is sent to a client or a lead and nothing is written to
 // the CRM. Reading a page never calls the AI (`peek`); only an explicit button does.
 

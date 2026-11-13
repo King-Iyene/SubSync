@@ -218,8 +218,10 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "bf_forecast",
   "bf_recover",
   "bf_today",
-  // Team and client AI jobs (docs/AI_AGENTS_PLAN.md section 9), each on top of ai_byo and default off: ai_report the monthly client report summary (and Draft all), ai_leads lead stories, ai_coach coaching notes, ai_anomaly why a number moved, ai_meeting meeting summary and follow-up draft, ai_one_thing the weekly one thing to fix.
+  // Team and client AI jobs (docs/AI_AGENTS_PLAN.md section 10), each on top of ai_byo and default off: ai_report the monthly client report summary (and Draft all), ai_leads lead stories, ai_coach coaching notes, ai_anomaly why a number moved, ai_meeting meeting summary and follow-up draft, ai_one_thing the weekly one thing to fix.
   // Bring your own AI (docs/AI_AGENTS_PLAN.md): ai_byo the connection card, usage panel and gateway; ai_brief the 7 am brief wording; ai_chatgpt the Sign in with ChatGPT entry (stays off until OpenAI approves our app). Default off.
+  // Workflow module (docs/features/WORKFLOW_MODULE.md): the blocks card, the trigger job and the action endpoint. Default off.
+  "wf_module",
   "ai_byo",
   "ai_brief",
   "ai_chatgpt",
@@ -229,6 +231,10 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "ai_anomaly",
   "ai_meeting",
   "ai_one_thing",
+  "ai_deal_health",
+  "ai_deal_followup",
+  "ai_deal_winloss",
+  "ai_deal_forecast",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

@@ -1,6 +1,6 @@
 import type { JobDef } from "../jobs";
 
-// The six team and client jobs (docs/AI_AGENTS_PLAN.md section 9). Each is suggest-only: our SQL works out every number, the model only writes words around them, the number guard in
+// The six team and client jobs (docs/AI_AGENTS_PLAN.md section 10). Each is suggest-only: our SQL works out every number, the model only writes words around them, the number guard in
 // safety.ts throws away any answer with a figure we did not give it, and an agency person reads and edits every client-facing text and sends it themselves. Registered in ../jobs.ts with one spread.
 
 export const TEAM_JOB_IDS = ["report_summary", "lead_story", "coach_note", "anomaly_explain", "meeting_summary", "one_thing"] as const;

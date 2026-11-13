@@ -21,6 +21,12 @@ type Sent = { fields: string[]; includesNames: boolean; text: string } | null;
 type Preview = { ok: boolean; text?: string; error?: string; runId?: string; sent: Sent };
 
 const usd = (n: number) => `$${n.toFixed(n < 1 ? 3 : 2)}`;
+const DEAL_JOB_HELP: Record<string, string> = {
+  deal_health: "In Pipeline, explains in plain words what is stuck or missing on one deal. The Health badge itself is worked out by rules.",
+  deal_followup: "Suggests one next touch for your stuck deals. You choose which to add as an internal task, after a preview. Nothing is sent to a lead.",
+  deal_winloss: "Plain-English patterns in your won and lost deals, once you have 15 closed deals.",
+  deal_forecast: "Explains what could move your forecast. The forecast number comes from SubSync, never from the AI.",
+};
 const METHOD_NAME = { key: "your own API key", openrouter: "OpenRouter sign-in", chatgpt: "ChatGPT sign-in" } as const;
 
 export function AiCard() {
@@ -159,7 +165,7 @@ function Connected({ data, conn, act }: { data: Status; conn: Conn; act: Act }) 
       <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={conn.shareNames} onChange={(e) => void act("update", { shareNames: e.target.checked })} data-testid="ai-names" />
         <span><b>Also send names and reasons</b> (off by default). By default only counts and dollar estimates go to your AI provider. Switched on, client or person names that appear in your brief also go to your own provider, under their terms. SubSync never keeps them in clear.</span></label>
       {data.jobs?.map((j) => (
-        <label key={j.id} className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={conn.jobs[j.id] === true} onChange={(e) => void act("update", { jobs: { [j.id]: e.target.checked } })} /><span><b>{j.title}</b>{!data.flags.brief && j.id === "brief" ? " (not switched on for your account yet)" : ""}</span></label>
+        <label key={j.id} className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={conn.jobs[j.id] === true} onChange={(e) => void act("update", { jobs: { [j.id]: e.target.checked } })} /><span><b>{j.title}</b>{!data.flags.brief && j.id === "brief" ? " (not switched on for your account yet)" : ""}{DEAL_JOB_HELP[j.id] ? <span className="block text-xs text-muted-foreground">{DEAL_JOB_HELP[j.id]}</span> : null}</span></label>
       ))}
       <div className="flex flex-wrap gap-2">
         <Btn variant="secondary" disabled={busy || !data.flags.brief} onClick={() => void runPreview()} testId="ai-preview">{busy ? "Writing a sample..." : "Preview a sample"}</Btn>

@@ -26,6 +26,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/cron/workflow-triggers",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/cron/meeting-expiry",
       "schedule": "20 3 * * *"
     },

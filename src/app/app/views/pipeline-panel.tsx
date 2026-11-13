@@ -7,6 +7,7 @@ import { ErrorState, SkeletonRows } from "../ds";
 import { useData } from "../session";
 import { BTN, ModeLine, PRIMARY, type Mode } from "./appointment-actions-ui";
 import { DealChangeFlow, DealUndoButton, UnclogChips } from "./pipeline-actions-ui";
+import { DealHealthSection } from "./pl3/deal-ai";
 
 // The deal panel (slice PB): the right-side panel the integrator mounts when a deal row is clicked, `<DealPanel locationId id onClose onChanged />`. It shows what happened to the deal
 // and every action: move stage, change owner, change value, mark won or lost (with the reason), rename, add a note or a task for the follow-up, delete (typed confirmation), the
@@ -68,6 +69,8 @@ export function DealPanel({ locationId, id, onClose, onChanged }: { locationId: 
                 </div>
               )}
             </section>
+
+            {open && <DealHealthSection locationId={locationId} id={id} />}
 
             {data.can.edit && open && <UnclogChips items={data.suggestions} onPick={(u) => setFlow({ action: u.action, title: u.label })} />}
 
