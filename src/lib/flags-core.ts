@@ -222,6 +222,12 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "ai_byo",
   "ai_brief",
   "ai_chatgpt",
+  // AI data jobs (docs/AI_AGENTS_PLAN.md section 9): each its own switch, all default off, and all need ai_byo.
+  "ai_ask_data",
+  "ai_data_review",
+  "ai_data_clean",
+  "ai_dup_judge",
+  "ai_setup_audit",
 ]);
 
 export function resolveFeatures(all: readonly Feature[], overrides: Record<string, boolean>, allOn = false): Record<Feature, boolean> {

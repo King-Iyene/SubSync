@@ -1,6 +1,6 @@
 # AI jobs spec (for the next builder)
 
-Platform built in `src/lib/ai/`. Read `docs/AI_AGENTS_PLAN.md` first. Everything below is a specification: only the platform and the 7 am brief writer exist.
+Platform built in `src/lib/ai/`. Read `docs/AI_AGENTS_PLAN.md` first. Jobs 1 to 5 below are now built (AI_AGENTS_PLAN section 9, each behind its own flag); the text is kept as the design reference.
 
 ## How to add a job (the extension points)
 1. **Registry** (`src/lib/ai/jobs.ts`): the entry already exists as `planned`. Fill `system`, `output` (text or JSON schema), `tools`, `maxTokens`, `maxToolRounds`, set `status: "live"`.

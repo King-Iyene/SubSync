@@ -9,6 +9,7 @@ import { handOff } from "../ds/remember";
 import { useApiClient, useData } from "../session";
 import type { GoFn } from "../nav";
 import { actionPerson, toSeed, type PersonUi } from "./people-rows";
+import { AskDialog, useAidStatus } from "./ask-data";
 
 // The search box in the header (Ctrl or Cmd + K, or press "/" when no field is open): find any person in every client account the signed-in person may see, and open their panel
 // without leaving the page. Searching across accounts is the one thing the CRM cannot do. Arrow keys move down the results and Enter opens one; each result has a Call button
@@ -21,6 +22,9 @@ export function GlobalSearch({ go }: { go: GoFn }) {
   const [debounced, setDebounced] = useState("");
   const [lead, setLead] = useState<number | null>(null);
   const [hi, setHi] = useState(0);
+  const [asking, setAsking] = useState<string | null>(null);
+  const aid = useAidStatus(open);
+  const askOn = aid.data?.jobs.ask_data.flag === true && !aid.data.demo;
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -61,10 +65,12 @@ export function GlobalSearch({ go }: { go: GoFn }) {
                 if (e.key === "ArrowDown" && shownRows.length > 0) { e.preventDefault(); setHi((i) => Math.min(shownRows.length - 1, i + 1)); }
                 else if (e.key === "ArrowUp" && shownRows.length > 0) { e.preventDefault(); setHi((i) => Math.max(0, i - 1)); }
                 // Enter below calls preventDefault: the panel moves focus to its Close button, which would otherwise take this same Enter as a click.
+                else if (e.key === "Enter" && askOn && q.trim().length >= 3 && (q.trim().endsWith("?") || e.altKey || (shownRows.length === 0 && q.trim().split(/s+/).length >= 4))) { e.preventDefault(); setAsking(q.trim()); close(); }
                 else if (e.key === "Enter" && shownRows.length > 0) { e.preventDefault(); openAt(at); }
                 else if (e.key === "Escape") close();
               }}
               className="w-full border-b bg-transparent px-4 py-3 text-base outline-none" data-testid="global-search-input" />
+            {askOn && q.trim().length >= 3 && <button type="button" onClick={() => { setAsking(q.trim()); close(); }} className="block w-full border-b px-4 py-2 text-left text-sm hover:bg-accent/50" data-testid="gs-ask">Ask your data: <b>{q.trim()}</b> <span className="text-xs text-muted-foreground">(Enter after a question mark, or Alt+Enter)</span></button>}
             <div className="max-h-[50vh] overflow-y-auto" aria-live="polite">
               {!term.ok ? (
                 <div className="px-4 py-3 text-sm text-muted-foreground">
@@ -102,6 +108,7 @@ export function GlobalSearch({ go }: { go: GoFn }) {
           <LeadDrawer leads={shownRows.map(toSeed)} index={lead} onIndex={setLead} onClose={() => setLead(null)} />
         </div>
       )}
+      {asking !== null && <AskDialog question={asking} onClose={() => setAsking(null)} />}
     </>
   );
 }

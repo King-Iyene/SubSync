@@ -215,6 +215,12 @@ export const FEATURES = [
   "ai_byo",
   "ai_brief",
   "ai_chatgpt",
+  // AI data jobs (docs/AI_AGENTS_PLAN.md section 9): each its own switch, all default off, and all need ai_byo.
+  "ai_ask_data",
+  "ai_data_review",
+  "ai_data_clean",
+  "ai_dup_judge",
+  "ai_setup_audit",
   "st_settings",
   "st_guides",
   "st_news",
