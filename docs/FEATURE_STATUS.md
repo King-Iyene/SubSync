@@ -337,3 +337,15 @@ Every module shows data in the demo: see `docs/DEMO_SCREENSHOTS.md` (start, fill
 ## Settings, Connections: Your tools (14 Nov 2026)
 
 One list: AI (own row, Connect your AI, inline connect options, usage, caps, typed disconnect), Slack (plus chat status from slack_chat_links and slack_chat_events), Fathom, Email (save address, public-record SPF/DKIM/DMARC check, Send me a test which is a dry run while SEND_EMAIL_LIVE is off), Calendars (count, which have a team member, "Needs permission: reconnect"). "What's connected" strip on top. Connect Slack and Connect Fathom start the sign-in directly; the detail section is open by default. Status words are in src/lib/connections/tools-status.ts (unit tested). Tested against live data: no (not run in a browser). Slack chat "connected" means the bot handled a message in the last 2 days, because event rows are kept 2 days.
+
+## Live click-through round 1 fixes (14 Nov 2026)
+
+| Item | Status |
+|---|---|
+| saas/company.read removed from requested scopes (agency-only, cannot be granted); plan screens say "Not available for this kind of app" | built, live. Not verified against the live platform: whether saas/location.read returns any plan data |
+| Tab strips wrap (ModuleTabs default wrap, plus the few hand-made strips) | built, live, unit test guards it |
+| Money > Client payments action row keeps its height on every sub-tab | built, live |
+| Page bottom padding enlarged so the last card scrolls into view | built, live. Not reproduced here (needs the embedded host) |
+| Quick tour is a non-blocking card (Esc or click away, shown once) | built, live |
+| Custom date box has visible From and To (Lagos time) | built, live |
+| Every file download shows a notice and an open-in-new-tab fallback | built, live |

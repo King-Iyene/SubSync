@@ -122,6 +122,7 @@ li[data-tier="Surge"] .s6-rank { background: color-mix(in srgb, var(--s6-violet)
 
 .s6-tour { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 16px; background: var(--s6-scrim); }
 .s6-tour > div { width: min(440px, 100%); background: var(--s6-pop); border: 1px solid color-mix(in srgb, var(--s6-edgec) 40%, transparent); border-radius: 18px; padding: 28px; box-shadow: 0 0 40px -8px color-mix(in srgb, var(--s6-cyan) 50%, transparent); }
+.s6-tourpop { position: fixed; right: 16px; bottom: 16px; z-index: 40; width: min(360px, calc(100vw - 32px)); background: var(--s6-pop); color: var(--foreground); border: 1px solid color-mix(in srgb, var(--s6-edgec) 40%, transparent); border-radius: 16px; padding: 18px 20px; box-shadow: 0 8px 28px -6px rgba(0,0,0,.35); }
 
 @media (prefers-reduced-motion: reduce) {
   .s6 *, .s6-dot, .s6-bars > div, .s6-enter, .s6-pulse { animation: none !important; transition: none !important; }
@@ -147,7 +148,7 @@ li[data-tier="Surge"] .s6-rank { background: color-mix(in srgb, var(--s6-violet)
 
 /* SPEED7 design review: phone polish. The tab strip scrolls sideways, so its right edge fades to say there is more, tabs snap, and small grey helper text is lifted to a contrast of at least 4.5:1 on the navy. */
 @media (max-width: 640px) {
-  .s6 [role="tablist"] { scroll-snap-type: x proximity; -webkit-mask-image: linear-gradient(to right, #000000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000000 calc(100% - 32px), transparent); padding-inline-end: 24px; }
+  .s6 [role="tablist"] { scroll-snap-type: x proximity; }
   .s6 [role="tab"] { scroll-snap-align: center; min-height: 44px; min-width: 44px; }
   .s6 button, .s6 [role="button"], .s6 summary { min-height: 44px; }
 }

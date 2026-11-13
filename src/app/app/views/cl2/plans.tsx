@@ -24,7 +24,7 @@ export function TodayPanel({ onButton, onTile }: { onButton: (b: NonNullable<Cl2
         <p className="cl-sentence" data-testid="cl2-today-sentence">{t.headline}</p>
         {t.button && <button type="button" className="s6-btn" data-kind="primary" data-testid="cl2-today-go" onClick={() => onButton(t.button as NonNullable<Cl2Today["button"]>)}>{t.button.label} ({t.button.count.toLocaleString("en-US")})</button>}
         {t.atRisk.length > 0 && <p className="ap-fine" title={FORMULA}>Plans at risk (estimate): {t.atRisk.map((a) => `${money(a.monthly, a.currency)} a month across ${a.accounts} ${a.accounts === 1 ? "client" : "clients"}`).join("; ")}.</p>}
-        {t.planAccess === "needs_permission" && <p className="ap-fine">Needs permission: reconnect to let SubSync read your clients&apos; paid plans.</p>}
+        {t.planAccess === "no_data" && <p className="ap-fine" data-testid="cl2-plans-na"><b>Not available for this kind of app.</b> The platform only gives plan details to company-level apps.</p>}
       </section>
       <div className="cl-tiles">{t.tiles.map((x) => <button key={x.key} type="button" className="cl-tile" data-testid={`cl2-tile-${x.key}`} onClick={() => onTile(x)}><b>{x.count.toLocaleString("en-US")}</b><span>{x.label}</span></button>)}</div>
     </div>

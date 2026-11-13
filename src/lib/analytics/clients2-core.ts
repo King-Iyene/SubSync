@@ -16,7 +16,7 @@ const PAUSED = /^paused$/i;
 export function payStatus(raw: string | null, state: PlanState): { key: PayKey; label: string } {
   if (state === "no_plan") return { key: "none", label: "Not on a paid plan from you" };
   if (state === "needs_permission") return { key: "unknown", label: "Needs permission: reconnect" };
-  if (state === "not_available") return { key: "unknown", label: "Not available from the platform yet" };
+  if (state === "not_available") return { key: "unknown", label: "Not available for this kind of app" };
   if (state === "not_checked" || raw === null) return { key: "unknown", label: "Not checked yet" };
   if (PAID.test(raw)) return { key: "paid", label: "Paid up" };
   if (PAST_DUE.test(raw)) return { key: "past_due", label: "Past due" };
@@ -38,7 +38,7 @@ export function monthlyOf(amount: number | null, interval: string | null): numbe
 /** One plain line for the plan block: what this means and what to do next. */
 export function explainPlan(state: PlanState, key: PayKey, httpStatus: number | null, reason: string | null): string {
   if (state === "needs_permission") return "The platform refused this read (permission). Reconnect SubSync and allow plan access, then this fills in.";
-  if (state === "not_available") return reason ?? `The platform did not give plan details this time${httpStatus ? ` (it answered ${httpStatus})` : ""}. SubSync tries again every hour.`;
+  if (state === "not_available") return reason ?? "Not available for this kind of app. The platform only gives plan details to company-level apps.";
   if (state === "not_checked") return "Not read yet. The next hourly read will fill this in.";
   if (state === "no_plan") return "This client is not on a paid plan you sell in your CRM, or paid plans are not switched on there.";
   switch (key) {
@@ -66,7 +66,7 @@ const num = (v: unknown) => { const n = v === null || v === undefined ? NaN : Nu
 /** The plan block for one account from the stored row (no row = never read). */
 export function planOf(r: BillingRow | undefined, now: number): Cl2Plan {
   const st = r?.state ?? "unknown";
-  const state: PlanState = st === "ok" ? "ok" : st === "no_plan" ? "no_plan" : st === "needs_permission" ? "needs_permission" : st === "unknown" || !r ? "not_checked" : "not_available";
+  const state: PlanState = st === "ok" ? "ok" : st === "no_plan" ? "no_plan" : st === "unknown" || !r ? "not_checked" : "not_available";
   const raw = (r?.subscription_status as string | null | undefined) ?? null;
   const p = payStatus(raw, state);
   const amount = num(r?.price_amount), interval = (r?.billing_interval as string | null | undefined) ?? null;

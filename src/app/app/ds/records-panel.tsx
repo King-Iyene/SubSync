@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { ListControls, PageBar, useListPrefs } from "./list-prefs";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { saveBlob } from "../download-note";
 import { createPortal } from "react-dom";
 import { portalRoot } from "./portal-root";
 import {
@@ -121,11 +122,7 @@ export function RecordsPanel({ spec, onClose, now, zone = "UTC", canExport = tru
 
   const download = () => {
     const blob = new Blob(["﻿" + toCsv(spec.cols, rows, zone)], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${spec.exportName.replace(/[^a-z0-9-]+/gi, "-").toLowerCase()}-${new Date(now).toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    saveBlob(blob, `${spec.exportName.replace(/[^a-z0-9-]+/gi, "-").toLowerCase()}-${new Date(now).toISOString().slice(0, 10)}.csv`);
     setMenu(false);
   };
 

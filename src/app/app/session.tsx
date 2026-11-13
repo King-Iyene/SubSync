@@ -1,5 +1,6 @@
 "use client";
 
+import { showDownloadNote } from "./download-note";
 import { onDataChanged } from "./data-changed";
 import { quietRefreshDelay } from "@/lib/sync/incremental";
 import { plainError } from "@/lib/design/plain-error";
@@ -166,14 +167,17 @@ export function makeApi(initialToken: string, refresh: () => Promise<string | nu
     put: async (path, body) => { sharedReads().clear(); forgetRecent(shared); try { return await parse(await request("PUT", path, body ?? {})); } finally { sharedReads().clear(); } },
     del: async (path) => { sharedReads().clear(); forgetRecent(shared); try { return await parse(await request("DELETE", path)); } finally { sharedReads().clear(); } },
     download: async (path, filename) => {
-      const res = await request("GET", path);
-      if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})));
-      const url = URL.createObjectURL(await res.blob());
+      let url: string;
+      try {
+        const res = await request("GET", path);
+        if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})));
+        url = URL.createObjectURL(await res.blob());
+      } catch (e) { showDownloadNote("failed", filename); throw e; }
       const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      a.href = url; a.download = filename; a.style.display = "none";
+      document.body.appendChild(a); a.click(); a.remove();
+      showDownloadNote("done", filename, url);
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     },
   };
 }

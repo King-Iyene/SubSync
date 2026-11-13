@@ -11,12 +11,12 @@ test("the permissions requested are exactly the agreed list", () => {
     "contacts.readonly", "contacts.write", "conversations.readonly", "conversations/message.readonly", "conversations/reports.readonly",
     "locations.readonly", "locations/customFields.readonly", "locations/customFields.write", "locations/tags.readonly", "locations/tags.write", "locations/tasks.readonly", "locations/tasks.write",
     "oauth.readonly", "oauth.write", "opportunities.readonly", "opportunities.write", "users.readonly",
-    "workflows.readonly", "workflows.logs", "workflows.write", "workflows.publish", "workflows.delete", "campaigns.readonly", "emails/campaigns.readonly", "emails/stats.readonly", "saas/location.read", "saas/company.read",
+    "workflows.readonly", "workflows.logs", "workflows.write", "workflows.publish", "workflows.delete", "campaigns.readonly", "emails/campaigns.readonly", "emails/stats.readonly", "saas/location.read",
     "payments/transactions.readonly", "payments/subscriptions.readonly", "invoices.readonly", "wallet.readonly", "marketplace-installer-details.readonly",
     "forms.readonly", "surveys.readonly", "funnels/funnel.readonly",
   ].sort());
   assert.equal(new Set(GHL_SCOPES).size, GHL_SCOPES.length, "no duplicates");
-  assert.equal(GHL_SCOPES.length, 40);
+  assert.equal(GHL_SCOPES.length, 39);
   for (const s of ["locations/tasks.readonly", "locations/tasks.write", "locations/customFields.write", "locations/tags.write", "conversations/reports.readonly"]) assert.ok((GHL_SCOPES as readonly string[]).includes(s), s);
 });
 

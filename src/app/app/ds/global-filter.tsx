@@ -158,13 +158,21 @@ function DateControl({ mode }: { mode: "range" | "now" | "dates" }) {
           className={`min-h-9 px-1.5 text-sm outline-none sm:px-2.5 focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === "custom" ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>Custom</button>
       </div>
       {spec.preset === "custom" && (
-        <form className="inline-flex flex-wrap items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); applyDraft(); }} data-testid="custom-range">
-          <input type="date" aria-label="From date" aria-invalid={Boolean(problem)} value={from} max={to || today || undefined} onChange={(e) => setDates(e.target.value, to)} className="min-h-9 rounded-lg border bg-card px-2 text-sm" />
-          <input type="time" aria-label="From time (optional)" title="From time (optional), Lagos time" aria-invalid={Boolean(problem)} value={fromTime} onChange={(e) => setDates(from, to, e.target.value, toTime)} className="min-h-9 w-[6.5rem] rounded-lg border bg-card px-2 text-sm" data-testid="from-time" />
-          <span aria-hidden className="text-muted-foreground">to</span>
-          <input type="date" aria-label="To date" aria-invalid={Boolean(problem)} value={to} max={today ?? undefined} onChange={(e) => setDates(from, e.target.value)} className="min-h-9 rounded-lg border bg-card px-2 text-sm" />
-          <input type="time" aria-label="To time (optional)" title="To time (optional), Lagos time" aria-invalid={Boolean(problem)} value={toTime} onChange={(e) => setDates(from, to, fromTime, e.target.value)} className="min-h-9 w-[6.5rem] rounded-lg border bg-card px-2 text-sm" data-testid="to-time" />
+        <form className="flex basis-full flex-wrap items-end gap-2 rounded-lg border bg-muted/40 p-2" onSubmit={(e) => { e.preventDefault(); applyDraft(); }} data-testid="custom-range" aria-label="Pick your own dates">
+          <label className="grid gap-0.5 text-xs font-medium text-muted-foreground">From
+            <input type="date" aria-label="From date" aria-invalid={Boolean(problem)} value={from} max={to || today || undefined} onChange={(e) => setDates(e.target.value, to)} className="min-h-9 rounded-lg border bg-card px-2 text-sm font-normal text-foreground" />
+          </label>
+          <label className="grid gap-0.5 text-xs font-medium text-muted-foreground">Time ({zoneWord()}, optional)
+            <input type="time" aria-label="From time (optional)" title={`From time (optional), ${zoneWord()} time`} aria-invalid={Boolean(problem)} value={fromTime} onChange={(e) => setDates(from, to, e.target.value, toTime)} className="min-h-9 w-[7.5rem] rounded-lg border bg-card px-2 text-sm font-normal text-foreground" data-testid="from-time" />
+          </label>
+          <label className="grid gap-0.5 text-xs font-medium text-muted-foreground">To
+            <input type="date" aria-label="To date" aria-invalid={Boolean(problem)} value={to} max={today ?? undefined} onChange={(e) => setDates(from, e.target.value)} className="min-h-9 rounded-lg border bg-card px-2 text-sm font-normal text-foreground" />
+          </label>
+          <label className="grid gap-0.5 text-xs font-medium text-muted-foreground">Time ({zoneWord()}, optional)
+            <input type="time" aria-label="To time (optional)" title={`To time (optional), ${zoneWord()} time`} aria-invalid={Boolean(problem)} value={toTime} onChange={(e) => setDates(from, to, fromTime, e.target.value)} className="min-h-9 w-[7.5rem] rounded-lg border bg-card px-2 text-sm font-normal text-foreground" data-testid="to-time" />
+          </label>
           <button type="submit" disabled={Boolean(problem) || !dirty} data-testid="apply-range" className="min-h-9 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50">Apply</button>
+          <p className="basis-full text-xs text-muted-foreground">Pick the first and last day. It applies to every page, like the buttons above. Times are {zoneWord()} time.</p>
         </form>
       )}
       <span className="text-xs text-muted-foreground max-lg:sr-only" data-testid="date-window" aria-live="polite">{spec.preset === "custom" ? "From " : ""}{pr.label}, {zoneWord()} time{pr.timed ? ". Figures kept per day (daily totals) count whole days: day precision." : ""}</span>

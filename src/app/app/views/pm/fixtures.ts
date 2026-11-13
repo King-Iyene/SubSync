@@ -11,7 +11,7 @@ const ROWS: PmRow[] = [
   ROW({ key: "s5", accountName: "Sample Dental", problem: "late_invoice", problemLabel: "Late invoice", who: "Ivo Petrov", amount: 640, ageDays: 22, status: "contacted" }),
 ];
 const SOURCES: PmSource[] = [
-  { key: "plans", label: "Your clients' paid plans", state: "ok", scope: "saas/company.read", lastOkAt: "2026-11-11T08:00:00Z", message: null },
+  { key: "plans", label: "Your clients' paid plans", state: "ok", scope: "", lastOkAt: "2026-11-11T08:00:00Z", message: null },
   { key: "transactions", label: "Payments", state: "ok", scope: "payments/transactions.readonly", lastOkAt: "2026-11-11T08:00:00Z", message: null },
   { key: "subscriptions", label: "Repeat payments", state: "needs_permission", scope: "payments/subscriptions.readonly", lastOkAt: null, message: "Needs permission: reconnect" },
   { key: "invoices", label: "Invoices", state: "ok", scope: "invoices.readonly", lastOkAt: "2026-11-11T08:00:00Z", message: null },

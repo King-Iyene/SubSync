@@ -61,5 +61,5 @@ export function PaymentsModule({ go, embed = false }: { go: GoFn; /** Inside the
 
 /** The page frame: the full Payments page, or (inside the Money page, which has its own title) just the content with the Export button kept at the top. */
 function Shell({ embed, title, subtitle, actions, children }: { embed: boolean; title: string; subtitle: string; actions: React.ReactNode; children: React.ReactNode }) {
-  return embed ? <>{actions && <div className="mb-2 flex justify-end">{actions}</div>}{children}</> : <Page title={title} subtitle={subtitle} actions={actions}>{children}</Page>;
+  return embed ? <><div className="mb-2 flex min-h-9 justify-end" data-testid="pm-actions-row">{actions}</div>{children}</> : <Page title={title} subtitle={subtitle} actions={actions}>{children}</Page>;
 }

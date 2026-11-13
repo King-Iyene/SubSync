@@ -43,4 +43,4 @@ export type PmOptions = { accounts: Array<{ id: string; name: string }>; currenc
 export type PmSetup = { sources: PmSource[]; checks: Array<{ key: string; title: string; ok: boolean; detail: string }>; scopes: string[] };
 export type WithMeta<T> = T & PmMeta;
 
-export const PM_SCOPES = { plans: "saas/company.read", transactions: "payments/transactions.readonly", subscriptions: "payments/subscriptions.readonly", invoices: "invoices.readonly", wallet: "wallet.readonly", installer: "marketplace-installer-details.readonly" } as const;
+export const PM_SCOPES = { plans: "", transactions: "payments/transactions.readonly", subscriptions: "payments/subscriptions.readonly", invoices: "invoices.readonly", wallet: "wallet.readonly", installer: "marketplace-installer-details.readonly" } as const;
