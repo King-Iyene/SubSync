@@ -233,3 +233,9 @@ For testing only. Before any pilot or outside install: run `node --env-file=.env
 
 ## 34. Test deals with values (for judging the pipeline funnel)
 Every test deal is $0, so the funnel cannot be judged. In KD Squares Test, create 5 test deals with a value and an owner (for example $500 to $20,000, spread over three steps, two different owners, one in a late step). Then open Pipeline, Money flow. Until then, click "See an example" there to see the shape with made-up numbers (marked Example).
+
+## 35. Backlog after the Appointments and Pipeline builds (11 Nov 2026)
+- Appointments: virtualised long tables, the pager on the keyset cursor, tree badge numbers as separate clickable buttons, and a 1M timing run (`scripts/appointments-timing.ts`, read-only; needs a machine that can reach the database).
+- Pipeline: see PR #18 and the pl-calm3 branch for scale items.
+- Browser checks at 768 and in the real dark switch for Appointments and Pipeline.
+- Pipeline: roll up stage-move history and the win-rate basis so Overview and stacks reach under 1 s (rollup for cards already built; timings measured over the internet at ~0.4 s per round trip).
