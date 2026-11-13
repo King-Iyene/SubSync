@@ -89,7 +89,10 @@ export type Pl3MoneyFlow = {
 
 /** Time-lapse replay frames (30 to 90 days), one per day, from our own stage history. */
 export type Pl3Replay = {
-  days: number; frames: Array<{ day: string; stages: Array<{ stageId: string; count: number; value: number }>; wonValue: number; lostValue: number; moved: Array<{ from: string | null; to: string; count: number; value: number }> }>;
+  days: number; frames: Array<{
+    day: string; stages: Array<{ stageId: string; count: number; value: number; noValueCount?: number }>; wonValue: number; lostValue: number; wonCount?: number; lostCount?: number;
+    moved: Array<{ from: string | null; to: string; count: number; value: number }>; closed?: Array<{ from: string | null; status: "won" | "lost"; count: number; value: number }>;
+  }>;
   enough: boolean; historySince: string | null;
 };
 
