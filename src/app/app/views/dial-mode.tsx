@@ -15,6 +15,7 @@ import { announceCall } from "../ds/dial-button";
 import { InfoTip } from "../ds/info-tip";
 import { fmtMoney } from "../ui";
 import { PeoplePopup, type PersonRow } from "./dial-people";
+import { CallFirstCard } from "./ai-lead-cards";
 import { CallQueueCard } from "./dial-queue-panel";
 import { cadenceSummary, touchRow } from "@/lib/dial/touch";
 import { PrefsCtx, useScripts, ActivityCard, AttemptCard, BestHourCard, Board6, CadenceCard, DispositionEditor, PowerBar, useCadence, useCallbacks, useDispositions, useGoals, useLocal, useTick, type SavedCallback } from "./dial6-ui";
@@ -154,6 +155,7 @@ function DialInner() {
         <button type="button" onClick={() => setView("callbacks")} aria-pressed={view === "callbacks"} data-testid="dial-view-callbacks" className="cm-seg-i"><CalendarClock aria-hidden />Today&apos;s callbacks<span className="cm-n">{todays.length}</span></button>
       </div>
 
+      {view === "lists" && <CallFirstCard list={list} range={range ? { from: range.from, to: range.to } : null} />}
       {view === "callbacks" ? (
         <div className="s6-card mb-8" data-testid="dial-callbacks">
           <h3 className="s6-q">Who asked for a callback today?</h3>

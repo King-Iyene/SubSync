@@ -16,7 +16,11 @@ test("pilot modules are on by default and a database row can still override the 
   assert.deepEqual([...DEFAULT_OFF].sort(), [
     "ai_brief",
     "ai_byo",
+    "ai_call_first",
     "ai_chatgpt",
+    "ai_cold_reasons",
+    "ai_lead_summary",
+    "ai_reply_draft",
     "am_auto_notes",
     "am_slack_auto",
     "ap_exec",

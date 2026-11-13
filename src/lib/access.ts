@@ -102,7 +102,7 @@ const GET_VIEWS = ["today", "deal-rules", "overview", "accounts", "onboarding", 
 // Connections (stage E0): EVERY role connects its own tools, so my-connections is open to all kinds; it only ever touches the signed-in person's own rows.
 // team-connections and meeting-policy are open to the kinds too, but the handler lets only administrators in (a client's account user gets 403) and limits an
 // account administrator to the people and the rule of their own account.
-const PERSONAL_RULES: Rule[] = [["GET", "ai"], ["POST", "ai", "act"], ["GET", "my-connections"], ["POST", "my-connections"], ["DELETE", "my-connections"], ["GET", "team-connections"], ["POST", "team-connections"], ["PUT", "meeting-policy"], ["GET", "meeting-logged"], ["GET", "meeting-inbox"], ["POST", "meeting-inbox"], ["PUT", "meeting-inbox"], ["GET", "meeting-setup"], ["POST", "meeting-setup"], ["PUT", "meeting-setup"]];
+const PERSONAL_RULES: Rule[] = [["GET", "ai"], ["POST", "ai", "act"], ["POST", "ai", "lead"], ["GET", "my-connections"], ["POST", "my-connections"], ["DELETE", "my-connections"], ["GET", "team-connections"], ["POST", "team-connections"], ["PUT", "meeting-policy"], ["GET", "meeting-logged"], ["GET", "meeting-inbox"], ["POST", "meeting-inbox"], ["PUT", "meeting-inbox"], ["GET", "meeting-setup"], ["POST", "meeting-setup"], ["PUT", "meeting-setup"]];
 
 // Notifications (stage F9): the bell is for every kind of person (a client's staff see only their own account's items and only their own marks).
 // The preferences, Slack channels and tests are for a business (its administrator, checked inside the handler); a client's staff never reach them.

@@ -11,6 +11,8 @@ import { can, personFromSession, type Person } from "../connections/person";
 import type { Feature } from "../entitlements";
 import { resolveEntitlements } from "../flags";
 import { json, type AuthContext } from "./auth";
+import { handleAiLead } from "./ai-lead-routes";
+import { LEAD_JOB_FLAG, LEAD_JOB_IDS } from "../ai/jobs-lead";
 import { viewerOf } from "./people3-routes";
 
 // /api/app/ai?part=status|usage|history|sent|brief-note and POST /api/app/ai/act/<models|connect|start|update|rotate|disconnect|preview|brief-note|feedback>.
@@ -18,7 +20,7 @@ import { viewerOf } from "./people3-routes";
 // administrator; one client account's own connection for that account's administrator. Nothing here ever returns a key, a token, a verifier, or anyone's prompt or answer but the caller's own.
 
 type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
-type Deps = { allowed: () => Promise<string[] | null> };
+type Deps = { allowed: () => Promise<string[] | null>; locationToken?: (locationId: string) => Promise<string>; links?: () => Promise<ReturnType<typeof import("../links").deepLinks>> };
 const fetcher: Fetch = (url, init) => fetch(url, init as RequestInit) as never;
 const KEY = /^[\x21-\x7e]{8,512}$/;
 const MODEL = /^[A-Za-z0-9._:/@+-]{1,200}$/;
@@ -51,17 +53,22 @@ export async function handleAi(ctx: Ctx, deps: Deps): Promise<Response> {
   const m = manage(ctx), user = ctx.session.userId ?? null;
   if (!user) return json({ error: "Please sign in again" }, 401);
   const chatgpt = on("ai_chatgpt");
+  // The four lead jobs (lead summary, who to call first, why leads go cold, reply drafts) have their own endpoints and flags: ai-lead-routes.ts.
+  if (ctx.segments[1] === "lead" && deps.locationToken && deps.links) {
+    try { return await handleAiLead(ctx, { allowed: deps.allowed, locationToken: deps.locationToken, links: deps.links }, on, user); }
+    catch (e) { console.error("ai lead", e instanceof Error ? e.message : "failed"); return json({ error: "AI help is unavailable right now. Nothing was changed." }, 503); }
+  }
 
   if (!isAct) {
     if (part === "status" || !part) {
       const methods = { key: true, openrouter: true, chatgpt: !chatgpt ? "off" : chatgptKeys() ? "ready" : "coming" };
-      if (!m) return json({ canManage: false, flags: { brief: on("ai_brief") }, killed: killedGlobally() });
+      if (!m) return json({ canManage: false, flags: jobFlags(on), killed: killedGlobally() });
       const [conn, u, own] = await Promise.all([
         publicConnection(ctx.installationId, m.scope), usage(ctx.installationId, m.scope),
         m.level === "company" ? sql()`select count(*)::int n from ai_connections where installation_id = ${ctx.installationId} and location_id <> ''` : Promise.resolve([{ n: 0 }]),
       ]);
       return json({
-        canManage: true, level: m.level, connection: conn, usage: u, killed: killedGlobally(), flags: { brief: on("ai_brief") }, methods,
+        canManage: true, level: m.level, connection: conn, usage: u, killed: killedGlobally(), flags: jobFlags(on), methods,
         providers: PROVIDERS.map((id) => ({ id, name: PROVIDER_NAME[id], ...PROVIDER_HELP[id] })), methodCost: METHOD_COST,
         jobs: liveJobs().map((j) => ({ id: j.id, title: j.title, approval: j.approval })), accountConnections: Number(own[0]?.n ?? 0),
         note: "A ChatGPT or Claude chat subscription cannot be used with a key. Use an API key, OpenRouter, or (when OpenAI approves it) sign in with ChatGPT.",
@@ -176,6 +183,9 @@ export async function handleAi(ctx: Ctx, deps: Deps): Promise<Response> {
 type Result = Awaited<ReturnType<typeof companyNote>>["result"];
 const shape = (r: Result, facts: { text: string; fields: string[]; includesNames: boolean } | null) =>
   r.ok ? { ok: true, text: r.text, runId: r.runId, costUsd: r.costUsd, sent: facts } : { ok: false, code: r.code, error: r.message, sent: facts };
+
+/** Which jobs are switched on for this account, keyed by job id (Settings shows a note next to a job that is not). */
+const jobFlags = (on: (f: string) => boolean): Record<string, boolean> => ({ brief: on("ai_brief"), ...Object.fromEntries(LEAD_JOB_IDS.map((j) => [j, on(LEAD_JOB_FLAG[j])])) });
 
 const flagsOf = (on: (f: string) => boolean): BriefFlags => ({ cf_save: on("cf_save"), cf_recover: on("cf_recover"), cf_deals: on("cf_deals"), wg_wallet: on("wg_wallet"), pm_module: on("pm_module"), td_today: on("td_today"), fn_today: on("fn_today"), sp_ignored: on("sp_ignored_leads") });
 

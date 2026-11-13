@@ -1,10 +1,11 @@
+import { LEAD_JOBS, LEAD_JOB_IDS } from "./jobs-lead";
 import type { Schema } from "./safety";
 
 // The job registry: every AI job is one entry here. The gateway (gateway.ts) runs any live entry the same way: kill switches, the customer's spend cap, rate limit, idempotency,
 // tool whitelist, post-check and the run log. To add a job: add an entry, write its input builder (a pure function that builds the prompt from that tenant's own rows) and its
 // golden tests, and flip `status` to "live". The planned entries below are NOT built; their full specification is in docs/AI_JOBS_SPEC.md.
 
-export const JOB_IDS = ["brief", "data_review", "data_clean", "ask_data", "dup_adjudicate", "setup_audit"] as const;
+export const JOB_IDS = ["brief", "data_review", "data_clean", "ask_data", "dup_adjudicate", "setup_audit", ...LEAD_JOB_IDS] as const;
 export type JobId = (typeof JOB_IDS)[number];
 export const isJobId = (v: unknown): v is JobId => (JOB_IDS as readonly unknown[]).includes(v);
 
@@ -45,6 +46,7 @@ export const JOBS: Record<JobId, JobDef> = {
   data_clean: { id: "data_clean", title: "Data cleaning proposals", status: "planned", approval: "approve", privacy: "names_optin", costClass: "small", output: { kind: "json", schema: { type: "object", props: {} }, maxChars: 4000 }, tools: [], maxTokens: 1200, maxToolRounds: 4, system: "" },
   ask_data: { id: "ask_data", title: "Ask your data", status: "planned", approval: "suggest", privacy: "names_optin", costClass: "large", output: { kind: "json", schema: { type: "object", props: {} }, maxChars: 3000 }, tools: [], maxTokens: 1200, maxToolRounds: 6, system: "" },
   dup_adjudicate: { id: "dup_adjudicate", title: "Duplicate adjudication", status: "planned", approval: "approve", privacy: "names_optin", costClass: "large", output: { kind: "json", schema: { type: "object", props: {} }, maxChars: 2000 }, tools: [], maxTokens: 600, maxToolRounds: 2, system: "" },
+  ...LEAD_JOBS,
   setup_audit: { id: "setup_audit", title: "Setup auditor", status: "planned", approval: "suggest", privacy: "aggregate", costClass: "large", output: { kind: "json", schema: { type: "object", props: {} }, maxChars: 4000 }, tools: [], maxTokens: 1200, maxToolRounds: 6, system: "" },
 };
 

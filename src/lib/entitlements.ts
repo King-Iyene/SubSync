@@ -215,6 +215,11 @@ export const FEATURES = [
   "ai_byo",
   "ai_brief",
   "ai_chatgpt",
+  // The four lead AI jobs (suggest only), each with its own flag on top of ai_byo. Default off.
+  "ai_lead_summary",
+  "ai_call_first",
+  "ai_cold_reasons",
+  "ai_reply_draft",
   "st_settings",
   "st_guides",
   "st_news",
