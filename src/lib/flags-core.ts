@@ -231,6 +231,12 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "ai_anomaly",
   "ai_meeting",
   "ai_one_thing",
+  // AI data jobs (docs/AI_AGENTS_PLAN.md section 9): each its own switch, all default off, and all need ai_byo.
+  "ai_ask_data",
+  "ai_data_review",
+  "ai_data_clean",
+  "ai_dup_judge",
+  "ai_setup_audit",
   "ai_deal_health",
   "ai_deal_followup",
   "ai_deal_winloss",
