@@ -66,7 +66,7 @@ test("pressing Replay: starts on the first day, plays on every tick to the last 
   let st: ReplayState = { frame: null, playing: false };
   st = pressPlay(st, total, false);
   assert.deepEqual(st, { frame: 0, playing: true });
-  const seen = [st.frame];
+  const seen: Array<number | null> = [st.frame];
   for (let i = 0; i < 10 && st.playing; i++) { st = tickReplay(st, total); seen.push(st.frame); }
   assert.deepEqual(seen, [0, 1, 2, 3, 4]);
   assert.equal(st.playing, false);
