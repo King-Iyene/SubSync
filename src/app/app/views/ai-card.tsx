@@ -11,7 +11,7 @@ import { Badge, Btn } from "../ui";
 type Conn = { method: "key" | "openrouter" | "chatgpt"; provider: string; baseUrl: string | null; model: string; last4: string; status: "connected" | "needs_attention"; capUsd: number; paused: boolean; shareNames: boolean; jobs: Record<string, boolean> };
 type Usage = { runs: number; ok: number; rejected: number; errors: number; spendUsd: number; byJob: Record<string, { runs: number; spendUsd: number }>; lastErrors: Array<{ at: string; job: string; reason: string }>; thumbs: { up: number; down: number } };
 type Status = {
-  canManage: boolean; level?: "company" | "account"; connection?: Conn | null; usage?: Usage; killed: boolean; flags: { brief: boolean };
+  canManage: boolean; level?: "company" | "account"; connection?: Conn | null; usage?: Usage; killed: boolean; flags: Record<string, boolean>;
   methods?: { key: boolean; openrouter: boolean; chatgpt: "off" | "coming" | "ready" };
   providers?: Array<{ id: string; name: string; steps: string; cost: string; keyHint: string }>; methodCost?: Record<string, string>;
   jobs?: Array<{ id: string; title: string }>; accountConnections?: number; note?: string;
@@ -163,7 +163,7 @@ function Connected({ data, conn, act }: { data: Status; conn: Conn; act: Act }) 
       <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={conn.shareNames} onChange={(e) => void act("update", { shareNames: e.target.checked })} data-testid="ai-names" />
         <span><b>Also send names and reasons</b> (off by default). By default only counts and dollar estimates go to your AI provider. Switched on, client or person names that appear in your brief also go to your own provider, under their terms. SubSync never keeps them in clear.</span></label>
       {data.jobs?.map((j) => (
-        <label key={j.id} className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={conn.jobs[j.id] === true} onChange={(e) => void act("update", { jobs: { [j.id]: e.target.checked } })} /><span><b>{j.title}</b>{!data.flags.brief && j.id === "brief" ? " (not switched on for your account yet)" : ""}{DEAL_JOB_HELP[j.id] ? <span className="block text-xs text-muted-foreground">{DEAL_JOB_HELP[j.id]}</span> : null}</span></label>
+        <label key={j.id} className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={conn.jobs[j.id] === true} onChange={(e) => void act("update", { jobs: { [j.id]: e.target.checked } })} /><span><b>{j.title}</b>{data.flags[j.id] === false ? " (not switched on for your account yet)" : ""}{DEAL_JOB_HELP[j.id] ? <span className="block text-xs text-muted-foreground">{DEAL_JOB_HELP[j.id]}</span> : null}</span></label>
       ))}
       <div className="flex flex-wrap gap-2">
         <Btn variant="secondary" disabled={busy || !data.flags.brief} onClick={() => void runPreview()} testId="ai-preview">{busy ? "Writing a sample..." : "Preview a sample"}</Btn>

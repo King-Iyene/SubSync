@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { clearDraft, getDraft, putDraft } from "@/lib/design/drafts";
 import { useData } from "../../session";
 import { InfoTip } from "../info-tip";
+import { AiDraftButton } from "../ai-lead";
+import { DRAFT_NOTE } from "@/lib/ai/lead-core";
 import { INPUT, wbButtons, type Runner } from "./runner";
 import type { WbContext, WbThread } from "./types";
 
@@ -88,18 +90,20 @@ export function Thread({ locationId, contactId, reloadKey, crmUrl }: { locationI
   );
 }
 
-export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChange, focusOnMount = false, draftKey }: { ctx: WbContext; runner: Runner; initial?: "SMS" | "Email"; open?: boolean; onOpenChange?: (o: boolean) => void; focusOnMount?: boolean; /** Where this person's unsent text is kept while the panel closes, reopens or refreshes. */ draftKey?: string }) {
+export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChange, focusOnMount = false, draftKey, lead }: { ctx: WbContext; runner: Runner; initial?: "SMS" | "Email"; open?: boolean; onOpenChange?: (o: boolean) => void; focusOnMount?: boolean; /** Where this person's unsent text is kept while the panel closes, reopens or refreshes. */ draftKey?: string; /** The lead this box writes to, for the optional AI draft button. */ lead?: { locationId: string; contactId: string } }) {
   const saved = draftKey ? getDraft(draftKey) : undefined;
   const [channel, setChannel] = useState<"SMS" | "Email" | "WhatsApp">(saved?.channel ?? (initial === "SMS" && !ctx.phone ? "Email" : initial));
   const [text, setText] = useState(saved?.text ?? "");
   const [subject, setSubject] = useState(saved?.subject ?? "");
+  // True while the words in the box came from an AI draft the person has not sent or cleared yet: a note says so, and sending still needs the usual preview and confirm.
+  const [aiDraft, setAiDraft] = useState(false);
   // Pressing Text or Email on the panel changes the way to send without throwing the box away (the first run is the opening itself).
   const firstInitial = useRef(true);
   useEffect(() => { if (firstInitial.current) { firstInitial.current = false; return; } setChannel(initial === "SMS" && !ctx.phone ? "Email" : initial); }, [initial, ctx.phone]);
   // The draft is kept as it is typed, and cleared when the message was really sent.
   useEffect(() => { if (draftKey) putDraft(draftKey, { text, subject, channel }); }, [draftKey, text, subject, channel]);
   const sentKind = runner.result?.tone === "done" ? runner.result.kind : null;
-  useEffect(() => { if (sentKind === "message") { setText(""); setSubject(""); if (draftKey) clearDraft(draftKey); } }, [sentKind, draftKey]);
+  useEffect(() => { if (sentKind === "message") { setText(""); setSubject(""); setAiDraft(false); if (draftKey) clearDraft(draftKey); } }, [sentKind, draftKey]);
   const box = useRef<HTMLTextAreaElement>(null);
   const first = ctx.name.trim().split(/\s+/)[0] ?? "";
   const email = channel === "Email";
@@ -134,9 +138,11 @@ export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChan
           <option value="">Template...</option>
           {ctx.templates.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
         </select>
+        {lead && <AiDraftButton locationId={lead.locationId} contactId={lead.contactId} channel={channel} hasText={text.trim().length > 0} onDraft={(t) => { setText(t); setAiDraft(true); requestAnimationFrame(() => box.current?.focus()); }} />}
       </div>
       {email && <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" aria-label="Subject" maxLength={200} className={INPUT} data-testid="wb-subject" />}
-      <textarea ref={box} value={text} onChange={(e) => setText(e.target.value)} rows={2} maxLength={email ? 10000 : 1000} placeholder={`Write to ${first || "them"}...`} aria-label="Message" className="thin-scroll block max-h-56 w-full resize-none rounded-lg border bg-background px-3 py-2.5 text-[15px] leading-relaxed focus-visible:outline-2 focus-visible:outline-[var(--ring)]" data-testid="wb-text" />
+      <textarea ref={box} value={text} onChange={(e) => { setText(e.target.value); if (!e.target.value.trim()) setAiDraft(false); }} rows={2} maxLength={email ? 10000 : 1000} placeholder={`Write to ${first || "them"}...`} aria-label="Message" className="thin-scroll block max-h-56 w-full resize-none rounded-lg border bg-background px-3 py-2.5 text-[15px] leading-relaxed focus-visible:outline-2 focus-visible:outline-[var(--ring)]" data-testid="wb-text" />
+      {aiDraft && text.trim() && <p className="flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm" role="status" data-testid="ai-draft-note"><span className="rounded bg-primary/15 px-1.5 py-0.5 text-xs font-semibold text-primary">AI draft</span><span>{DRAFT_NOTE}</span></p>}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground"><span>Insert:</span>
           {[["First name", first], ["My name", ctx.me ?? ""], ["Business", ctx.locationName ?? ""]].map(([l, v]) => <button key={l} type="button" disabled={!v} onClick={() => insert(v)} className="min-h-9 rounded-md border px-2.5 text-sm hover:bg-accent disabled:opacity-40" data-testid="wb-merge">{l}</button>)}
