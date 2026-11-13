@@ -61,7 +61,7 @@ export function composeEmail(input: Item[], o: MailOptions): Mail {
 /** The CRM page that matches an in-app link, on that alert's own account and the company's own CRM domain. null = the CRM has no equivalent (or no single account), so the link stays in SubSync. */
 export function crmLinkFor(source: DomainSource, link: Link): string | null {
   const loc = link.locationId;
-  if (!loc || !link.view) return null;
+  if (!loc || !link.view || !/^[A-Za-z0-9_-]{1,64}$/.test(loc)) return null; // an odd id can never become part of a Slack link
   const d = deepLinks(source);
   switch (link.view) {
     case "speed": case "sla": case "unanswered": return d.conversations(loc);
@@ -73,11 +73,24 @@ export function crmLinkFor(source: DomainSource, link: Link): string | null {
   }
 }
 
-/** A Slack link: the CRM page when one exists (label says "in your CRM"), otherwise the SubSync page (label says "in SubSync"). */
-function slackLink(o: SlackOptions, i: Item): string {
-  const label = (i.linkLabel ?? "Open it").replace(/ in (your CRM|SubSync)$/, "");
+/** Where a SubSync-only view lives in the app menu, in words. SubSync opens only inside the CRM (it signs the person in there), so a Slack message can never link to it directly. */
+export function menuFor(view: string | null): string {
+  switch (view) {
+    case "email": return "SubSync > Clients > Email health";
+    case "sync": case "settings": return "SubSync > Settings > Sync status";
+    case "connections": return "SubSync > Settings > Integrations";
+    case "alerts": return "SubSync > Today";
+    default: return "SubSync";
+  }
+}
+
+/** A Slack link that can work: the CRM page when one exists ("... in your CRM"); otherwise that account's CRM dashboard with the menu path to the SubSync view; with no single account, plain words and no link. */
+export function slackLink(o: { crmDomain?: DomainSource }, i: Pick<Item, "link" | "linkLabel">): string {
   const crm = crmLinkFor(o.crmDomain, i.link);
-  return `<${crm ?? appLink(o.appUrl, i.link)}|${slackEsc(`${label} ${crm ? "in your CRM" : "in SubSync"}`)}>`;
+  if (crm) return `<${crm}|${slackEsc(`${(i.linkLabel ?? "Open it").replace(/ in (your CRM|SubSync)$/, "")} in your CRM`)}>`;
+  const text = `Open your CRM, then ${menuFor(i.link.view)}`;
+  const loc = i.link.locationId;
+  return loc && /^[A-Za-z0-9_-]{1,64}$/.test(loc) ? `<${deepLinks(o.crmDomain).account(loc)}|${slackEsc(text)}>` : slackEsc(text);
 }
 
 export type SlackOptions = { company: string; appUrl: string; /** The company's CRM domain (settings.appDomain / white-label); the default host is used only when none is known. */ crmDomain?: DomainSource; test?: boolean };

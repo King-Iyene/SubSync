@@ -27,7 +27,8 @@ export type ChatDeps = {
   recentCount(teamId: string, slackUser: string, sinceMs: number): Promise<number>;
   ask(link: ChatLink, question: string, userKey: string): Promise<AskResult>;
   post(link: ChatLink, channel: string, threadTs: string | null, text: string): Promise<void>;
-  appUrl(): string;
+  /** The account's CRM dashboard link (its own company's CRM domain), or null when the chat is not for one account. SubSync addresses are never sent to Slack. */
+  crmUrl(link: ChatLink): Promise<string | null>;
   /** Run after the response is sent (Vercel `after`). */
   later(fn: () => Promise<void>): void;
   log(code: string, detail?: Record<string, unknown>): void;
@@ -72,6 +73,6 @@ async function answer(team: string, ev: SlackEvent, d: ChatDeps): Promise<void> 
   if (q.length > QUESTION_MAX) return say(`Please keep the question under ${QUESTION_MAX} characters.`);
   if ((await d.recentCount(team, user, d.now() - RATE_WINDOW_MS)) > RATE_MAX) return say("You are asking quickly. Please wait a few minutes and ask again.");
   const r = await d.ask(link, q, `slack:${team}:${user}`);
-  if (!r.ok) return say(formatRefusal(r.code, r.message, d.appUrl()));
-  return say(formatAnswer(r, { appUrl: d.appUrl(), locationId: link.locationId }));
+  if (!r.ok) return say(formatRefusal(r.code, r.message, await d.crmUrl(link)));
+  return say(formatAnswer(r, { crmUrl: await d.crmUrl(link) }));
 }

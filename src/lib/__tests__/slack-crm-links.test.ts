@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import fs from "node:fs";
+import { resolveCompanyDomain, type DomainRow } from "../links.ts";
 import { describeAlert, type AlertInput } from "../notifications/alert-text.ts";
 import { composeSlack, crmLinkFor, type Item } from "../notifications/compose.ts";
 
@@ -40,12 +42,20 @@ test("the stored white-label domain is used, and the default host only when ther
   for (const none of [undefined, null, "", "not a host/../x"]) assert.match(composeSlack([it], { company: "Co", appUrl: APP, crmDomain: none }), /<https:\/\/app\.gohighlevel\.com\/v2\//);
 });
 
-test("alerts with no CRM page keep the SubSync link and say it opens SubSync", () => {
-  for (const [kind, detail] of SUBSYNC_KINDS) {
-    const [l] = links(composeSlack([item(A(kind, detail))], { company: "Co", appUrl: APP }));
-    assert.match(l.url, /^https:\/\/subsync\.kdsquares\.com\/app#/, kind);
-    assert.match(l.label, / in SubSync$/, kind);
-  }
+test("alerts with no CRM page never link to SubSync: they link to the account's CRM dashboard and name the menu", () => {
+  const text = composeSlack([item(A("email", { domain: "kdsquares.com", status: "warning" }))], { company: "Co", appUrl: APP, crmDomain: "app.kdsquares.com" });
+  const [l] = links(text);
+  assert.equal(l.url, "https://app.kdsquares.com/v2/location/locAAA/dashboard");
+  assert.equal(l.label, "Open your CRM, then SubSync &gt; Clients &gt; Email health");
+  const sync = links(composeSlack([item(A("sync", { error: "x" }))], { company: "Co", appUrl: APP }))[0];
+  assert.equal(sync.label, "Open your CRM, then SubSync &gt; Settings &gt; Sync status");
+  for (const [kind, detail] of SUBSYNC_KINDS) assert.doesNotMatch(composeSlack([item(A(kind, detail))], { company: "Co", appUrl: APP }), /kdsquares\.com\/app|app#/, kind);
+});
+
+test("no account on the alert: plain words, no link at all", () => {
+  const text = composeSlack([item(A("email", { domain: "x.com" }, null as unknown as string))], { company: "Co", appUrl: APP });
+  assert.equal(links(text).length, 0);
+  assert.match(text, /Open your CRM, then SubSync &gt; Clients &gt; Email health/);
 });
 
 test("a digest takes each alert's location from that alert, so one account never gets another's link", () => {
@@ -63,4 +73,44 @@ test("no account on the alert means no CRM link (nothing is guessed); labels nev
   assert.equal(crmLinkFor(null, { view: "email", locationId: "L1" }), null);
   const text = composeSlack([item(A("sla", { unanswered: 5, slaHours: 4 })), item(A("email", { domain: "x.com" }))], { company: "Co", appUrl: APP });
   for (const l of links(text)) assert.doesNotMatch(l.label, /gohighlevel|highlevel|ghl/i);
+});
+
+// ---- one CRM domain per company ----
+const row = (o: Partial<DomainRow> & { own?: boolean }): DomainRow => ({ own: false, source: "default", appDomain: "app.gohighlevel.com", detected: null, ...o });
+
+test("a sibling account inherits the company's detected domain", () => {
+  const r = resolveCompanyDomain([row({ own: true }), row({ source: "sso", appDomain: "app.kdsquares.com", detected: "app.kdsquares.com" }), row({})]);
+  assert.deepEqual([r.appDomain, r.source, r.detected], ["app.kdsquares.com", "sso", "app.kdsquares.com"]);
+  assert.equal(resolveCompanyDomain([row({ own: true }), row({ source: "install", detected: "crm.a.com" })]).source, "install");
+});
+
+test("a typed domain wins: this account's own first, then any sibling's, over a detected one", () => {
+  const detected = row({ source: "sso", appDomain: "app.kdsquares.com", detected: "app.kdsquares.com" });
+  assert.equal(resolveCompanyDomain([row({ own: true, source: "manual", appDomain: "mine.example.com" }), row({ source: "manual", appDomain: "other.example.com" }), detected]).appDomain, "mine.example.com");
+  assert.equal(resolveCompanyDomain([row({ own: true }), row({ source: "manual", appDomain: "typed.example.com" }), detected]).appDomain, "typed.example.com");
+});
+
+test("the default host only when nothing is known; a bad stored value is ignored", () => {
+  assert.deepEqual(resolveCompanyDomain([row({ own: true }), row({})]), { appDomain: "app.gohighlevel.com", source: "default", detected: null });
+  assert.equal(resolveCompanyDomain([]).appDomain, "app.gohighlevel.com");
+  assert.equal(resolveCompanyDomain([row({ own: true, source: "manual", appDomain: "https://evil.com/x" }), row({ detected: "not a host" })]).appDomain, "app.gohighlevel.com");
+});
+
+test("tenant isolation: the rule only sees the rows it is given, and the company read selects only one company's installs", () => {
+  // Company B has its own domain; company A's rows never include it, so A can never get it.
+  const a = resolveCompanyDomain([row({ own: true }), row({})]);
+  const b = resolveCompanyDomain([row({ own: true, source: "sso", detected: "crm.b.com", appDomain: "crm.b.com" })]);
+  assert.equal(a.appDomain, "app.gohighlevel.com");
+  assert.equal(b.appDomain, "crm.b.com");
+  const q = fs.readFileSync(new URL("../analytics/queries.ts", import.meta.url), "utf8");
+  assert.match(q, /i\.company_id = coalesce\(me\.agency_company_id, me\.company_id\)/);
+  assert.match(q, /where me\.id = \$\{installationId\} and i\.uninstalled_at is null/);
+});
+
+test("sign-in and the install event share the company's domain with all its installs, and the chat bot reads it too", () => {
+  const q = fs.readFileSync(new URL("../analytics/queries.ts", import.meta.url), "utf8");
+  assert.match(q, /for \(const id of siblings\)/);
+  assert.match(q, /app_domain_source <> 'manual'/);
+  const route = fs.readFileSync(new URL("../../app/api/slack/events/route.ts", import.meta.url), "utf8");
+  assert.match(route, /companyDomain\(link\.installationId\)/);
 });

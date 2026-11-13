@@ -8,12 +8,14 @@ import { featureOn, resolveEntitlements } from "@/lib/flags";
 import { handleSlackRequest, type ChatDeps } from "@/lib/slack-chat/handler";
 import { claimEvent, findLink, postReply, recentCount } from "@/lib/slack-chat/store";
 import { safeError } from "@/lib/safe-log";
+import { companyDomain } from "@/lib/analytics/queries";
+import { deepLinks } from "@/lib/links";
 
 // Slack's Events API address (docs/SLACK_CHAT_SETUP.md). Behind the slack_chat flag, default off. Every request is checked against Slack's signature first; the rules
 // are in src/lib/slack-chat/handler.ts. We answer at once and work after the response, because Slack waits three seconds.
 export const maxDuration = 60;
 
-const appUrl = () => (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+const crmUrl = async (link: { installationId: string; locationId: string | null }) => { if (!link.locationId) return null; const d = await companyDomain(link.installationId).catch(() => null); return deepLinks(d?.appDomain).account(link.locationId); };
 
 const deps = (): ChatDeps => ({
   enabled: async () => !killedGlobally() && (await featureOn("slack_chat")),
@@ -31,7 +33,7 @@ const deps = (): ChatDeps => ({
     return askData({ tenant, userKey, question, deps: realDeps(), anonymous: true });
   },
   post: (link, channel, thread, text) => postReply(link, channel, thread, text),
-  appUrl,
+  crmUrl,
   later: (fn) => after(fn),
   log: (code, detail) => console.log(code, JSON.stringify(detail ?? {})),
 });

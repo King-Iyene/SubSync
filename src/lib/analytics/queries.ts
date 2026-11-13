@@ -2,7 +2,7 @@ import { sql } from "../db";
 import { cachedRead } from "../read-cache";
 import type { AccountRow, AccountSettings, AlertDraft } from "./derive";
 import type { DomainReport } from "../dns/email-auth";
-import { DEFAULT_APP_DOMAIN } from "../links";
+import { resolveCompanyDomain, type ResolvedDomain, DEFAULT_APP_DOMAIN } from "../links";
 import { effectiveLogo, validLogoUrl } from "../brand-logo";
 import { countedInScope, dealIsStale, dealScopeJoins, daysInStepSql, outOfScope } from "./stage-rules-sql";
 import { currentSnapshotVersion, snapshotOk } from "./definitions-sql";
@@ -85,15 +85,17 @@ async function loadSettings(installationId: string): Promise<Settings> {
     await db`insert into settings (installation_id) values (${installationId}) on conflict do nothing`;
     [r] = await read();
   }
+  // The domain is the COMPANY's, not this install's: a sibling account of the same company may be the one that saw it (sign-in or install event).
+  const company = r.app_domain_source === "manual" ? null : await companyDomain(installationId).catch(() => null);
   const days = Array.isArray(r.stale_deal_days) && r.stale_deal_days.length ? Number(r.stale_deal_days[0]) : 30;
   return {
     staleDays: days,
     dormantDays: r.dormant_days,
     slaHours: r.sla_hours,
     slackWebhookUrl: r.slack_webhook_url,
-    appDomain: r.ghl_app_domain,
-    appDomainSource: r.app_domain_source === "manual" || r.app_domain_source === "sso" || r.app_domain_source === "install" ? r.app_domain_source : "default",
-    detectedDomain: (r.detected_app_domain as string | null) ?? null,
+    appDomain: company?.appDomain ?? r.ghl_app_domain,
+    appDomainSource: company?.source ?? (r.app_domain_source === "manual" || r.app_domain_source === "sso" || r.app_domain_source === "install" ? r.app_domain_source : "default"),
+    detectedDomain: company?.detected ?? (r.detected_app_domain as string | null) ?? null,
     digestEnabled: r.digest_enabled,
     customChecklist: Array.isArray(r.custom_checklist) ? r.custom_checklist.filter((x: unknown): x is string => typeof x === "string") : [],
     digestHour: (r.digest_hour as number | null) ?? null,
@@ -118,6 +120,23 @@ async function loadSettings(installationId: string): Promise<Settings> {
   };
 }
 
+// The installs of one company: its agency install and every client-account install that names it (agency_company_id). Never another company's.
+const COMPANY_INSTALLS = (id: string) => sql()`
+  select i.id from installations me
+  join installations i on i.id = me.id or i.company_id = coalesce(me.agency_company_id, me.company_id) or i.agency_company_id = coalesce(me.agency_company_id, me.company_id)
+  where me.id = ${id} and i.uninstalled_at is null`;
+
+/** The CRM domain for one install, resolved across its whole company (see resolveCompanyDomain for the order). */
+export async function companyDomain(installationId: string): Promise<ResolvedDomain> {
+  const rows = await sql()`
+    select (i.id = ${installationId}) own, s.app_domain_source source, s.ghl_app_domain app_domain, s.detected_app_domain detected
+    from installations me
+    join installations i on i.id = me.id or i.company_id = coalesce(me.agency_company_id, me.company_id) or i.agency_company_id = coalesce(me.agency_company_id, me.company_id)
+    join settings s on s.installation_id = i.id
+    where me.id = ${installationId} and i.uninstalled_at is null`;
+  return resolveCompanyDomain(rows.map((r) => ({ own: r.own === true, source: (r.source as string | null) ?? null, appDomain: (r.app_domain as string | null) ?? null, detected: (r.detected as string | null) ?? null })));
+}
+
 // Keep the company's own login domain, seen at sign-in or in the install event (stored per install, so per company). It is always remembered as
 // "detected"; it becomes the domain links use unless the company typed one in Settings, which always wins.
 export async function captureWhitelabelDomain(installationId: string, domain: string, from: "sso" | "install" = "sso"): Promise<void> {
@@ -130,6 +149,14 @@ export async function captureWhitelabelDomain(installationId: string, domain: st
       app_domain_source = case when app_domain_source = 'manual' then 'manual' else ${from} end
     where installation_id = ${installationId}
       and (detected_app_domain is distinct from ${domain} or (app_domain_source <> 'manual' and ghl_app_domain is distinct from ${domain}))`;
+  // The same company's other installs learn it too (their own typed domain, if any, still wins). Additive: only fills settings rows, never removes anything.
+  const siblings = (await COMPANY_INSTALLS(installationId).catch(() => [])).map((r) => r.id as string).filter((id) => id !== installationId);
+  for (const id of siblings) {
+    await db`insert into settings (installation_id) values (${id}) on conflict do nothing`;
+    await db`
+      update settings set detected_app_domain = ${domain}, ghl_app_domain = ${domain}, app_domain_source = ${from}
+      where installation_id = ${id} and app_domain_source <> 'manual' and (detected_app_domain is distinct from ${domain} or ghl_app_domain is distinct from ${domain})`;
+  }
 }
 
 // Keep the logo address the install event or sign-in carried (already checked to be https). The owner's own address in Settings wins at read time.
