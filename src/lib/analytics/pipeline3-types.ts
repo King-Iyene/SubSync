@@ -41,7 +41,7 @@ export type Pl3Row = {
 
 export type Pl3Overview = {
   headline: string; button: { label: string; part: Pl3Part; bucket: Pl3Bucket | null; count: number } | null;
-  openCount: number; openValue: Money; weighted: Estimate; atRisk: Estimate;
+  openCount: number; /** Every open deal in play (no value or no owner included). The empty state asks this, never `openCount`, which counts money deals only. */ openAll?: number; openValue: Money; weighted: Estimate; atRisk: Estimate;
   stale: { count: number; value: number };
   wonLast30: Money; lostLast30: Money; winRate: Rate; velocity: Estimate; medianWonCycleDays: number | null;
   /** Big open deals (top tenth by value) with no movement for `days` days. */

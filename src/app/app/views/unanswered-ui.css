@@ -247,7 +247,7 @@
 .ur-scope { font-size: 0.75rem; color: var(--muted-foreground); margin: 4px 0 0; }
 
 /* sub-sections inside the tab of Speed to lead */
-.ur-sub { display: flex; gap: 4px; overflow-x: auto; margin: 0 0 14px; padding: 4px; border: 1px solid color-mix(in srgb, var(--s6-line) 90%, transparent); border-radius: 12px; width: fit-content; max-width: 100%; }
+.ur-sub { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 14px; padding: 4px; border: 1px solid color-mix(in srgb, var(--s6-line) 90%, transparent); border-radius: 12px; width: fit-content; max-width: 100%; }
 .ur-subtab { flex: none; min-height: 44px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); font-size: 0.875rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .ur-subtab[aria-selected="true"] { background: color-mix(in srgb, var(--s6-cyan) 18%, transparent); color: var(--s6-btn-ink); }
 .ur-subtab:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }

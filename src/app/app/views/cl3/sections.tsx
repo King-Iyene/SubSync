@@ -7,6 +7,7 @@ import { RoleChip } from "../../roles";
 import { useCl, type ClParams } from "./data";
 import { AccountSettings } from "./settings";
 import { ago, change, day, Find, LevelChip, Load, minutes, money, NOT_ENOUGH, NOT_FROM_PLATFORM, Pager, RECONNECT, Spark } from "./shared";
+import { saveBlob } from "../../download-note";
 
 // The sections of the Clients screen that read their own part: Trends, Compare accounts, Reports, People, Setup health (with the plan and subscription list). Reads only, except the settings
 // panel opened from Reports. Every figure is a count from synced data; anything under its minimum says "Not enough data".
@@ -144,7 +145,7 @@ export function Reports({ filters, onChanged }: Shared & { onChanged: () => void
   const csv = (rows: Cl3Receipt[]) => {
     const head = ["Client", "Week starting", "Came in", "Answered", "Still waiting", "Booked", "Showed", "No-shows", "Appointments with no outcome", "Deals won", "Money won"];
     const body = rows.map((x) => [x.name, x.weekStart, x.cameIn, x.answered, x.stillWaiting, x.booked, x.showed, x.noshow, x.unmarked, x.won, Math.round(x.wonValue)].map(csvCell).join(","));
-    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([[head.map(csvCell).join(","), ...body].join("\n")], { type: "text/csv" })); a.download = `weekly-client-report-${rows[0]?.weekStart ?? "week"}.csv`; a.click(); URL.revokeObjectURL(a.href);
+    saveBlob(new Blob([[head.map(csvCell).join(","), ...body].join("\n")], { type: "text/csv" }), `weekly-client-report-${rows[0]?.weekStart ?? "week"}.csv`);
   };
   return (
     <div data-testid="cl-reports">

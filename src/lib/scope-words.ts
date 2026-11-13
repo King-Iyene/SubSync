@@ -14,7 +14,6 @@ const WORDS: Record<string, string> = {
   "payments/subscriptions.readonly": "read repeat payments",
   "payments/orders.readonly": "read orders and payments",
   "invoices.readonly": "read invoices",
-  "saas/company.read": "read the plan each client account is on",
   "users.readonly": "read team members",
   "calendars.readonly": "read calendars",
   "calendars/events.readonly": "read appointments",

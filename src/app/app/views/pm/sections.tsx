@@ -7,7 +7,7 @@ import type { PmDispute, PmDisputes, PmHistory, PmOptions, PmSetup, PmToday, PmU
 import { EmptyState } from "../../ds";
 import { useApiClient } from "../../session";
 import { fixturesOn, usePm } from "./data";
-import { Load, Money, NotFromPlatform, PermissionNotice, RECONNECT, ago, day } from "./shared";
+import { Load, Money, NotFromPlatform, PermissionNotice, ago, day } from "./shared";
 import type { QFilters } from "./queue";
 
 // The other Payments screens: Today, Disputes (a log you keep), Upcoming (estimates only), History (our own record) and Setup. Every number opens its rows or says where it comes from.
@@ -170,9 +170,8 @@ function PlansSection({ u }: { u: PmUpcoming }) {
   return (
     <section className="pm-card" aria-label="Expected from your clients">
       <h2 className="pm-h mb-2">From your clients (estimate)</h2>
-      {u.plans.state === "needs_permission" && <p className="text-sm"><b>{RECONNECT}</b></p>}
       {u.plans.items.map((i) => <p key={i.currency} className="text-sm"><b className="pm-amt">{fmtMoney(i.amount, i.currency)}</b> a month from {i.accounts} paying client {i.accounts === 1 ? "account" : "accounts"}. <span className="ap-fine">{i.formula}</span></p>)}
-      {u.plans.items.length === 0 && u.plans.state !== "needs_permission" && <NotFromPlatform>the price of the plans you sell to your clients.</NotFromPlatform>}
+      {u.plans.items.length === 0 && <p className="ap-fine" data-testid="pm-not-available"><b>Not available for this kind of app.</b> The platform only gives plan details to company-level apps.</p>}
       {u.plans.items.length > 0 && <p className="ap-fine mt-1">{u.plans.note}</p>}
     </section>
   );

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { adapt, API_PART, dealsOf, flowOf, forecastOf, healthOf, overviewOf, peopleOf, proofOf, queryOf } from "../../app/app/views/pl3/adapters.ts";
+import { adapt, API_PART, dealsOf, flowOf, forecastOf, healthOf, overviewIsEmpty, overviewOf, peopleOf, proofOf, queryOf } from "../../app/app/views/pl3/adapters.ts";
 import { allowedAccount } from "../api/pl-guard.ts";
 import { routeAllowed } from "../access.ts";
 
@@ -89,4 +89,19 @@ test("route rules: the pipeline reads and the checked change routes are open to 
   }
   assert.equal(routeAllowed("agency", "POST", ["pipeline3", "act", "apply"]), true);
   assert.equal(routeAllowed("client", "DELETE", ["pipeline3"]), false);
+});
+
+// Regression (13 Nov): the Overview said "No deals to show yet" for accounts with thousands of open deals, because the empty rule asked the MONEY count (deals with a value and an owner) instead of the open deals.
+test("the Overview is never empty while open deals exist, with or without money, and whatever the dates are", () => {
+  // The live shape: 9,002 open deals, none counted in the money, nothing won or lost in the dates (no stage moves in the window).
+  const live = overviewOf({ openCount: 0, openAll: 9002, openValue: { value: 0, n: 0 }, stale: { count: 0, value: 0 }, wonLast30: { value: 0, n: 0 }, lostLast30: { value: 0, n: 0 }, winRate: { value: null, n: 0, of: 0, enough: false }, health: { score: 0, noOwner: 151, noValue: 8838, test: 13, outliers: 0 }, headline: "No deals in play yet." } as never);
+  assert.equal(live.headline.openAll, 9002);
+  assert.equal(overviewIsEmpty(live.headline), false);
+  // Money deals only (an older answer without openAll) is not empty either.
+  assert.equal(overviewIsEmpty(overviewOf({ openCount: 3, openValue: { value: 100, n: 3 } } as never).headline), false);
+  // Closed deals in the dates alone keep it open too.
+  assert.equal(overviewIsEmpty(overviewOf({ openCount: 0, openAll: 0, wonLast30: { value: 500, n: 1 } } as never).headline), false);
+  // Truly nothing: the empty state shows.
+  assert.equal(overviewIsEmpty(overviewOf({ openCount: 0, openAll: 0 } as never).headline), true);
+  assert.equal(overviewIsEmpty(overviewOf(null).headline), true);
 });

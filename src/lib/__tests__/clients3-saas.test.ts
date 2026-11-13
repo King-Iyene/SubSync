@@ -23,7 +23,7 @@ test("reads every page with companyId, v3, and maps plan names and three states"
 });
 
 test("needs permission only for 401 or 403; other failures are not available", async () => {
-  for (const [status, want] of [[401, "needs_permission"], [403, "needs_permission"], [500, "not_available"], [429, "not_available"]] as const) {
+  for (const [status, want] of [[401, "not_available"], [403, "not_available"], [500, "not_available"], [429, "not_available"]] as const) {
     const r = await readSaasPlans(async () => ({ status, body: null }), "co1");
     assert.equal(stateFor(r, "a").state, want);
   }

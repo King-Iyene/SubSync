@@ -286,7 +286,7 @@ export function ChangeDialog({ kind, items, accounts, permitted, preset, onClose
 
 export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: Array<{ id: T; label: string }>; value: T; onChange: (t: T) => void }): ReactNode {
   return (
-    <div role="tablist" aria-label="Sections of this page" className="mb-6 flex gap-1 overflow-x-auto border-b" data-testid="wf-tabs">
+    <div role="tablist" aria-label="Sections of this page" className="mb-6 flex flex-wrap gap-1 border-b" data-testid="wf-tabs">
       {tabs.map((t) => <button key={t.id} type="button" role="tab" aria-selected={value === t.id} onClick={() => onChange(t.id)} data-testid={`wf-tab-${t.id}`} className={`min-h-10 shrink-0 border-b-2 px-3 text-sm ${value === t.id ? "border-primary font-semibold" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{t.label}</button>)}
     </div>
   );

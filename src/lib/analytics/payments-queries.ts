@@ -120,8 +120,8 @@ export async function sources(s: Scope, ids: string[]): Promise<PmSource[]> {
   ]);
   const out: PmSource[] = [];
   const p = pl[0] ?? {};
-  out.push({ key: "plans", label: SOURCE_LABEL.plans, scope: PM_SCOPES.plans, lastOkAt: iso(p.at), state: n(p.ok) > 0 ? "ok" : n(p.perm) > 0 ? "needs_permission" : n(p.na) > 0 ? "not_available" : "not_checked",
-    message: n(p.ok) > 0 ? null : n(p.perm) > 0 ? "Needs permission: reconnect" : n(p.na) > 0 ? "Not available from the platform yet" : "Not checked yet" });
+  out.push({ key: "plans", label: SOURCE_LABEL.plans, scope: PM_SCOPES.plans, lastOkAt: iso(p.at), state: n(p.ok) > 0 ? "ok" : n(p.perm) + n(p.na) > 0 ? "not_available" : "not_checked",
+    message: n(p.ok) > 0 ? null : n(p.perm) + n(p.na) > 0 ? "Not available for this kind of app. The platform only gives plan details to company-level apps." : "Not checked yet" });
   for (const key of ["transactions", "subscriptions", "invoices"] as const) {
     const r = st.find((x) => x.resource === key);
     const state: PmSource["state"] = !r ? "not_checked" : r.ok ? "ok" : r.perm ? "needs_permission" : r.bad ? "not_available" : "not_checked";
@@ -235,7 +235,7 @@ export async function upcoming(s: Scope, f: Filters): Promise<PmUpcoming> {
     plans: {
       state: ps?.state ?? "not_checked",
       items: priced.map((p) => ({ currency: p.currency as string, amount: Math.round(n(p.a) * 100) / 100, count: n(p.c), accounts: n(p.c), formula: "Estimate: plan price per month times paying client accounts. The platform does not give billing days." })),
-      note: priced.length ? "About this much a month from your clients (estimate). The platform does not tell us the day each client is charged." : ps?.state === "needs_permission" ? "Needs permission: reconnect" : "Not available from the platform yet: the price of the plans you sell.",
+      note: priced.length ? "About this much a month from your clients (estimate). The platform does not tell us the day each client is charged." : "Not available for this kind of app. The platform only gives plan details to company-level apps.",
     },
     customers: { available: false, note: "Not available from the platform yet: the date of the next repeat payment for your clients' customers." },
     missing: ["Next charge date of a paid plan", "Why a payment failed", "Retrying a card from SubSync", "A link for the customer to update their card", "Payment disputes from your processor"],

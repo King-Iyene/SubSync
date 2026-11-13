@@ -6,7 +6,7 @@ Plain words. Written 11 Nov 2026, scope list updated 12 Nov 2026, from `src/lib/
 
 ## 1. Scopes for this release
 
-The app asks for 40 permissions today (7 required, 33 optional): the 30-row table, the 3 Lead intake scopes, the 5 coming-feature scopes and 2 still-unused ones below. Against the 21 published in 2.0.0, **19 are new** (marked NEW; 15 in the table, 3 Lead intake, plus `locations/customFields.write`). The installed app has no workflows permission at all today. Anything already granted stays granted; only NEW ones make installs press Update.
+The app asks for 39 permissions today (7 required, 32 optional): the 29-row table, the 3 Lead intake scopes, the 5 coming-feature scopes and 2 still-unused ones below. Against the 21 published in 2.0.0, **19 are new** (marked NEW; 15 in the table, 3 Lead intake, plus `locations/customFields.write`). The installed app has no workflows permission at all today. Anything already granted stays granted; only NEW ones make installs press Update.
 
 Name check: the official scope page (marketplace.gohighlevel.com/docs/oauth/Scopes) loads with scripts, so it could not be read from here. "VERIFIED" below means a primary-source read recorded in our docs (SCOPE_PLAN, PAYMENTS_BRIEF); "INFERENCE" means not confirmed. Check each in the portal's scope picker: if the picker does not list it, do not tick it.
 
@@ -36,7 +36,6 @@ Name check: the official scope page (marketplace.gohighlevel.com/docs/oauth/Scop
 | [ ] | `campaigns.readonly` NEW | Opt | INFERENCE | Campaign list and health | Needs permission: reconnect |
 | [ ] | `emails/campaigns.readonly` NEW | Opt | INFERENCE | Same campaign list | Needs permission: reconnect |
 | [ ] | `emails/stats.readonly` NEW | Opt | INFERENCE | Campaign delivery totals | Needs permission: reconnect |
-| [ ] | `saas/company.read` NEW | Opt | INFERENCE (PAYMENTS_BRIEF says VERIFIED name; SCOPE_PLAN says INFERENCE) | Clients > Billing (plan, subscription status) | Needs permission: reconnect |
 | [ ] | `payments/transactions.readonly` NEW | Opt | VERIFIED | Payments: failed payments, refunds | Needs permission: reconnect |
 | [ ] | `payments/subscriptions.readonly` NEW | Opt | VERIFIED | Payments: failed repeat payments | Needs permission: reconnect |
 | [ ] | `invoices.readonly` NEW | Opt | VERIFIED | Payments: late invoices | Needs permission: reconnect |
@@ -84,7 +83,7 @@ Removing needs a small code change first (`scopes.ts`, `scope-groups.ts`, regene
 | `forms.readonly` | Capabilities probe only | Not asked for. Leave off. |
 | `invoices.write` | Resend invoice (flag `pm_resend`, off) | Would message a customer. Leave off. |
 
-**Count for the portal: tick all 40 scopes (7 required, 33 optional): 30 from the first table, 3 Lead intake, 5 coming-feature, 2 still-unused. Set every one except the first 7 to Optional.** Total in `scopes.ts` today: 40.
+**Count for the portal: tick all 39 scopes (7 required, 32 optional): 29 from the first table, 3 Lead intake, 5 coming-feature, 2 still-unused. Set every one except the first 7 to Optional.** Total in `scopes.ts` today: 40.
 
 ## 2. Portal steps (King; about 10 minutes)
 
@@ -121,7 +120,7 @@ Needs your login. Do this on a quiet day: a published version goes live at once 
 | Payments: failed repeat payments | `payments/subscriptions.readonly` |
 | Payments: late invoices | `invoices.readonly` |
 | Credit balance warning | `wallet.readonly` |
-| Clients > Billing plan status | `saas/company.read` |
+| Clients > Billing plan status | Not available for this kind of app (agency-only permission; removed 13 Nov 2026) |
 | Workflows page and setup check | `workflows.readonly` |
 | Failing and idle workflow checks | `workflows.logs` |
 | Campaign list and health | `campaigns.readonly`, `emails/campaigns.readonly` |
@@ -169,6 +168,6 @@ NEEDS_KING item 4 says $9 and CLAUDE.md says $11.50: CLAUDE.md wins ($11.50).
 ## 7. Uncertain
 
 - Live version number and whether the portal offers Minor or only Major.
-- Names marked INFERENCE (workflows, campaigns, `saas/company.read`, installer details).
+- Names marked INFERENCE (workflows, campaigns, installer details).
 - `workflows.publish` may not exist as a separate scope.
 - Whether adding NEW optional scopes counts against the private install cap or re-bills anything (it should not).
