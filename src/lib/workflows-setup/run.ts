@@ -3,26 +3,43 @@ import { isLive } from "../live-flags";
 import { getSettings as companySettings } from "../analytics/queries";
 import { writeEnabledFor } from "../analytics/cleanup-config";
 import { resolveBrand } from "../brand-resolve";
+import { parseGranted } from "../scope-groups";
 import { locationAccessToken } from "../sync/engine";
 import { getSettings as callQueueSettings } from "../dial/callqueue-run";
-import { httpClient } from "./client";
+import { httpClient, type WfClient } from "./client";
+import { handSteps } from "./hand-steps";
 import { folderNameFor, neutralName } from "./naming";
-import { checkOnly, provision, type Result, type Row, type Store } from "./provisioner";
+import { checkOnly, DEFAULT_SETUP, missingSetupScopes, provision, type Result, type Row, type Store } from "./provisioner";
 import { CALL_QUEUE } from "./templates";
 
 // Server side of workflow setup (docs/features/WORKFLOW_SETUP.md). Tables come from the not-yet-applied migration 20261117090000: until it runs, `ready` is false and nothing is read or written.
 const missing = (e: unknown) => ["42P01", "42703"].includes((e as { code?: string })?.code ?? "");
 
-export type SetupSettings = { folderName: string; autoSetup: boolean; assignMode: "round_robin" | "user"; assignUserId: string | null };
+export type SetupSettings = { folderName: string; autoSetup: boolean; autoPublish: boolean; assignMode: "round_robin" | "user"; assignUserId: string | null };
 export async function getSetupSettings(installationId: string, locationId: string): Promise<{ ready: boolean; s: SetupSettings; brandFolder: string }> {
   const brand = resolveBrand(await companySettings(installationId).catch(() => null));
   const brandFolder = folderNameFor({ brand });
-  const base: SetupSettings = { folderName: brandFolder, autoSetup: false, assignMode: "round_robin", assignUserId: null };
+  const base: SetupSettings = { folderName: brandFolder, ...DEFAULT_SETUP, assignMode: "round_robin", assignUserId: null };
+  const shape = (r: Record<string, unknown>, publish: boolean): SetupSettings => ({ folderName: folderNameFor({ custom: r.folder_name as string | null, brand }), autoSetup: r.auto_setup === true, autoPublish: publish, assignMode: r.assign_mode === "user" ? "user" : "round_robin", assignUserId: (r.assign_user_id as string | null) ?? null });
   try {
-    const [r] = await sql()`select folder_name, auto_setup, assign_mode, assign_user_id from workflow_setup_settings where installation_id = ${installationId} and location_id = ${locationId}`;
+    let r: Record<string, unknown> | undefined;
+    try { [r] = await sql()`select folder_name, auto_setup, auto_publish, assign_mode, assign_user_id from workflow_setup_settings where installation_id = ${installationId} and location_id = ${locationId}`; }
+    catch (e) {
+      // Before the 20261231170000 migration there is no auto_publish column: read the old shape and publish by default.
+      if ((e as { code?: string })?.code !== "42703") throw e;
+      [r] = await sql()`select folder_name, auto_setup, assign_mode, assign_user_id from workflow_setup_settings where installation_id = ${installationId} and location_id = ${locationId}`;
+    }
     if (!r) return { ready: true, s: base, brandFolder };
-    return { ready: true, brandFolder, s: { folderName: folderNameFor({ custom: r.folder_name as string | null, brand }), autoSetup: r.auto_setup === true, assignMode: r.assign_mode === "user" ? "user" : "round_robin", assignUserId: (r.assign_user_id as string | null) ?? null } };
+    return { ready: true, brandFolder, s: shape(r, r.auto_publish !== false) };
   } catch (e) { if (missing(e)) return { ready: false, s: base, brandFolder }; throw e; }
+}
+
+/** Scopes this install was granted, or null when unknown (nothing is blocked on a guess). */
+export async function grantedFor(installationId: string): Promise<string[] | null> {
+  try {
+    const [r] = await sql()`select scope from installations where id = ${installationId}`;
+    return typeof r?.scope === "string" && r.scope.trim() ? parseGranted(r.scope) : null;
+  } catch { return null; }
 }
 
 export async function saveSetupSettings(installationId: string, locationId: string, p: Record<string, unknown>): Promise<{ ok: boolean; message?: string }> {
@@ -37,9 +54,10 @@ export async function saveSetupSettings(installationId: string, locationId: stri
   const uid = p.assignUserId === undefined ? cur.s.assignUserId : typeof p.assignUserId === "string" && /^[A-Za-z0-9_-]{3,64}$/.test(p.assignUserId) ? p.assignUserId : null;
   if (mode === "user" && !uid) return { ok: false, message: "Choose which person gets the calls." };
   const auto = typeof p.autoSetup === "boolean" ? p.autoSetup : cur.s.autoSetup;
-  await sql()`insert into workflow_setup_settings (installation_id, location_id, folder_name, auto_setup, assign_mode, assign_user_id, updated_at)
-    values (${installationId}, ${locationId}, ${folder}, ${auto}, ${mode}, ${mode === "user" ? uid : null}, now())
-    on conflict (installation_id, location_id) do update set folder_name = excluded.folder_name, auto_setup = excluded.auto_setup, assign_mode = excluded.assign_mode, assign_user_id = excluded.assign_user_id, updated_at = now()`;
+  const publish = typeof p.autoPublish === "boolean" ? p.autoPublish : cur.s.autoPublish;
+  await sql()`insert into workflow_setup_settings (installation_id, location_id, folder_name, auto_setup, auto_publish, assign_mode, assign_user_id, updated_at)
+    values (${installationId}, ${locationId}, ${folder}, ${auto}, ${publish}, ${mode}, ${mode === "user" ? uid : null}, now())
+    on conflict (installation_id, location_id) do update set folder_name = excluded.folder_name, auto_setup = excluded.auto_setup, auto_publish = excluded.auto_publish, assign_mode = excluded.assign_mode, assign_user_id = excluded.assign_user_id, updated_at = now()`;
   return { ok: true };
 }
 
@@ -68,18 +86,26 @@ export async function setupView(installationId: string, locationId: string): Pro
   return { users, ready: st.ready, state: row?.status ?? "none", workflowId: row?.workflowId ?? null, updateAvailable: !!row && row.templateVersion < CALL_QUEUE.version, lastError: row?.lastError ?? null, settings: st.s, folderDefault: st.brandFolder, live, tag: cq.s.tag };
 }
 
+const NO_CLIENT: WfClient = { async stepTypes() { return { ok: false, kind: "failed", status: 0 }; }, async list() { return { ok: false, kind: "failed", status: 0 }; }, async validate() { return { ok: false, kind: "failed", status: 0 }; }, async create() { return { ok: false, kind: "failed", status: 0 }; }, async publish() { return { ok: false, kind: "failed", status: 0 }; } };
+
 export async function runSetup(a: { installationId: string; companyId: string; locationId: string; manual: boolean }): Promise<Result> {
   const [st, cq] = await Promise.all([getSetupSettings(a.installationId, a.locationId), callQueueSettings(a.installationId, a.locationId)]);
   if (!st.ready) return { state: "unavailable", code: "failed", message: "Setup needs the latest database update, which has not run yet.", lines: [] };
-  const token = await locationAccessToken(a.companyId, a.locationId);
+  const granted = await grantedFor(a.installationId);
+  // Without the two workflow permissions no key is minted and no request is made: the provisioner answers "needs permission" at once.
+  let client = NO_CLIENT;
+  if (!missingSetupScopes(granted)) {
+    try { client = httpClient(await locationAccessToken(a.companyId, a.locationId), a.locationId); }
+    catch { return { state: "unavailable", code: "failed", message: "SubSync could not reach this account just now. Try again in a minute, or use the steps below.", lines: [], steps: handSteps(cq.s.tag, st.s.assignMode === "user" && st.s.assignUserId ? { mode: "user", userId: st.s.assignUserId } : { mode: "round_robin" }, st.s.folderName, CALL_QUEUE.name) }; }
+  }
   const optedIn = await writeEnabledFor(a.installationId, a.locationId);
   return provision(CALL_QUEUE, {
-    client: httpClient(token, a.locationId), store: storeFor(a.installationId, a.locationId), installationId: a.installationId, locationId: a.locationId, optedIn, manual: a.manual,
+    client, store: storeFor(a.installationId, a.locationId), installationId: a.installationId, locationId: a.locationId, optedIn, manual: a.manual, granted, autoPublish: st.s.autoPublish,
     settings: { folderName: st.s.folderName, tag: cq.s.tag, assign: st.s.assignMode === "user" && st.s.assignUserId ? { mode: "user", userId: st.s.assignUserId } : { mode: "round_robin" } },
   });
 }
 
-/** The INSTALL hook: only when the account switched automatic setup on, and never able to stop an install. */
+/** The INSTALL hook (location installs, and each account of a bulk install): on unless the account switched automatic setup off, a dry run until the account opts in, and never able to stop an install. */
 export async function autoSetupOnInstall(installationId: string, companyId: string, locationId: string): Promise<void> {
   try {
     const st = await getSetupSettings(installationId, locationId);

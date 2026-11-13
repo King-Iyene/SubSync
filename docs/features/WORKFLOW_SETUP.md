@@ -13,7 +13,11 @@ Built on the Workflows API v3 findings in DIALQUEUE.md (Create is limited availa
 - Names (white-label safe): folder default "Lead Response Automations", or "<Brand> Automations" when the company brand is on, or a per-account name; workflow "Call queue"; tag default `call-now` (a tag already saved keeps working). A vendor word is refused everywhere. The template key exists only in our table.
 - Calls are assigned to a chosen user or round robin, never "contact owner".
 - Fallback: 403 not enabled, missing permission, a rejected definition, or a missing step type (Manual Action: Call) shows a calm message and "Do it yourself in 5 steps" with copy buttons, plus "I did it" (read-only check; without `workflows.readonly` it counts contacts carrying the tag).
-- INSTALL: for a location install, after the first sync is queued, it runs only when the account has "Set up automatically" on (default off). It never stops an install.
+- INSTALL (location installs and each account of a bulk install): after the first sync is queued it runs unless the account turned "Set up automatically" off (default now ON, migration 20261231170000; the write gateway still makes it a dry run until the account opts in). It never stops an install.
+- Permission first: without `workflows.readonly` and `workflows.write` (read from the install) no key is minted and no request is made; the answer is state `needs_permission` ("Needs permission: reconnect"). Every "cannot do it automatically" answer carries `steps` (the hand-built steps) so the card can show them.
+- Auto-publish (`workflow_setup_settings.auto_publish`, default on): the workflow only creates internal call tasks, so it is published after creating. Off leaves a draft and says so.
+- Daily check (`daily.ts`, from the hourly Workflows cron, 10 accounts per run, each once a day, read only): removed or unpublished raises one quiet in-app alert (key `cqwf:<location>`, no email or Slack) and clears when fixed. A removed workflow is never re-created by this check, and a customer workflow is never deleted (also on uninstall; Settings should say so).
+- Probe: `scripts/probe-workflows.ts` (docs/WORKFLOWS_PROBE.md). Support message: docs/WORKFLOWS_API_SUPPORT_MESSAGE.md.
 - Uninstall: customer workflows are never deleted; our rows go with the install's data.
 
 ## UNVERIFIED until the first enabled account

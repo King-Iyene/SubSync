@@ -6,7 +6,7 @@ Plain words. Written 11 Nov 2026 from `src/lib/ghl/scopes.ts`, `src/lib/scope-gr
 
 ## 1. Scopes for this release
 
-The app asks for 36 permissions today (7 required, 29 optional). Against the 21 published in 2.0.0, **15 are new** (marked NEW). Anything already granted stays granted; only NEW ones make installs press Update.
+The app asks for 39 permissions today (7 required, 32 optional; the last three, `forms.readonly`, `surveys.readonly` and `funnels/funnel.readonly`, are the Lead intake ones added after the table below was written). Against the 21 published in 2.0.0, **18 are new** (marked NEW). The installed app has no workflows permission at all today. Anything already granted stays granted; only NEW ones make installs press Update.
 
 Name check: the official scope page (marketplace.gohighlevel.com/docs/oauth/Scopes) loads with scripts, so it could not be read from here. "VERIFIED" below means a primary-source read recorded in our docs (SCOPE_PLAN, PAYMENTS_BRIEF); "INFERENCE" means not confirmed. Check each in the portal's scope picker: if the picker does not list it, do not tick it.
 
@@ -28,9 +28,9 @@ Name check: the official scope page (marketplace.gohighlevel.com/docs/oauth/Scop
 | [ ] | `contacts.write` | Opt | VERIFIED | Data cleanup, meeting notes, Find lead tag/note, call queue tag | Needs permission: reconnect; nothing is written |
 | [ ] | `opportunities.write` | Opt | VERIFIED | Pipeline actions (stage, value, owner) after preview | Needs permission: reconnect |
 | [ ] | `calendars/events.write` | Opt | VERIFIED | Mark showed / no-show after preview | Needs permission: reconnect |
-| [ ] | `workflows.readonly` NEW | Opt | INFERENCE (Workflows API is limited availability) | Workflows page, setup check | Needs permission: reconnect |
+| [ ] | `workflows.readonly` NEW | Opt | INFERENCE (Workflows API is limited availability) | Workflows page, setup check, and the automatic call queue workflow (section 1B) | Needs permission: reconnect |
 | [ ] | `workflows.logs` NEW | Opt | INFERENCE | Failing/idle workflow checks | Needs permission: reconnect |
-| [ ] | `workflows.write` NEW | Opt | INFERENCE | Rename/copy workflow after preview and confirm | Needs permission: reconnect |
+| [ ] | `workflows.write` NEW | Opt | INFERENCE | Rename/copy workflow after preview and confirm, and creating the call queue workflow (section 1B) | Needs permission: reconnect |
 | [ ] | `workflows.publish` NEW | Opt | INFERENCE (NEEDS_KING says it may really be `workflows.write`) | Publish/pause after preview | Needs permission: reconnect |
 | [ ] | `workflows.delete` NEW | Opt | INFERENCE | Delete with typed confirmation | Needs permission: reconnect |
 | [ ] | `campaigns.readonly` NEW | Opt | INFERENCE | Campaign list and health | Needs permission: reconnect |
@@ -68,7 +68,7 @@ Removing needs a small code change first (`scopes.ts`, `scope-groups.ts`, regene
 | `forms.readonly` | Capabilities probe only | Not asked for. Leave off. |
 | `invoices.write` | Resend invoice (flag `pm_resend`, off) | Would message a customer. Leave off. |
 
-**Count for the portal: tick 30 scopes (7 required, 23 optional) from the first table; 14 of them are new vs 2.0.0 and need the Update; plus 6 to remove or keep (your call).** Total in `scopes.ts` today: 36.
+**Count for the portal: tick 30 scopes (7 required, 23 optional) from the first table; 14 of them are new vs 2.0.0 and need the Update; plus 6 to remove or keep (your call).** Total in `scopes.ts` today: 39.
 
 ## 2. Portal steps (King; about 10 minutes)
 
@@ -112,6 +112,14 @@ Needs your login. Do this on a quiet day: a published version goes live at once 
 | Our plan check against our records | `marketplace-installer-details.readonly` |
 
 Already working if granted in 2.0.0: speed to lead, appointments, tags, names, Data cleanup, meeting notes, deal and appointment actions.
+
+## 1B. Call queue workflow: created automatically (the two permissions that matter)
+
+SubSync creates the one internal "Call queue" workflow in each client account by itself (tag added, manual call task, tag removed; it sends nothing to contacts) when the CRM allows it. It needs only `workflows.readonly` and `workflows.write` (both Optional; they are rows in the table above, tick them there). Where the CRM has not enabled its Workflows API for the account (it answers 403 WORKFLOW_API_NOT_ENABLED_FOR_LOCATION), the card says so in plain words and shows the 2-minute hand-built steps. Without the permissions it says "Needs permission: reconnect".
+
+Portal steps: developer portal > **My Apps** > SubSync > **Versions** > **Clone as Draft** > **Advanced Settings** > **Auth** > **Scopes** > **Add scope** > tick `workflows.readonly` and `workflows.write`, set both to **Optional** (only tick `workflows.publish` and `workflows.delete` if the picker lists them) > write the release notes (see below) > publish as 1.1.0 (Minor). Then in **KD Squares Test**: open the app list, press **Update**, allow the workflow permissions, and run the probe (docs/WORKFLOWS_PROBE.md). Writing stays a dry run until `WRITE_GHL_LIVE=true` and the account opted in.
+
+Release note line: "New optional permission: workflows. SubSync can set up one internal call queue workflow in each client account for you. It never messages your contacts. Skip it and nothing breaks: you get a 2-minute guided setup instead."
 
 ## 4. Rollback
 
