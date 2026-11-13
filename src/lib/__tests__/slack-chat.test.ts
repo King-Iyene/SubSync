@@ -89,7 +89,7 @@ test("a mention is acknowledged at once and answered in a thread from the accoun
   assert.equal(t.posts[0].channel, "C1");
   assert.equal(t.posts[0].token, "xoxb-fake");
   assert.match(t.posts[0].text, /9 leads are waiting/);
-  assert.match(t.posts[0].text, /Leads waiting: 9 \(9 rows\) <https:\/\/app\.test\/app#ask\?rows=leads_waiting~from%3D2026-11-06~to%3D2026-11-13&label=Leads%20waiting\|Open the rows>/);
+  assert.match(t.posts[0].text, /Leads waiting: 9 \(9 rows\) <https:\/\/app\.test\/app#ask\?rows=leads_waiting~from%3D2026-11-06~to%3D2026-11-13&label=Leads%20waiting\|Open the rows in SubSync>/);
   assert.match(t.posts[0].text, /Nothing was sent or changed/);
 });
 
@@ -148,7 +148,7 @@ test("switched off or kill switch: acknowledged, nothing asked", async () => {
 test("no AI connected: replies 'AI is not connected yet' with a link", async () => {
   const t = setup({ ask: async () => ({ ok: false, code: "no_connection", message: "Connect your AI account first." }) });
   await t.run(mention());
-  assert.equal(t.posts[0].text, "AI is not connected yet. Connect your AI key here: <https://app.test/app#connections|Connections>.");
+  assert.equal(t.posts[0].text, "AI is not connected yet. Connect your AI key here: <https://app.test/app#connections|Connections in SubSync>.");
 });
 
 test("a person asking too fast is slowed down before the AI is called", async () => {

@@ -32,6 +32,12 @@ export function deepLinks(source: DomainSource) {
     /** The CRM's own call and text task list (manual actions from workflows). */
     manualActions: (loc: string) => `${base}/${loc}/conversations/manual_actions`,
     opportunities: (loc: string) => `${base}/${loc}/opportunities/list`,
+    /** The CRM's conversations list for one account (CHECK the exact path against a live CRM). */
+    conversations: (loc: string) => `${base}/${loc}/conversations/conversations`,
+    /** The CRM calendar of one account (CHECK). */
+    calendar: (loc: string) => `${base}/${loc}/calendars/view`,
+    /** The CRM contacts list of one account (CHECK). */
+    contacts: (loc: string) => `${base}/${loc}/contacts/smart_list/All`,
     conversation: (loc: string, id: string) => `${base}/${loc}/conversations/conversations/${id}`,
   };
 }
