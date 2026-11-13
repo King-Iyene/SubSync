@@ -1,3 +1,4 @@
+import { localDay } from "./zone.ts";
 // The Appointments filters and how they travel in the address (pure, unit tested).
 // Shared by every section: days (or a custom date range), account, calendar, person, source, search.
 // For the two worklists (Needs outcome, No-show recovery) only: booker, owner, status, age (days since the appointment time) and sort.
@@ -79,10 +80,12 @@ export function filtersFromParams(p: URLSearchParams): ApFilters {
 export const DATE_PRESETS = [["today", "Today"], ["yesterday", "Yesterday"], ["this_week", "This week"], ["last_week", "Last week"], ["this_month", "This month"], ["last_month", "Last month"], ["next7", "Next 7 days"], ["last7", "Last 7 days"], ["last30", "Last 30 days"], ["last90", "Last 90 days"], ["last180", "Last 180 days"], ["last365", "Last 12 months"]] as const;
 export type DatePreset = (typeof DATE_PRESETS)[number][0];
 const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+/** Today in the account time zone, as a UTC-midnight number so the calendar arithmetic below stays in whole days. */
+const localMidnight = (now: number) => Date.parse(`${localDay(now)}T00:00:00Z`);
 const DAYMS = 86_400_000;
 /** The first and last day (ISO, inclusive) of a preset. Weeks start on Monday. Pure, so it is unit tested. */
 export function presetRange(key: DatePreset, now: number): { from: string; to: string } {
-  const t = Math.floor(now / DAYMS) * DAYMS, dow = (new Date(t).getUTCDay() + 6) % 7, mon = t - dow * DAYMS, d = new Date(t);
+  const t = localMidnight(now), dow = (new Date(t).getUTCDay() + 6) % 7, mon = t - dow * DAYMS, d = new Date(t);
   const monthStart = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
   switch (key) {
     case "today": return { from: iso(t), to: iso(t) };

@@ -4,6 +4,7 @@ import { SlidersHorizontal, Sparkles } from "lucide-react";
 import { useState } from "react";
 import type { Appt3Options } from "@/lib/analytics/appointments3-types";
 import { DATE_PRESETS, presetRange, previousRange, rangeKey, type DatePreset } from "@/lib/design/appt-filters";
+import { localDay } from "@/lib/design/zone";
 import { useAp, type ApFilters } from "./data";
 import { SearchSelect } from "./search-select";
 
@@ -12,7 +13,7 @@ import { SearchSelect } from "./search-select";
 
 type Set = (p: Partial<ApFilters>) => void;
 const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-const today = () => iso(Date.now());
+const today = () => localDay(Date.now());
 const DAYMS = 86_400_000;
 const lastN: Record<string, 7 | 30 | 90> = { last7: 7, last30: 30, last90: 90 };
 
@@ -26,11 +27,11 @@ export function DateAxis({ filters, set }: { filters: ApFilters; set: Set }) {
       <select className="ap-field" aria-label="Appointment date" value={key} data-testid="ap-days"
         onChange={(e) => {
           const v = e.target.value;
-          if (v === "custom") set({ from: iso(Date.now() - 29 * DAYMS), to: today() });
+          if (v === "custom") set({ from: iso(Date.parse(`${localDay(Date.now())}T00:00:00Z`) - 29 * DAYMS), to: today() });
           else if (lastN[v]) set({ days: lastN[v], from: "", to: "" });
           else set(presetRange(v as DatePreset, Date.now()));
         }}>
-        {DATE_PRESETS.map(([k, l]) => <option key={k} value={k}>{k === "next7" || /^lastd+$/.test(k) ? l : `Happening: ${l.toLowerCase()}`}</option>)}
+        {DATE_PRESETS.map(([k, l]) => <option key={k} value={k}>{k === "next7" || /^lastd+$/.test(k) ? l : `Appointments happening: ${l.toLowerCase()}`}</option>)}
         <option value="custom">Choose dates</option>
       </select>
       {custom && key === "custom" && <>
@@ -52,7 +53,7 @@ export function BookedAxis({ filters, set }: { filters: ApFilters; set: Set }) {
         onChange={(e) => {
           const v = e.target.value;
           if (v === "any") set({ bookedFrom: "", bookedTo: "" });
-          else if (v === "custom") set({ bookedFrom: iso(Date.now() - 6 * DAYMS), bookedTo: today() });
+          else if (v === "custom") set({ bookedFrom: iso(Date.parse(`${localDay(Date.now())}T00:00:00Z`) - 6 * DAYMS), bookedTo: today() });
           else { const r = presetRange(v as DatePreset, Date.now()); set({ bookedFrom: r.from, bookedTo: r.to }); }
         }}>
         <option value="any">Booked any time</option>

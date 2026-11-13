@@ -1,14 +1,13 @@
 "use client";
 
 import { Check, ExternalLink, Link2, ListChecks, Loader2, Search, Undo2, Video, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { decodeRange, resolveRange, todayOf } from "@/lib/design/range";
-import { pageRangeFromHash } from "@/lib/design/global-filter";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { addDays, localDay } from "@/lib/design/zone";
+import { usePageRange } from "../ds/page-range";
 import { EmptyState, ErrorState, SkeletonRows } from "../ds";
 import { OpenLeadButton } from "../ds/open-lead-button";
 import { BrandIcon } from "../ds/brand-icon";
 import { ManualMatch, TranscriptBox } from "./meeting-call-parts";
-import { remembered } from "../ds/remember";
 import { ApiError, useApiClient, useData } from "../session";
 import { BTN, ChangeFlow, PRIMARY } from "./appointment-actions-ui";
 import { FX_DETAIL, FX_LIST, mnFx } from "./meeting-fixtures";
@@ -37,19 +36,18 @@ const errText = (e: unknown) => (e instanceof ApiError ? String(e.body.message ?
 export const whenOf = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }) : "time unknown");
 const dueOf = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
-const subscribe = (cb: () => void) => { window.addEventListener("subsync-range", cb); window.addEventListener("hashchange", cb); return () => { window.removeEventListener("subsync-range", cb); window.removeEventListener("hashchange", cb); }; };
 /** The dates chosen on the bar at the top of the page, as two days (null while the page is loading). The calls listed are the ones that started in this window. */
 export function useBarDays(): { from: string; to: string } | null {
   // Read the dates in the snapshot, so the day is taken when the bar changes and never during a render. With nothing chosen the bar shows the last 30 days, so that is what is used.
-  const key = useSyncExternalStore(subscribe, () => { const spec = pageRangeFromHash(window.location.hash) ?? decodeRange(remembered("range-page")) ?? { preset: "30d" as const, compare: "none" as const }; const r = resolveRange(spec, todayOf(Date.now())); return `${r.current.from}|${r.current.to}`; }, () => "");
-  return useMemo(() => { if (!key) return null; const [from, to] = key.split("|"); return { from, to }; }, [key]);
+  const bar = usePageRange(); // the ONE date range of the app (the address, this tab's custom choice, the remembered preset), never a copy of its rules
+  return useMemo(() => (bar.ready ? { from: bar.from, to: bar.to } : null), [bar.ready, bar.from, bar.to]);
 }
 
 const TONE: Record<string, string> = { on_contact: "bg-emerald-500", practice: "bg-sky-500", waiting_pick: "bg-amber-500", waiting_ok: "bg-amber-500", needs_permission: "bg-red-500", refused: "bg-red-500", other: "bg-muted-foreground/50" };
 const SELECT = "min-h-11 rounded-lg border bg-card px-2 text-sm sm:min-h-10";
 
-/** The last 7 days as two UTC days: the window the Fathom card counts. */
-export function lastSevenDays(now = Date.now()): { from: string; to: string } { return { from: new Date(now - 7 * 86_400_000).toISOString().slice(0, 10), to: new Date(now).toISOString().slice(0, 10) }; }
+/** The last 7 days as two days in the account time zone: the window the Fathom card counts (a labelled fixed window, not the bar). */
+export function lastSevenDays(now = Date.now()): { from: string; to: string } { return { from: addDays(localDay(now), -7), to: localDay(now) }; }
 
 export function MeetingsList({ onOpenAppointment, week = null, onClearWeek }: { onOpenAppointment?: (locationId: string, appointmentId: string) => void; week?: { from: string; to: string } | null; onClearWeek?: () => void }) {
   const api = useApiClient();

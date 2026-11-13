@@ -4,7 +4,8 @@ import { Check, ChevronDown, Loader2, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { accountButtonText, barMode, recentFirst } from "@/lib/design/global-filter";
 import { describeHidden, isFiltered, EMPTY_FILTER, nameList, scopeOf, type FilterOptions, type FilterValue } from "@/lib/design/filters";
-import { PRESETS, todayOf, type RangeSpec } from "@/lib/design/range";
+import { BAR_PRESETS, CALENDAR_PRESETS, todayOf, type RangePreset, type RangeSpec } from "@/lib/design/range";
+import { zoneWord } from "@/lib/design/zone";
 import { checkCustom, isDefaultRange } from "@/lib/design/page-range";
 import { parseTodayAccounts, withTodayAccounts } from "@/lib/analytics/today-queue";
 import { useData, useInflight } from "../session";
@@ -135,27 +136,32 @@ function DateControl({ mode }: { mode: "range" | "now" | "dates" }) {
   }, [pending, inflight]);
   const applyPreset = (s: RangeSpec) => { setDraft(null); pr.apply(s); };
   const applyDraft = () => { if (!problem && dirty) { pr.apply({ preset: "custom", from, to, compare: spec.compare }); setDraft(null); } };
+  // A custom range applies as soon as both dates are real and in order (no separate Apply press to forget); a bad pair shows its reason and applies nothing.
+  const setDates = (f: string, t: string) => { setDraft({ from: f, to: t }); if (f && t && !checkCustom(f, t, today)) { pr.apply({ preset: "custom", from: f, to: t, compare: spec.compare }); setDraft(null); } };
+  const quick = BAR_PRESETS.filter((p) => !CALENDAR_PRESETS.some((c) => c.key === p.key && c.key !== "today" && c.key !== "yday"));
+  const more = CALENDAR_PRESETS.filter((c) => c.key !== "today" && c.key !== "yday");
   if (mode === "now") return <p className="text-sm text-muted-foreground" data-testid="date-now" title="This page shows what is true at this moment, not a date range."><span className="font-medium text-foreground">Live</span>, as of right now</p>;
   const updating = pending && inflight > 0;
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 sm:gap-x-2.5" data-testid="date-control">
       <div role="group" aria-label="Dates" className="inline-flex max-w-full flex-wrap divide-x overflow-hidden rounded-lg border bg-card">
-        {PRESETS.map((p) => (
+        {quick.map((p) => (
           <button key={p.key} type="button" aria-pressed={spec.preset === p.key} onClick={() => applyPreset({ preset: p.key, compare: spec.compare })}
             className={`min-h-9 whitespace-nowrap px-1.5 text-sm outline-none sm:px-2.5 focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === p.key ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>{p.label.startsWith("Last ") ? <><span className="sm:hidden" aria-hidden>{p.label.slice(5).replace(" days", "d")}</span><span className="max-sm:sr-only">{p.label.slice(5)}</span></> : p.label}</button>
         ))}
+        <select aria-label="This week, this month and others" data-testid="calendar-presets" value={more.some((m) => m.key === spec.preset) ? spec.preset : ""} onChange={(e) => e.target.value && applyPreset({ preset: e.target.value as RangePreset, compare: spec.compare })} className={`min-h-9 bg-card px-1.5 text-sm outline-none sm:px-2 focus-visible:ring-2 focus-visible:ring-ring/40 ${more.some((m) => m.key === spec.preset) ? "bg-primary font-medium text-primary-foreground" : ""}`}><option value="">Week or month</option>{more.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}</select>
         <button type="button" aria-pressed={spec.preset === "custom"} onClick={() => { setDraft(null); pr.apply({ preset: "custom", from: spec.from ?? pr.from, to: spec.to ?? pr.to, compare: spec.compare }); }}
           className={`min-h-9 px-1.5 text-sm outline-none sm:px-2.5 focus-visible:ring-2 focus-visible:ring-ring/40 ${spec.preset === "custom" ? "bg-primary font-medium text-primary-foreground" : "hover:bg-accent"}`}>Custom</button>
       </div>
       {spec.preset === "custom" && (
         <form className="inline-flex flex-wrap items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); applyDraft(); }} data-testid="custom-range">
-          <input type="date" aria-label="From date" aria-invalid={Boolean(problem)} value={from} max={to || today || undefined} onChange={(e) => setDraft({ from: e.target.value, to })} className="min-h-9 rounded-lg border bg-card px-2 text-sm" />
+          <input type="date" aria-label="From date" aria-invalid={Boolean(problem)} value={from} max={to || today || undefined} onChange={(e) => setDates(e.target.value, to)} className="min-h-9 rounded-lg border bg-card px-2 text-sm" />
           <span aria-hidden className="text-muted-foreground">to</span>
-          <input type="date" aria-label="To date" aria-invalid={Boolean(problem)} value={to} max={today ?? undefined} onChange={(e) => setDraft({ from, to: e.target.value })} className="min-h-9 rounded-lg border bg-card px-2 text-sm" />
+          <input type="date" aria-label="To date" aria-invalid={Boolean(problem)} value={to} max={today ?? undefined} onChange={(e) => setDates(from, e.target.value)} className="min-h-9 rounded-lg border bg-card px-2 text-sm" />
           <button type="submit" disabled={Boolean(problem) || !dirty} data-testid="apply-range" className="min-h-9 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50">Apply</button>
         </form>
       )}
-      <span className="text-xs text-muted-foreground max-lg:sr-only" data-testid="date-window" aria-live="polite">{pr.label}</span>
+      <span className="text-xs text-muted-foreground max-lg:sr-only" data-testid="date-window" aria-live="polite">{spec.preset === "custom" ? "From " : ""}{pr.label}, {zoneWord()} time</span>
       <label className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border bg-card px-2 text-sm sm:px-2.5" title="Compare with the previous period: shows the change against the period just before, where a number has one">
         <input type="checkbox" className="size-4" checked={spec.compare !== "none"} onChange={(e) => applyPreset({ ...spec, compare: e.target.checked ? "previous" : "none" })} data-testid="compare-previous" />
         <span aria-hidden className="max-sm:hidden">Compare</span><span className="sr-only">Compare with the previous period</span><span aria-hidden className="sm:hidden">vs before</span>

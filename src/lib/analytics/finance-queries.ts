@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { localDay } from "../design/zone.ts";
 import { ttlCache } from "../ttl-cache";
 import { planOf, type BillingRow } from "./clients2-core";
 import { ownersOf } from "./clients-actions-queries";
@@ -25,7 +26,7 @@ export const cleanId = (v: unknown): string | null => (typeof v === "string" && 
 const n = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v ? new Date(v as string).toISOString() : null);
 const like = (q: string) => `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-export const today = (now = Date.now()) => new Date(now).toISOString().slice(0, 10);
+export const today = (now = Date.now()) => localDay(now); // the day in the account time zone
 
 // ---------- settings ----------
 

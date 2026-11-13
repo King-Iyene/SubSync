@@ -18,6 +18,7 @@ import { Hit, type SectionProps } from "./sections";
 import { RateTag, StatusLegend, toneVar } from "./status-ui";
 import { SCALES, toneOf, type Scale } from "@/lib/design/status-tone";
 import type { ApCalendarRow, ApCalendarsView, ApPersonCalRow, ApConflictRow, ApHealthRow, ApPersonRow, ApProof, ApSaleInfo, ApShareView, ApSourceRow, ApSpeedBand } from "./types";
+import { addDays, localDay } from "@/lib/design/zone";
 
 type Col<T> = { h: string; num?: boolean; cell: (r: T) => ReactNode };
 function Grid<T extends { [k: string]: unknown }>({ rows, cols, onRow, testId, tone }: { rows: T[]; cols: Array<Col<T>>; onRow?: (r: T) => void; testId?: string; tone?: (r: T) => "amber" | "red" | undefined }) {
@@ -167,8 +168,8 @@ export function BookingShare({ filters, onPerson, onDrill, openView }: SectionPr
   if (!res.data) return <div className="ap-tablewrap p-6" role="status" aria-busy="true">Loading...</div>;
   const d = res.data, rows = d.rows;
   const un = rows.find((r) => r.unassigned);
-  const wantFrom = filters.from || new Date(now - filters.days * 86_400_000).toISOString().slice(0, 10);
-  const wantTo = filters.to || new Date(now).toISOString().slice(0, 10);
+  const wantFrom = filters.from || addDays(localDay(now), -filters.days);
+  const wantTo = filters.to || localDay(now);
   // The window is always printed as dates, so every figure on this screen says exactly which days it covers.
   const period = `${filters.from && filters.to ? "these dates" : `the last ${filters.days} days`} (${shortDay(wantFrom)} to ${shortDay(wantTo)})`;
   const total = rows.reduce((a2, r) => a2 + (r.role === "closer" ? (r.owned ?? 0) : r.bookings), 0);

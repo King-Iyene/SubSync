@@ -9,6 +9,7 @@ import type { ApPart, ApPersonRow, ApRow, ApScope } from "./types";
 /** Scope the user picks. `days` is turned into from/to on the server's day boundaries; everything else is passed through and re-checked on the server (never trusted). */
 export { DEFAULT_FILTERS, filtersFromParams, filtersToParams, FILTER_KEYS, AGE_OPTIONS, STATUS_OPTIONS, SORT_OPTIONS, type ApFilters } from "@/lib/design/appt-filters";
 import { DEFAULT_FILTERS, type ApFilters } from "@/lib/design/appt-filters";
+import { addDays, localDay } from "@/lib/design/zone";
 
 const FX = /[?&]apfx=(1|empty|error)/;
 function fxFound(): string {
@@ -23,9 +24,9 @@ export const fixturesOn = () => fxFound() !== "";
 const fxMode = () => { const v = fxFound(); return v === "empty" || v === "error" ? v : ""; };
 
 export function scopeOf(f: ApFilters): ApScope {
-  const day = 86_400_000, to = new Date(), from = new Date(to.getTime() - f.days * day);
+  const to = localDay(Date.now()), from = addDays(to, -f.days); // days in the account time zone (docs/DATE_RULES.md)
   const custom = !!f.from && !!f.to; // a chosen date range replaces the preset days
-  return { from: custom ? f.from : from.toISOString().slice(0, 10), to: custom ? f.to : to.toISOString().slice(0, 10), locationId: f.locationId || undefined, calendarId: f.calendarId || undefined, source: f.source || undefined, userId: f.userId || undefined };
+  return { from: custom ? f.from : from, to: custom ? f.to : to, locationId: f.locationId || undefined, calendarId: f.calendarId || undefined, source: f.source || undefined, userId: f.userId || undefined };
 }
 export function queryOf(part: ApPart, f: ApFilters, extra: Record<string, string | number | undefined> = {}): string {
   const s = scopeOf(f); const p = new URLSearchParams({ part: API_PART[part] ?? part, from: s.from, to: s.to });
