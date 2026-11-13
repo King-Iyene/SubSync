@@ -248,6 +248,8 @@ export const DEFAULT_OFF: ReadonlySet<Feature> = new Set<Feature>([
   "ai_deal_forecast",
   // Chat with the bot in Slack (docs/SLACK_CHAT_SETUP.md). Default off; also needs ai_byo and ai_ask_data.
   "slack_chat",
+  // Text and email from SubSync to one lead at a time, only when a person presses Send after a preview (King, 13 Nov). Default off; also needs the optional message permission.
+  "send_messages",
   // The AI writes the sentence under an alert in Slack from the alert's facts only (needs ai_byo and the account's switch). Default off.
   "ai_slack_reports",
 ]);

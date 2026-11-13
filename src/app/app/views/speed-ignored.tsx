@@ -13,7 +13,7 @@ import "./speed4.css";
 
 // "Waiting on the client": for an agency, which client accounts are not answering the leads the agency sends them. Per account: people nobody called back, new leads never answered, customers who
 // wrote and got no reply, and customers who got only an automatic reply. Every number opens exactly the people it counts (the same query, docs/METRICS.md "Clients ignoring leads").
-// SubSync only measures this. It never messages a lead or a client.
+// SubSync measures this and sends nothing to a lead or a client by itself.
 
 type Report = {
   enabled: boolean; now: number; days: number; eventsStored: number; accounts: Array<AccountCount & { previous: number | null }>;

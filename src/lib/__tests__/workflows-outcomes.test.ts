@@ -71,5 +71,5 @@ test("install plan: exists, blocked, rehearsal, live, and the cap", () => {
 
 test("templates are plain: unique keys, no vendor words, task only (never a message)", () => {
   assert.equal(new Set(TEMPLATES.map((t) => t.key)).size, TEMPLATES.length);
-  for (const t of TEMPLATES) { assert.equal(hasVendorWord(t.name + t.summary + t.defaultTag), false); assert.match(t.summary, /never messages/); }
+  for (const t of TEMPLATES) { assert.equal(hasVendorWord(t.name + t.summary + t.defaultTag), false); assert.match(t.summary, /only gives your team a task/); }
 });

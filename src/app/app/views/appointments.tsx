@@ -104,7 +104,7 @@ export function AppointmentsView({ go }: { go: GoFn }) {
         <EmptyState title="No appointments yet" body={waiting > 0 ? "They will appear after the app is approved again and the next sync finishes." : "Once calendars have bookings, the no-shows to call, the appointments nobody marked and the true show rate appear here. Appointments are read from the last 90 days and the next 60."} action={<button type="button" className={BTN} onClick={() => go("help")}>Open Getting started</button>} />
       ) : (
         <div className={loading ? "opacity-70 transition-opacity" : "transition-opacity"} aria-busy={loading}>
-          <HowTo id="appointments-v2" title="How this works">Start with the button. Each row has one button and a menu. SubSync only reads: mark outcomes in your CRM.</HowTo>
+          <HowTo id="appointments-v2" title="How this works">Start with the button. Each row has one button and a menu. Mark outcomes here after a preview and a confirm, or in your CRM.</HowTo>
 
           <section className="mb-7" aria-label="What needs you" data-testid="appt-headline-block">
             <h2 className="max-w-4xl text-[clamp(1.6rem,3.3vw,2.6rem)] font-semibold leading-[1.06] tracking-tight" data-testid="appt-headline" data-clear={h.total === 0}>

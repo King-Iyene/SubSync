@@ -27,7 +27,7 @@ export function IgnoredLeadsSettings() {
   return (
     <Card title="Clients not answering leads">
       <div data-testid="ignored-settings">
-        <p className="mb-3 text-sm text-muted-foreground">SubSync tells you when a client account is not answering the leads sent to it: new leads nobody has called or messaged, customers who wrote and got no reply, and missed calls nobody returned. You are told once, and again only if it clears and happens again. SubSync never messages the leads or the client.</p>
+        <p className="mb-3 text-sm text-muted-foreground">SubSync tells you when a client account is not answering the leads sent to it: new leads nobody has called or messaged, customers who wrote and got no reply, and missed calls nobody returned. You are told once, and again only if it clears and happens again. This alert goes only to you.</p>
         {list.length > 1 && (
           <div className="mb-3">
             <label htmlFor="ign-scope" className="mb-1 block text-sm font-medium">Apply to</label>

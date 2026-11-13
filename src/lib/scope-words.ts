@@ -21,7 +21,7 @@ const WORDS: Record<string, string> = {
   "locations/tags.readonly": "read tags",
   "conversations.readonly": "read conversations",
   "conversations/message.readonly": "read messages",
-  "conversations/message.write": "add a note to a conversation",
+  "conversations/message.write": "send a text or email when you press Send",
   "opportunities.readonly": "read deals",
   "conversations/reports.readonly": "read conversation reports (coming feature, not used yet)",
   "locations/tasks.readonly": "read tasks (coming feature, not used yet)",

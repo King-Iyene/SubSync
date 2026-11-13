@@ -205,6 +205,8 @@ With "Everyone" install there is ONE price line: a price per client account per 
 |---|---|---|
 | Free | $0 | Instant Audit, overview, contact search, data health |
 | Pro (final, still to be created) | $11.50 per client account per month | Everything in Wave 1 |
+
+> NOTE 13 Nov 2026 (King, owner): the free plan is gone. The marketplace draft has ONE plan, **Growth**, Paid, monthly, $11.50 per client account per month, 14-day free trial (the only free period), plan id `6af521842a5c6a72fd97d767`. The old Free Plan (`6ae40eb4f65e3c03823476b8`) and $5 plan were deleted from the draft; installs on them stay mapped as legacy full access. Wording: "Try it free for 14 days, then $11.50 per client account per month". The table above is kept for history.
 | Higher tier (later, as a new plan) | $9 to $19 per client account per month (hypothesis) | AI brief, anomaly detection, forecasts |
 
 **How it works:**
@@ -437,3 +439,6 @@ Standing routines (customer walkthrough, simplify pass, innovation pass, daily s
 9. Use fewer tokens in every build and move fast: short briefs pointing at the shared brief, short reports, no re-reading, no polling.
 10. Priority order for every build: money first, the customer second, innovation third.
 11. MAKE EVERYTHING LIVE after building: merge to main, flags ON, verify it is visible in the live app. Never leave a feature dark or switched off silently; if one must be off, say so in the same message with the reason and when it returns.
+
+## SUPERSEDED BY KING, 13 NOV 2026: SubSync sends messages and changes the CRM
+The lines above that say "read-only by default", "SubSync never messages leads", "never replies for the agency" (sections 1A and 8, build rules, the brief's standing rule 7) are **superseded**. SubSync sends texts and emails (flag `send_messages`, optional scope `conversations/message.write`) only when a person presses Send (or a schedule they set), never on its own, and never to a contact who asked not to be contacted. It also changes things in the CRM (appointments, tags, deals, notes, tasks, owners, contact data, merges, workflows), always through a preview, a confirm and an audit log. Every CRM write is listed in `docs/CRM_WRITES.md`. Guardrails stay: `WRITE_GHL_LIVE` and the other `*_LIVE` switches off unless King turns them on, the per-account opt-in, a re-check of do-not-contact just before sending, quiet hours, caps, the `SEND_MESSAGES_KILL` kill switch, and our own sends never change our own numbers (rule 14).

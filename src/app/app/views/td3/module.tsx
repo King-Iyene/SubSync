@@ -460,7 +460,7 @@ function SettingsTab({ level, cashOn, saveOn, nav }: { level: string; cashOn: bo
           </div>
           <section className="td-card2" aria-label="Daily email">
             <h2 className="td-h2">Daily email</h2>
-            <p className="ap-fine mb-2">One short email a day with the same ranked list as Today and one link. It never messages your leads. Your day is in {d.timezone}.</p>
+            <p className="ap-fine mb-2">One short email a day with the same ranked list as Today and one link. This email goes only to you. Your day is in {d.timezone}.</p>
             {!d.canEdit && <p className="ap-fine" role="status">Ask your administrator to change this.</p>}
             <form className="td-form" onSubmit={(e) => { e.preventDefault(); void save(d, form); }}>
               <label className="flex-row items-center gap-2" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><input type="checkbox" disabled={!d.canEdit} checked={form.on} onChange={(e) => setForm({ ...form, on: e.target.checked })} /> Send me the daily email</label>

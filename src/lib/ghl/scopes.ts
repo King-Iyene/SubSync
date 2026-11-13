@@ -26,7 +26,10 @@ export const GHL_SCOPES = [
   "locations/tasks.write",
   // Release 1.1.0, OPTIONAL, for coming features (AI data cleaning changes custom field values after a preview). Not used yet. Together with
   // conversations/reports.readonly, locations/tasks.readonly, locations/tasks.write and locations/tags.write above, asked for now so no install has to approve again later.
-  // NEVER add conversations/message.write, invoices.write or conversations.write (delete): see NOT_REQUESTED in scope-groups.ts.
+  // NEVER add invoices.write or conversations.write (delete): see NOT_REQUESTED in scope-groups.ts.
+  // conversations/message.write is added by King's decision of 13 Nov 2026 (SubSync sends a text or email only when a person presses Send), OPTIONAL in the listing:
+  // King must tick it as optional in the developer portal (release 2.3.0) before an install asks for it. Without it the composer says "Needs permission: reconnect".
+  "conversations/message.write",
   "locations/customFields.write",
   // Workflows module (optional): read the list and history, then change after a preview. Campaigns are read only.
   "workflows.readonly",

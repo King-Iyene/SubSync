@@ -22,11 +22,13 @@ export const SYNCED_DELETE = [
   "wg_samples", "wg_state", "wg_events", "br_history", // Wallet guard: our readings of each credit balance, the working numbers and the events; the 7 am brief record
   "campaign_stats", "wf_outcome_daily", "mn_outcomes", "mn_tasks", "am_notices", "am_auto_adds", "am_slack_prefs", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items",
   "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", "cu_scans", "cu_actions", "dq_groups", "dq_events", "dq_source_daily", "dq_forms", "dq_submissions", "dq_scores", "dq_poll", "dq_mutes", // Data health (docs/features/DATA_HEALTH.md)
+  "message_sends", // Sending messages: one row per send attempt (ids, channel, a one-way hash of the words, result; never the words)
   "call_queue_log", "meeting_deliveries", "crm_writes", "contact_writes", "field_write_state", "meetings", "meeting_notes", "shared_audits", "sync_jobs", "sync_watermarks", "locations",
 ] as const;
 
 /** Settings, credentials and the agency's own notes. Kept by "delete my data" (the app keeps working), removed on uninstall. */
 export const CONFIG_DELETE_ON_UNINSTALL = [
+  "message_templates", "message_send_settings", // Sending messages: the account's own quick templates and its sending rules
   "call_lists", "account_profiles", "goals", "annotations", "usage_events", "team_names", "report_templates",
   "wfm_settings", "wfm_subscriptions", // Workflow module: which blocks an account switched on, and where its CRM wants triggers sent
   "ai_connections", "ai_oauth_pending", // Bring your own AI: the customer's own key (encrypted) and a sign-in in progress
@@ -58,6 +60,7 @@ export const LOCATION_DELETE = [
   "pm_notes", "pm_disputes",
   "fn_mrr_snapshot", "fn_pay_lines", "fn_pay_disputes", "fn_pay_rates", "fn_churn_state", "fn_ad_spend", "fn_ledger", "pr_reports", "pr_links", "td_daily_items", "td_receipts", "td_snoozes", "cf_recover_items", "cf_deal_flags", "cf_mutes", "wg_samples", "wg_state", "wg_events", "wg_rules", "notification_states", "notifications", "notification_deliveries", "notification_destinations", "client_departures", "client_rollup_state", "client_daily", "client_risk_history", "client_billing", "cl2_notes", "cl2_plan_events", "client_actions", "client_owners", "client_alert_mutes", "coaching_notes", "user_targets", "people_write_log", "people_proof_prefs",
   "ai_runs", "ai_connections", "ai_oauth_pending", "ai_team_prefs", "wfm_fired", "wfm_action_log", "wfm_settings", "wfm_subscriptions",
+  "message_sends", "message_templates", "message_send_settings",
   "crm_writes", "contact_writes", "field_write_state", "field_mappings", "meeting_policies", "meeting_notes", "meeting_hooks", "account_profiles", "client_notes", "today_actions", "growth_goals", "workflow_labels", "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", "cu_scans", "cu_actions", "dh_marks", "dh_rules", "campaign_stats", "wf_outcome_daily", "mn_outcomes", "mn_tasks", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items", "feedback_items", "client_steps", "client_step_history", "workflow_setup", "workflow_setup_settings", "call_queue_settings", "call_queue_log", "sync_jobs", "locations",
 ] as const;
 

@@ -14,6 +14,7 @@ import { RecoverLink } from "./td3/cash";
 import { UnansweredList, type AccountChoice, type OwnerChoice } from "./unanswered-list";
 import { ReplayCard, WaitColumns, WhereChart, type OwnerRank, type Paged, type Rank } from "./unanswered-charts";
 import { usePersonActions, type WaitRow } from "./unanswered-rows";
+import { BulkSendPanel } from "../ds/wb/send-panels";
 import { CARD_SLOTS, RoomProvider, Slot, hasUnansweredSlot, useSlotsVersion, type Flags, type SlotName, type UiRow } from "./unanswered-slots";
 import { DEFAULT_CHOICES, isNarrowed, useChoices, type Choices } from "./unanswered-state";
 import "./speed6.css";
@@ -22,7 +23,7 @@ import "./unanswered-slots-mount";
 
 // Unanswered messages, control-room style (the Speed to lead standard): one question ("who do I answer first?"), the numbers that open exactly their people, a fold of three
 // cards with the rest behind More, and a list that is searched, filtered and paged on the database. Behind the flag inbox_control_room; the older screen is untouched. Other slices
-// mount their pieces through the slots of unanswered-slots.tsx. SubSync shows who is waiting and never sends a reply.
+// mount their pieces through the slots of unanswered-slots.tsx. SubSync shows who is waiting and sends a reply only when a person presses Send.
 
 export type UiPayload = { flags: Flags; seePeople: boolean; kind: string; me: string | null };
 type Bucket = { key: string; label: string; count: number };
@@ -121,13 +122,14 @@ export function UnansweredRoom({ go, ui, embedded }: { go: GoFn; ui: UiPayload; 
 
   // ---- the cards: a fold of three, the rest behind More ----
   const listCard = (
-    <Q key="list" q="Who should I answer first?" sub={choices.tab === "us" ? "Longest wait first. Press a person to open them." : "People you wrote to who have not answered."} tip="A person is counted once, however many conversations they have. Only people past your reply target are listed. SubSync never sends a reply." span glow={hot && choices.tab === "us" ? "urgent" : "active"} testId="reply-now" sticky>
+    <Q key="list" q="Who should I answer first?" sub={choices.tab === "us" ? "Longest wait first. Press a person to open them." : "People you wrote to who have not answered."} tip="A person is counted once, however many conversations they have. Only people past your reply target are listed. SubSync sends a reply only when a person presses Send." span glow={hot && choices.tab === "us" ? "urgent" : "active"} testId="reply-now" sticky>
       {quietOn && !embedded && (
         <div className="ur-tabs" role="tablist" aria-label="Which people">
           <button type="button" role="tab" aria-selected={choices.tab === "us"} className="ur-tab" onClick={() => set({ tab: "us", sort: "wait" })} data-testid="tab-us">Waiting for us <span className="tnum" data-testid="tab-us-n">{(tabs?.us ?? w.people).toLocaleString("en-US")}</span></button>
           <button type="button" role="tab" aria-selected={choices.tab === "them"} className="ur-tab" onClick={() => set({ tab: "them", sort: "wait", bucket: null })} data-testid="tab-them" data-tip="Conversations where we wrote last and the person has gone quiet. An automatic message counts as ours.">Waiting on them <span className="tnum" data-testid="tab-them-n">{tabs ? tabs.them.toLocaleString("en-US") : "·"}</span></button>
         </div>
       )}
+      {ui.flags.send_messages === true && !clear && choices.tab === "us" && <BulkSendPanel rows={heroRows} />}
       {clear ? <AllClear text={d.next.text} go={go} embedded={embedded} /> : (
         <UnansweredList choices={choices} set={set} page={page} setPage={setPage} reset={reset} multi={multi} accounts={accounts} owners={owners} slaHours={d.slaHours} headingRef={heading} onTabs={onTabs} onRows={onRows} segments={embedded !== undefined} />
       )}
@@ -191,8 +193,8 @@ export function UnansweredRoom({ go, ui, embedded }: { go: GoFn; ui: UiPayload; 
         <header className="ur-head print:hidden">
           <div className="min-w-0 flex-1">
             {embedded ? <h2 className="sr-only">Unanswered messages</h2> : <h1 className="ur-title">Unanswered messages</h1>}
-            {embedded ? <p className="sr-only" data-testid="unanswered-subtitle">Everyone who wrote and is waiting for a reply right now, new leads and existing customers. SubSync shows who; it never sends a reply.</p>
-              : <p className="s6-sub !mb-0" data-testid="page-subtitle">Customers who wrote and are still waiting. SubSync shows who; it never sends a reply.</p>}
+            {embedded ? <p className="sr-only" data-testid="unanswered-subtitle">Everyone who wrote and is waiting for a reply right now, new leads and existing customers. SubSync shows who; it sends a reply only when a person presses Send.</p>
+              : <p className="s6-sub !mb-0" data-testid="page-subtitle">Customers who wrote and are still waiting. SubSync shows who; it sends a reply only when a person presses Send.</p>}
           </div>
           {ui.flags.inbox_search === true && <FindBox multi={multi} />}
           <ActionRow items={menu} testId="inbox-more" />

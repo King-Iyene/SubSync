@@ -5,13 +5,14 @@ import { COMPANY } from "@/lib/company";
 import { FEATURE_NEEDS } from "@/lib/scope-groups";
 import { NEEDS_PERMISSION } from "@/lib/meeting-wording";
 import { HIDEABLE_MODULES } from "@/lib/settings2";
+import { InlineAlert } from "../ds";
 import { useData } from "../session";
 import { Badge, Btn, Card, ErrorBox, Loading } from "../ui";
 import { WriteAccessCard } from "./write-access";
 import { useStState } from "./st-state";
 import type { PermissionGroup } from "./settings-parts";
 
-export type Home = { kind: string; plan: string; canManage: boolean; level: string; enforced: boolean; since: string | null; demo: boolean };
+export type Home = { kind: string; plan: string; canManage: boolean; level: string; enforced: boolean; trialEnded?: boolean; since: string | null; demo: boolean };
 
 export function ReadOnlyNote() {
   return <p className="border-l-2 border-warning py-1 pl-3 text-sm" data-testid="read-only">Only your administrator can change these. You can read them here.</p>;
@@ -19,11 +20,11 @@ export function ReadOnlyNote() {
 
 // ---------------- Account and plan ----------------
 export function PlanCard({ home }: { home: Home }) {
-  const word = home.plan === "pro" ? "Pro" : home.plan === "starter" ? "Starter" : "Free";
   return (
     <Card title="Your plan">
-      <p className="flex flex-wrap items-center gap-2 text-sm"><Badge tone={home.plan === "free" ? "neutral" : "good"}>{word}</Badge>
-        <span className="text-muted-foreground">{home.enforced ? "Some pages are part of the paid plan." : "Every page is open to you right now."}</span></p>
+      {home.trialEnded ? <InlineAlert tone="warning" title="Your 14-day trial has ended" className="mb-3">Your data is kept and nothing was deleted. To carry on with every page, choose the Growth plan ($11.50 per client account per month) in the marketplace where you installed SubSync.</InlineAlert> : null}
+      <p className="flex flex-wrap items-center gap-2 text-sm"><Badge tone={home.trialEnded ? "neutral" : "good"}>Growth</Badge>
+        <span className="text-muted-foreground">{home.trialEnded ? "Some pages are paused until you choose the plan." : "Try it free for 14 days, then $11.50 per client account per month."}</span></p>
       <p className="mt-2 text-xs text-muted-foreground">Billing and plan changes are handled in the marketplace where you installed SubSync. SubSync never asks for a card.</p>
     </Card>
   );
@@ -112,7 +113,7 @@ export function SafetySection() {
     <div className="space-y-4">
       <Card title="Reading by default">
         <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-          <li>SubSync reads your CRM. It never replies to a lead for you.</li>
+          <li>SubSync reads your CRM and can change things in it (book appointments, add tags, update deals, fix contact data) and send texts and emails, always through a preview and a confirm, with an audit log, only when a person presses the button, and never to a contact who asked not to be contacted.</li>
           <li>A change in a client account happens only where you switched it on below, only after a preview, and only after you confirm.</li>
           <li>A dry run shows exactly what would change and changes nothing. While the server&apos;s live switch is off, every change is a dry run, even for an allowed client.</li>
           <li>People who asked not to be contacted, and contacts with open deals, payments or booked appointments, are protected from deletes and merges.</li>

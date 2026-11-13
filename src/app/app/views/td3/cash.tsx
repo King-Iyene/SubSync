@@ -196,7 +196,7 @@ export function RecoverTab({ location, level, accounts }: { location: string; le
           {(preview.data.plan?.skipped ?? 0) > 0 && <p className="ap-fine">{preview.data.plan?.skipped} already belong to someone else, so they are left alone.</p>}
           {(preview.data.plan?.overCap ?? 0) > 0 && <p className="ap-fine">Only the first batch goes now; {preview.data.plan?.overCap} more can follow.</p>}
           {preview.data.mode && !preview.data.mode.live && <p className="ap-fine">Changes from SubSync are switched off for this account, so this will only be checked. Nothing will change in your CRM.</p>}
-          <p className="ap-fine">{preview.data.plan?.undoNote} This does not message anyone.</p>
+          <p className="ap-fine">{preview.data.plan?.undoNote} This sends nothing to the customer.</p>
           <div className="flex flex-wrap gap-3">
             <button type="button" className="s6-btn" data-kind="primary" disabled={busy || (preview.data.plan?.blockers.length ?? 0) > 0 || (preview.data.plan?.change.length ?? 0) === 0} onClick={() => void confirmAssign()} data-testid="cf-confirm">Confirm</button>
             <button type="button" className="s6-btn" onClick={() => setPreview(null)}>Cancel</button>
@@ -330,7 +330,7 @@ export function CashSettings() {
   return (
     <section aria-label="Morning save-this-account email" data-testid="cf-settings">
       <h2 className="cl-h mb-2">Morning email: accounts to save</h2>
-      <p className="ap-fine mb-2">One email each morning listing the client accounts most at risk today, with the evidence, an estimated dollar line and one button into the right list. It sends nothing on a calm day. It never messages your leads. Your day is in {s.timezone}.</p>
+      <p className="ap-fine mb-2">One email each morning listing the client accounts most at risk today, with the evidence, an estimated dollar line and one button into the right list. It sends nothing on a calm day. This email goes only to you. Your day is in {s.timezone}.</p>
       {!s.canEdit && <p className="ap-fine" role="status">Ask your administrator to change this.</p>}
       <form className="td-form" onSubmit={(e) => { e.preventDefault(); void save(); }}>
         <label style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><input type="checkbox" disabled={!s.canEdit} checked={form.on} onChange={(e) => setForm({ ...form, on: e.target.checked })} /> Send the morning email</label>

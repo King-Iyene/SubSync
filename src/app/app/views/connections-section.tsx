@@ -93,7 +93,7 @@ export function ConnectionsSection() {
             <EmailTool key={data.email.address ?? ""} email={data.email} check={liveCheck} onCheck={setCheck} reload={reload} />
           </ToolRow>
           <ToolRow id="calendars" icon="google_calendar" name="Calendars" tone={cs.tone} status={cs.text} line={calendarLine(data.calendars)}
-            what="SubSync reads the calendars and bookings in your CRM, whatever tool feeds them. Nothing to connect here, and SubSync only reads." owner="Your company account.">
+            what="SubSync reads the calendars and bookings in your CRM, whatever tool feeds them. Nothing to connect here. SubSync can also book and update appointments there, after a preview and a confirm." owner="Your company account.">
             <CalendarList calendars={data.calendars} />
           </ToolRow>
         </ul>

@@ -42,7 +42,7 @@ export function WriteAccessCard({ embedded = false }: { embedded?: boolean }) {
               <li key={a.locationId} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-t py-2.5" data-testid="write-row">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{a.name}</p>
-                  <p className="text-sm text-muted-foreground" data-testid="write-state">{a.writeEnabled ? "SubSync may change this client's contacts, after you confirm each change." : "Off. SubSync only reads this client's contacts."}</p>
+                  <p className="text-sm text-muted-foreground" data-testid="write-state">{a.writeEnabled ? "SubSync may change this client's contacts, after you confirm each change." : "Off. SubSync will not change this client's contacts, and will not send them anything."}</p>
                   {asking === a.locationId && !a.writeEnabled && (
                     <div className="mt-2 border-l-2 border-warning py-1 pl-3 text-sm" role="group" aria-label={`Allow changes for ${a.name}`}>
                       <p>Allow SubSync to change {a.name}&apos;s contacts? It will ask you to preview and confirm every change.</p>

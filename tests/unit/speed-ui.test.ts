@@ -92,7 +92,7 @@ describe("the page says the same plain things everywhere", () => {
     const page = readFileSync("src/app/app/views/speed.tsx", "utf8");
     expect(page).toContain("measuringSentence");
     expect(page).toContain('go("settings")');
-    expect(page).toContain("it never sends a reply");
+    expect(page).toContain("It sends a reply only when a person presses Send");
   });
   it("the source card under More detail has its own range (KF-4) and a list behind its figures (KF-6)", () => {
     const cards = readFileSync("src/app/app/views/speed-cards.tsx", "utf8");

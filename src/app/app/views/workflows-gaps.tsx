@@ -215,7 +215,7 @@ export function LibraryTab({ q, accounts, onDone }: { q: string; accounts: Array
         </Section>
       ) : null}
       {msg ? <InlineAlert tone={msg.ok ? "success" : "warning"} className="mt-4">{msg.text}</InlineAlert> : null}
-      <Section title="Automations that message customers" hint="SubSync never sends a message to a lead, so it does not create these. Copy one from a client that has it, or follow the steps.">
+      <Section title="Automations that message customers" hint="SubSync sends a message only when a person presses Send, so it does not create these automations. Copy one from a client that has it, or follow the steps.">
         <div className="grid gap-3 md:grid-cols-2">
           {data.guides.map((g) => (
             <details key={g.standard} className="rounded-xl border p-3"><summary className="min-h-9 cursor-pointer font-medium">{g.title}</summary><p className="mt-1 text-sm text-muted-foreground">{g.why}</p><ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">{g.steps.map((s) => <li key={s}>{s}</li>)}</ol></details>

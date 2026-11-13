@@ -66,7 +66,7 @@ If install is refused on your $97 Starter plan, use the GHL sandbox account or u
 
 1. I reseed the demo and take clean screenshots. You upload **3 real 16:9 screenshots** in App Profiles (the file picker is yours).
 2. Record a short demo video that includes an uninstall (I can script it; you upload).
-3. Fill the **Pricing** step. Decide first: $5 per client account, free up to 5 (the plan in the notes), or cheaper tiers because GoCSM is cheaper. Tell me and I set it up.
+3. Fill the **Pricing** step. Decided 13 Nov 2026: Paid, one plan **Growth**, monthly, $11.50 per client account, 14-day free trial, no free plan (id `6af521842a5c6a72fd97d767`). Say "Try it free for 14 days, then $11.50 per client account per month" in the listing.
 4. Get Privacy and Terms checked by a person. They are honest placeholders now.
 
 ## Part 6. Go public (you)

@@ -5,7 +5,7 @@ import { useApiClient, useData } from "../../session";
 
 // Clients, Proof: the AI-written summary of one monthly client report. SubSync works out every figure; the AI only writes the words around them and a check throws away any answer with a figure
 // we did not give it. What it writes is a DRAFT FOR YOUR REVIEW: it is never shown to a client. You read it, change anything, and choose to use it; only then does it appear in the report you copy,
-// print or share. SubSync never sends anything to your client.
+// print or share. SubSync does not send reports to your client for you: you share them yourself.
 
 type State = { draft: string | null; draftAt: string | null; summary: string | null; summaryAt: string | null; builtAt: string | null; ready: boolean; jobOn: boolean; tone: string; shared: boolean };
 type Run = { ok: boolean; text?: string; error?: string; code?: string };
@@ -44,7 +44,7 @@ export function SummaryBlock({ locationId, month, sample, refreshKey, onChange }
         {isDraft && <span className="ap-chip" data-tone="amber" data-testid="pr-ai-draft-chip">Draft for your review</span>}
         {!isDraft && d.summary && <span className="ap-chip" data-tone="green" data-testid="pr-ai-used-chip">In this report</span>}
       </div>
-      <p className="ap-fine">The AI writes the words from your recorded figures (tone: {d.tone}). It is never shown to your client until you use it and share the report. SubSync never sends anything to your client.</p>
+      <p className="ap-fine">The AI writes the words from your recorded figures (tone: {d.tone}). It is never shown to your client until you use it and share the report. SubSync does not send reports to your client for you: you share them yourself.</p>
       {!d.jobOn && <p className="ap-fine mt-1" role="status">This is switched off for this client account in Settings, AI.</p>}
       {!d.ready && !d.summary && <p className="ap-fine mt-1" role="status" data-testid="pr-ai-notready">Not enough has been recorded this month to write a fair summary.</p>}
       {nothingRecorded && <p className="ap-fine mt-1">The draft was skipped because too little was recorded this month.</p>}

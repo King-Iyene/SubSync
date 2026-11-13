@@ -6,7 +6,7 @@ Plain words. Written 11 Nov 2026, scope list updated 12 Nov 2026, from `src/lib/
 
 ## 1. Scopes for this release
 
-The app asks for 39 permissions today (7 required, 32 optional): the 29-row table, the 3 Lead intake scopes, the 5 coming-feature scopes and 2 still-unused ones below. Against the 21 published in 2.0.0, **19 are new** (marked NEW; 15 in the table, 3 Lead intake, plus `locations/customFields.write`). The installed app has no workflows permission at all today. Anything already granted stays granted; only NEW ones make installs press Update.
+The app asks for 40 permissions today (7 required, 33 optional, the 40th being conversations/message.write added 13 Nov 2026 for sending a text or email when a person presses Send): the 29-row table, the 3 Lead intake scopes, the 5 coming-feature scopes and 2 still-unused ones below. Against the 21 published in 2.0.0, **19 are new** (marked NEW; 15 in the table, 3 Lead intake, plus `locations/customFields.write`). The installed app has no workflows permission at all today. Anything already granted stays granted; only NEW ones make installs press Update.
 
 Name check: the official scope page (marketplace.gohighlevel.com/docs/oauth/Scopes) loads with scripts, so it could not be read from here. "VERIFIED" below means a primary-source read recorded in our docs (SCOPE_PLAN, PAYMENTS_BRIEF); "INFERENCE" means not confirmed. Check each in the portal's scope picker: if the picker does not list it, do not tick it.
 
@@ -77,7 +77,7 @@ Removing needs a small code change first (`scopes.ts`, `scope-groups.ts`, regene
 
 | Scope | Used by | Rule check |
 |---|---|---|
-| `conversations/message.write` | Inbox composer (send SMS/email), Fathom internal comments (`src/lib/connections/ingest.ts`) | FORBIDDEN as a send scope under CLAUDE.md sections 1A and 8 and standing rule 7 ("SubSync never replies for the agency"); `scope-groups.ts` lists it as "Never asked for". The internal-comment use is not a message to a lead, but the same scope also allows sending. Leave off. Composer stays preview only. |
+| `conversations/message.write` | Inbox composer (send SMS/email), Fathom internal comments (`src/lib/connections/ingest.ts`) | ALLOWED as an OPTIONAL send scope by King on 13 Nov 2026 (supersedes CLAUDE.md sections 1A and 8 and standing rule 7) ("SubSync never replies for the agency"); `scope-groups.ts` lists it as "Never asked for". The internal-comment use is not a message to a lead, but the same scope also allows sending. Leave off. Composer stays preview only. |
 | `conversations.write` | Clear junk: delete a conversation (`unanswered-gateway.ts`, flag `inbox_clear_junk`; request shape NOT VERIFIED LIVE) | A delete scope. Not in the list; NEEDS_KING item 33 says add it "next release". Recommend: leave off until the delete call is verified on a test account, then add in the next release (one more Update for every install). |
 | `payments/orders.readonly` | Lead panel money tab | Not in list; shows Needs permission: reconnect always. Leave off (no need). |
 | `forms.readonly` | Capabilities probe only | Not asked for. Leave off. |
@@ -151,6 +151,8 @@ A live version cannot be edited or unpublished by us. Rollback is two things: (a
 - [ ] Privacy policy and terms reviewed by a human (the app holds other businesses' customer data).
 - [ ] Database size: Find lead's tables and indexes take about 715 MB per 1M contacts; the current plan is 500 MB. Upgrade the database plan (Supabase Pro, check size) before a large agency installs.
 - [ ] Support email or phone live with a 24-hour reply (needed for review), logo and support details filled in the portal.
+
+> UPDATE 13 Nov 2026 (King): there is now NO free plan. The draft has one plan, **Growth**, Paid, monthly, $11.50 per client account, 14-day free trial, id `6af521842a5c6a72fd97d767`. The old Free Plan (`6ae40eb4f65e3c03823476b8`) and the $5 plan are deleted from the draft. Feature lines: "Manage every client account from one screen", "Speed to lead: see who is waiting and who to call first", "Appointments, no-shows and win-back lists that recover lost leads", "Pipeline money: where deals sit, what is stuck, who wins", "Alerts and exports for every client account". Steps 1 and 2 below are done; "Free Plan feature lines" no longer apply. Code maps Growth to full access and keeps the old Free Plan id as legacy full access.
 
 ## 6. BEFORE ANY PILOT ONLY: swap the plan to $11.50 (do not do this in this release)
 

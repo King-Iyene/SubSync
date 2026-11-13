@@ -18,7 +18,7 @@ import { ownedLocation } from "./tenant-guard";
 // Appointments > Booking funnel: GET /api/app/appointments/funnel?part=summary|breakdown|leaks|cohorts|forecast|rows|options (read only) and POST /api/app/appointments/funnel-recover
 // (tags the leads that dropped out so the account's own follow-up can pick them up; preview first, capped, typed words, a dry run unless the server switch AND the account's opt-in are on).
 // Who is asking and which accounts they may read come from the verified session (`allowed`), never from the request. An account id in the address only NARROWS inside them, and one
-// that is not theirs is the same answer as nothing there (never echoed). A client's staff never get a split by person or by account. SubSync never sends a message to anyone.
+// that is not theirs is the same answer as nothing there (never echoed). A client's staff never get a split by person or by account. SubSync sends a message only when a person presses Send.
 
 type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
 export type BfHelpers = { allowed: () => Promise<string[] | null>; links: () => Promise<ReturnType<typeof deepLinks>>; locationToken: (locationId: string) => Promise<string>; actor: (ctx: Ctx) => string | null };

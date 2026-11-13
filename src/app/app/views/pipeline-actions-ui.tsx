@@ -198,7 +198,7 @@ export function UnclogChips({ items, onPick }: { items: Unclog[]; onPick: (u: Un
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-[11px] text-muted-foreground">Each one shows a preview first. SubSync never sends anything to the person.</p>
+      <p className="mt-2 text-[11px] text-muted-foreground">Each one shows a preview first. These changes are never shown to the person.</p>
     </section>
   );
 }

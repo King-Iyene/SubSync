@@ -81,7 +81,7 @@ export function QualityTab({ canFix }: { canFix: boolean }) {
   return (
     <div data-testid="quality-tab">
       <HowTo id="quality" title="How the score works">
-        SubSync reads each client&apos;s contacts and finds what is missing, cannot work, needs tidying or is junk, then adds the duplicates. 100 means nothing to fix. It only reads: you see the exact fix and open the contact in your CRM.
+        SubSync reads each client&apos;s contacts and finds what is missing, cannot work, needs tidying or is junk, then adds the duplicates. 100 means nothing to fix. Nothing changes until you see the exact fix and confirm it.
       </HowTo>
       {problem && <div className="mb-4"><InlineAlert tone="danger" onDismiss={() => setProblem(null)}>{problem}</InlineAlert></div>}
 

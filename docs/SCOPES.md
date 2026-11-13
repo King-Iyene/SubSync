@@ -2,7 +2,7 @@
 
 This file is generated from `src/lib/scope-groups.ts` (run `scripts/gen-scopes-doc.ts`). A test fails when it is stale, when a permission the app asks for is missing from it, or when it lists one the app does not ask for. Do not edit it by hand.
 
-SubSync asks for 39 permissions: 7 required and 32 optional. Fewer permissions is a trust advantage, and every permission added later makes every installed company approve again, so each one below has a reason. An optional permission can be declined: the feature that needs it then says "Needs permission: reconnect" and everything else keeps working.
+SubSync asks for 40 permissions: 7 required and 33 optional. Fewer permissions is a trust advantage, and every permission added later makes every installed company approve again, so each one below has a reason. An optional permission can be declined: the feature that needs it then says "Needs permission: reconnect" and everything else keeps working.
 
 Wording rule: the screen says one of three things. **Needs permission: reconnect** (the app asked and this install declined, or the app has not asked yet), **Not available from the platform yet** (the platform refuses even with the permission, or has no such data), or it simply shows the data. See `docs/CAPABILITIES.md` for which data point is which.
 
@@ -14,7 +14,7 @@ Which accounts SubSync is connected to, and the one-account-at-a-time access it 
 | --- | --- | --- | --- |
 | `locations.readonly` | read | required | Names, time zones and contact details of your client accounts, so every number is shown against the right account and clock. |
 | `oauth.readonly` | read | required | Lists the accounts SubSync is installed on, so a new account is found without you doing anything. |
-| `oauth.write` | change | required | Lets SubSync read one client account at a time with a key limited to that account. The platform offers no read-only way to do this. It changes nothing in your accounts. |
+| `oauth.write` | change | required | Lets SubSync read one client account at a time with a key limited to that account. The platform offers no read-only way to do this. It does not change anything in your accounts by itself. |
 
 ## Contacts
 
@@ -42,6 +42,7 @@ Who wrote to a lead, when, and whether a person or an automation did.
 | --- | --- | --- | --- |
 | `conversations.readonly` | read | required | The conversation list: last message, direction, channel and unread count, for unanswered messages. Message text is never copied. |
 | `conversations/message.readonly` | read | optional | The messages inside a conversation, only to see who sent each one and when (a person or an automation, a call or a text). This is the only way to measure true speed to lead. The text of a message is never stored. |
+| `conversations/message.write` | change | optional | Only to send a text or an email to one lead when a person presses Send, after a preview. Optional. SubSync never sends on its own and never to a contact who asked not to be contacted. Without it the message box says: Needs permission, reconnect. |
 | `conversations/reports.readonly` | read | optional | For coming, richer response-time numbers (conversation reports). Not used yet: nothing in SubSync uses it today, and skipping it changes nothing. |
 
 ## Appointments
@@ -123,9 +124,8 @@ No permission needed. SubSync checks the sending domain's public DNS records (SP
 
 | Permission | Why it is not asked for |
 | --- | --- |
-| `invoices.write` | Sending an invoice again. Not asked for: it would message your client's customer, and SubSync does not message anyone for you. |
+| `invoices.write` | Sending an invoice again. Not asked for: it would message your client's customer, and SubSync sends a message only when a person presses Send in the message box. |
 | `conversations.write` | Deleting a conversation. Not asked for: SubSync does not delete anyone's conversations. |
-| `conversations/message.write` | Sending messages. Never asked for: SubSync does not reply to anyone, it measures how fast your team does. |
 
 ## Rules for every change permission
 

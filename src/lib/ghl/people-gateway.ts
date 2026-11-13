@@ -7,7 +7,7 @@ import { LIMITS, takeSlot } from "./workbench.ts";
 // The one door for moving a lead to another owner from the Team module (slice PB). Same switches as the other gateways: WRITE_GHL_LIVE off unless exactly "true", the account's own
 // opt-in, a preview first (the route), a typed confirmation or a tick where the route asks for one, one audit line per write with ids and field names only, calls spaced under the
 // platform's limit. Off or not allowed: the request is built, "WOULD WRITE crm.contact.reassign" is recorded and NOTHING is sent. Needs the optional permission contacts.write; without
-// it the answer is needs_permission ("Needs permission: reconnect"). This changes ONE field (the owner) of ONE contact. It never sends a message, never changes a deal, never removes
+// it the answer is needs_permission ("Needs permission: reconnect"). This changes ONE field (the owner) of ONE contact. It sends no message, changes no deal, never removes
 // anything. Request shape (PUT /contacts/{id} with assignedTo) follows the platform's published API description and is NOT VERIFIED LIVE.
 
 export const REASSIGN_SCOPE = "contacts.write";

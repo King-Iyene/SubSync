@@ -152,7 +152,7 @@ export function planAction(a: DealAction, f: DealFacts, ctx: PlanCtx): DealPlan 
     case "note": {
       if (!f.contactId) blockers.push({ id: "contact", text: "This deal has no contact to put the note on." });
       changes.push({ label: "Internal note", from: "none", to: a.text.length > 80 ? `${a.text.slice(0, 80)}...` : a.text });
-      warnings.push({ id: "internal", text: "An internal note on the contact. SubSync never sends anything to the lead." });
+      warnings.push({ id: "internal", text: "An internal note on the contact. A note like this is internal: the lead never sees it." });
       return plan({ kind: "note", summary: `Add a note to ${f.contactName || "the contact"} about ${f.name || "this deal"}.`, reversible: false });
     }
     case "task": {

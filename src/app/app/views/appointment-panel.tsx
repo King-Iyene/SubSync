@@ -163,7 +163,7 @@ function FollowUpNote({ locationId, appointmentId, onClose, api }: { locationId:
         <h2 className="text-base font-semibold">Follow-up note</h2>
         {msg ? <p role="status" className="mt-2 text-sm">{msg}</p> : pre ? (
           <>
-            <p className="mt-1 text-xs text-muted-foreground">An internal note on the contact{pre.preview.hasTask ? ", and a task for the next step due in 2 days" : ""}. SubSync never sends anything to the lead. These are excluded from your reply and activity numbers.</p>
+            <p className="mt-1 text-xs text-muted-foreground">An internal note on the contact{pre.preview.hasTask ? ", and a task for the next step due in 2 days" : ""}. A note like this is internal: the lead never sees it. These are excluded from your reply and activity numbers.</p>
             <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-md border bg-background p-2 text-sm">{pre.preview.text}</pre>
             {pre.preview.task && <p className="mt-2 text-sm"><b>Task:</b> {pre.preview.task}</p>}
             <ModeLine mode={pre.mode} needsPermission={pre.needsPermission} />

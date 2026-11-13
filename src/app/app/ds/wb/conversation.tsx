@@ -9,6 +9,8 @@ import { AiDraftButton } from "../ai-lead";
 import { DRAFT_NOTE } from "@/lib/ai/lead-core";
 import { INPUT, wbButtons, type Runner } from "./runner";
 import type { WbContext, WbThread } from "./types";
+import { smsSegments } from "@/lib/ghl/send-guard";
+import { SendRules } from "./send-panels";
 
 // The conversation tab: the live thread (fetched when the panel opens, shown, never stored by SubSync) and the composer, docked under it. Sending goes through the review sheet and the server's gateway.
 
@@ -113,12 +115,17 @@ export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChan
     setText((t) => `${t.slice(0, at)}${v}${t.slice(at)}`);
     requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(at + v.length, at + v.length); });
   };
-  const applyTemplate = (id: string) => { const t = ctx.templates.find((x) => x.id === id); if (!t) return; setText(t.text); if (t.subject) setSubject(t.subject); };
+  const applyTemplate = (id: string) => { const t = allTemplates.find((x) => x.id === id); if (!t) return; setText(t.text); if (t.subject) setSubject(t.subject); };
   useEffect(() => { const el = box.current; if (el) { el.style.height = "auto"; el.style.height = `${Math.min(el.scrollHeight, 224)}px`; } }, [text]);
   useEffect(() => { if (focusOnMount) requestAnimationFrame(() => box.current?.focus()); }, [focusOnMount]);
-  const sms = !email ? Math.max(1, Math.ceil(text.length / 160)) : 0;
+  const seg = !email ? smsSegments(text) : null;
+  const sms = seg ? Math.max(1, seg.parts) : 0;
+  const sendOff = ctx.send ? (!ctx.send.enabled ? "Sending from SubSync is not switched on for your account yet. You can still read the conversation and open it in your CRM." : ctx.send.killed ? "Sending is paused for everyone right now. Nothing can be sent." : ctx.send.paused ? "Sending is paused for this account (Settings, Messages)." : !ctx.send.roleOk ? "Only an owner or administrator can send from here." : ctx.send.needsPermission ? "Needs permission: reconnect SubSync and allow it to send messages." : null) : null;
+  const channels = ctx.send ? CHANNELS.filter(([k]) => k !== "WhatsApp") : CHANNELS;
+  const allTemplates = [...ctx.templates.filter((t) => !ctx.send || t.channel !== "WhatsApp"), ...(ctx.send?.templates ?? [])];
 
   if (ctx.dnd) return <p className="mt-4 rounded-xl border border-destructive/50 p-3.5 text-[15px] font-medium text-destructive" data-testid="wb-dnd">{ctx.name} asked not to be contacted. SubSync will not send them anything.</p>;
+  if (sendOff) return <p className="mt-4 rounded-xl border p-3.5 text-[15px] text-muted-foreground" role="status" data-testid="wb-send-off">{sendOff}</p>;
   if (!open) {
     return (
       <div className="sticky bottom-0 z-10 mt-3 flex items-center gap-3 rounded-xl border bg-card px-3 py-2 shadow-[0_-8px_14px_-10px_rgb(0_0_0/0.3)]" data-testid="wb-composer-collapsed">
@@ -128,15 +135,15 @@ export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChan
     );
   }
   return (
-    <form className="sticky bottom-0 z-10 mt-3 space-y-2.5 rounded-xl border bg-card p-3 shadow-[0_-8px_14px_-10px_rgb(0_0_0/0.3)]" aria-label="Write a message" data-testid="wb-composer" onSubmit={(e) => { e.preventDefault(); void runner.preview({ kind: "message", channel, text, ...(email ? { subject } : {}) }, { quote: email ? `Subject: ${subject}\n\n${text}` : text, verb: "Send now" }); }}>
+    <><form className="sticky bottom-0 z-10 mt-3 space-y-2.5 rounded-xl border bg-card p-3 shadow-[0_-8px_14px_-10px_rgb(0_0_0/0.3)]" aria-label="Write a message" data-testid="wb-composer" onSubmit={(e) => { e.preventDefault(); void runner.preview({ kind: "message", channel, text, ...(email ? { subject } : {}) }, { quote: email ? `Subject: ${subject}\n\n${text}` : text, verb: "Send now" }); }}>
       <div className="flex flex-wrap items-center gap-2">
         <div role="radiogroup" aria-label="How to send" className="inline-flex rounded-lg border p-0.5">
-          {CHANNELS.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={channel === k} disabled={!canUse(k)} onClick={() => setChannel(k)} className={`min-h-10 rounded-md px-3 text-[15px] font-medium disabled:opacity-40 ${channel === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`} data-testid={`wb-ch-${k}`}>{l}</button>)}
+          {channels.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={channel === k} disabled={!canUse(k)} onClick={() => setChannel(k)} className={`min-h-10 rounded-md px-3 text-[15px] font-medium disabled:opacity-40 ${channel === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`} data-testid={`wb-ch-${k}`}>{l}</button>)}
         </div>
         <button type="button" onClick={() => onOpenChange?.(false)} aria-label="Collapse the message box" className="ml-auto inline-flex size-9 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground" data-testid="wb-composer-collapse"><ChevronDown aria-hidden className="size-4" /></button>
         <select aria-label="Start from a template" value="" onChange={(e) => applyTemplate(e.target.value)} className={`${INPUT} !w-auto min-w-40`} data-testid="wb-template">
           <option value="">Template...</option>
-          {ctx.templates.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+          {allTemplates.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
         </select>
         {lead && <AiDraftButton locationId={lead.locationId} contactId={lead.contactId} channel={channel} hasText={text.trim().length > 0} onDraft={(t) => { setText(t); setAiDraft(true); requestAnimationFrame(() => box.current?.focus()); }} />}
       </div>
@@ -147,7 +154,7 @@ export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChan
         <div className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground"><span>Insert:</span>
           {[["First name", first], ["My name", ctx.me ?? ""], ["Business", ctx.locationName ?? ""]].map(([l, v]) => <button key={l} type="button" disabled={!v} onClick={() => insert(v)} className="min-h-9 rounded-md border px-2.5 text-sm hover:bg-accent disabled:opacity-40" data-testid="wb-merge">{l}</button>)}
         </div>
-        <span className="text-xs tabular-nums text-muted-foreground" data-testid="wb-count">{email ? `${text.length} characters` : `${text.length}/160 · ${sms} text${sms === 1 ? "" : "s"}`}</span>
+        <span className="text-xs tabular-nums text-muted-foreground" data-testid="wb-count">{email ? `${text.length} characters` : `${text.length} characters · ${sms} text part${sms === 1 ? "" : "s"}${seg?.unicode ? " (emoji or special letters make each part shorter)" : ""}${ctx.send?.footerEnabled ? " · opt-out line added" : ""}`}</span>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5" data-testid="wb-mode-chip">
@@ -156,6 +163,6 @@ export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChan
         </span>
         <button type="submit" disabled={runner.busy || !text.trim() || (email && !subject.trim())} title={runner.busy ? "Working on the last step" : !text.trim() ? "Write a message first" : email && !subject.trim() ? "Add a subject first" : undefined} className={`${wbButtons.PRIMARY} cursor-pointer disabled:cursor-not-allowed`} data-testid="wb-preview"><SendHorizonal aria-hidden className="size-4" />Review and send</button>
       </div>
-    </form>
+    </form>{lead && ctx.send?.enabled && <SendRules locationId={lead.locationId} />}</>
   );
 }
