@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { InlineAlert } from "../ds";
+import { TeamAiSettings } from "./ai-team/team-settings";
 import { useApiClient, useData } from "../session";
 import { Badge, Btn } from "../ui";
 
@@ -70,6 +71,7 @@ export function AiCard() {
       {msg && <p role="status" className={`mt-2 text-sm ${msg.ok ? "text-emerald-600" : "text-red-600"}`}>{msg.text}</p>}
       {c ? <Connected data={data} conn={c} act={act} /> : <Connect data={data} act={act} start={start} waiting={waiting} />}
       {data.usage && <UsagePanel usage={data.usage} conn={c} act={act} />}
+      {c && <TeamAiSettings />}
     </section>
   );
 }

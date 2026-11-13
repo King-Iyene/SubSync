@@ -216,6 +216,12 @@ export const FEATURES = [
   "wf_module",
   "ai_brief",
   "ai_chatgpt",
+  "ai_report",
+  "ai_leads",
+  "ai_coach",
+  "ai_anomaly",
+  "ai_meeting",
+  "ai_one_thing",
   // The four lead AI jobs (suggest only), each with its own flag on top of ai_byo. Default off.
   "ai_lead_summary",
   "ai_call_first",

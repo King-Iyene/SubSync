@@ -143,6 +143,7 @@ import { handleBfFunnel, handleBfRecover } from "./bf-routes";
 import { handlePipeline3, handlePipelineHistorySettings } from "./pipeline3-routes";
 import { handleClients3 } from "./clients3-routes";
 import { handleProof } from "./proof-routes";
+import { handleAiTeam } from "./ai-team-routes";
 import { handleFinance } from "./finance-routes";
 import { handleClients2 } from "./clients2-routes";
 import { handlePeople3 } from "./people3-routes";
@@ -2288,6 +2289,7 @@ async function dispatch(ctx: Ctx): Promise<Response> {
       return await handleWfm(ctx, { allowed: () => allowedIds(ctx) });
     }
     // Bring your own AI: /api/app/ai?part=... and /api/app/ai/act/<name>. Administrators only for the connection (checked inside); flag ai_byo.
+    if (a === "ai-team" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3))) return await handleAiTeam(ctx, { allowed: () => allowedIds(ctx) });
     if (a === "ai" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3) || (b === "lead" && ctx.segments.length === 3))) {
       return await handleAi(ctx, { allowed: () => allowedIds(ctx), locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), links: async () => (await scope(ctx)).links });
     }
