@@ -82,3 +82,19 @@ export function particleCounts(ths: number[], cap = 60): number[] {
 }
 /** Rows of bills (or cards) in a pile: proportional to its height, at most 40. */
 export const pileRows = (h: number): number => (h <= 0 ? 0 : Math.max(1, Math.min(40, Math.round(h / 6))));
+
+/** Most cards (or bills) any one pile may draw. */
+export const MAX_PILE_CARDS = 30;
+/**
+ * The ONE scale for every pile on the screen: how much a card stands for. With few deals it is exactly 1 (one card per deal, so a pile always matches its count).
+ * With many deals (or large money) it is the smallest "nice" step (1, 2, 5, 10, 20, 50 ...) that keeps the biggest pile at MAX_PILE_CARDS or fewer.
+ */
+export function pileUnit(values: number[], maxCards = MAX_PILE_CARDS): number {
+  const max = Math.max(0, ...values.filter((v) => Number.isFinite(v)));
+  if (max <= maxCards) return 1;
+  const raw = max / maxCards, mag = 10 ** Math.floor(Math.log10(raw));
+  for (const m of [1, 2, 5, 10]) if (m * mag >= raw) return m * mag;
+  return 10 * mag;
+}
+/** Cards for one pile: none when empty, at least one when anything is there, never more than MAX_PILE_CARDS. With unit 1 it is exactly the count. */
+export const pileCards = (value: number, unit: number): number => (value <= 0 ? 0 : Math.min(MAX_PILE_CARDS, Math.max(1, Math.ceil(value / Math.max(1, unit)))));

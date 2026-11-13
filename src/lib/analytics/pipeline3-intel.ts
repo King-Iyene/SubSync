@@ -212,7 +212,7 @@ export function buildStages(meta: StageMeta[], aggs: StageAgg[], pipelineId: str
 export type DayMove = { day: string; from: string | null; to: string | null; status: "won" | "lost" | null; count: number; value: number };
 export function buildReplay(days: string[], current: Array<{ stageId: string; count: number; value: number }>, moves: DayMove[]) {
   const stock = new Map(current.map((c) => [c.stageId, { count: c.count, value: c.value }]));
-  const frames: Array<{ day: string; stages: Array<{ stageId: string; count: number; value: number }>; wonValue: number; lostValue: number; moved: Array<{ from: string | null; to: string; count: number; value: number }> }> = [];
+  const frames: Array<{ day: string; stages: Array<{ stageId: string; count: number; value: number }>; wonValue: number; lostValue: number; wonCount: number; lostCount: number; moved: Array<{ from: string | null; to: string; count: number; value: number }>; closed: Array<{ from: string | null; status: "won" | "lost"; count: number; value: number }> }> = [];
   const byDay = new Map<string, DayMove[]>();
   for (const m of moves) byDay.set(m.day, [...(byDay.get(m.day) ?? []), m]);
   for (let i = days.length - 1; i >= 0; i--) {
@@ -220,7 +220,9 @@ export function buildReplay(days: string[], current: Array<{ stageId: string; co
     frames.push({
       day, stages: [...stock.entries()].map(([stageId, v]) => ({ stageId, count: Math.max(0, v.count), value: Math.max(0, Math.round(v.value)) })),
       wonValue: Math.round(ms.filter((m) => m.status === "won").reduce((t, m) => t + m.value, 0)), lostValue: Math.round(ms.filter((m) => m.status === "lost").reduce((t, m) => t + m.value, 0)),
+      wonCount: ms.filter((m) => m.status === "won").reduce((t, m) => t + m.count, 0), lostCount: ms.filter((m) => m.status === "lost").reduce((t, m) => t + m.count, 0),
       moved: ms.filter((m) => m.to && !m.status).map((m) => ({ from: m.from, to: m.to as string, count: m.count, value: Math.round(m.value) })),
+      closed: ms.filter((m) => m.status).map((m) => ({ from: m.from, status: m.status as "won" | "lost", count: m.count, value: Math.round(m.value) })),
     });
     // Going back one day: undo that day's moves (a deal that entered a stage was not there before; one that left was).
     for (const m of ms) {

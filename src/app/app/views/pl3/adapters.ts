@@ -55,6 +55,11 @@ export function flowOf(m: Pl3MoneyFlow | null, replay: Pl3Replay | null): PlMone
     replay: replay?.enough && replay.frames.length ? replay.frames.map((f) => ({
       date: f.day, wonCents: c(f.wonValue), lostCents: c(f.lostValue),
       stageValueCents: stages.map((s) => c(f.stages.find((x) => x.stageId === s.id)?.value)), stageCounts: stages.map((s) => f.stages.find((x) => x.stageId === s.id)?.count ?? 0),
+      stageNoValue: stages.map((s) => f.stages.find((x) => x.stageId === s.id)?.noValueCount ?? 0), wonCount: f.wonCount ?? 0, lostCount: f.lostCount ?? 0,
+      moves: [
+        ...arr<NonNullable<typeof f.moved>[number]>(f.moved).map((m) => ({ from: m.from === null ? null : index.get(m.from) ?? null, to: index.get(m.to) ?? null, status: null, count: m.count, valueCents: c(m.value) })).filter((m) => m.to !== null),
+        ...arr<NonNullable<typeof f.closed>[number]>(f.closed).map((m) => ({ from: m.from === null ? null : index.get(m.from) ?? null, to: null, status: m.status, count: m.count, valueCents: c(m.value) })),
+      ],
     })) : null,
     minDeals: 15,
     excluded: { zeroValue: lo?.noValue ?? 0, noOwner: lo?.noOwner ?? 0, test: lo?.test ?? 0, outlier: lo?.outlier ?? 0, outlierCents: c(lo?.outlierValue), ownerCounted: lo?.ownerCounted === true, testsCounted: lo?.testsCounted === true },
