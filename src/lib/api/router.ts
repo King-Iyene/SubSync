@@ -130,6 +130,7 @@ import { answerKey, cachedAnswer, cachedRead, forgetAllReads, forgetAnswers, rea
 import { runAfter } from "../run-after";
 import { demoRead, forgetDemoAnswers } from "./demo-cache";
 import { answerStoreKey, answerStoreOn, judgeAnswer, storable } from "../analytics/read-answers";
+import { inPipeline, pipelineParam } from "../analytics/pipeline-pick";
 import { readAnswer, storeAnswer } from "../analytics/read-answers-db";
 import { handleSpeedPrefs, handleSpeedDigest, handleSpeedLadder, handleSpeedPart, handleSpeedTarget } from "./speed-routes";
 import { handleUnansweredOutcome, handleUnansweredPart } from "./unanswered-routes";
@@ -1018,12 +1019,14 @@ async function search(ctx: Ctx) {
 async function stale(ctx: Ctx) {
   const { permits, links } = await scope(ctx);
   // The caller's own accounts only (the same ids that every number on the page was counted from).
-  const ids = ((await allowedIds(ctx)) ?? (await liveLocationIds(ctx.installationId))).filter(permits);
+  // The account and pipeline pickers of Pipeline narrow this list, its totals and its counting line the same way (the account only ever narrows inside the caller's own accounts).
+  const pipeline = pipelineParam(ctx.url.searchParams), oneAcct = ctx.url.searchParams.get("location");
+  const ids = ((await allowedIds(ctx)) ?? (await liveLocationIds(ctx.installationId))).filter(permits).filter((x) => !oneAcct || x === oneAcct);
   const left = ctx.url.searchParams.get("left") === "1";
   const [pg, trust, lo] = await Promise.all([
-    left ? null : staleDealsPage(ctx.installationId, { ids, limit: 500 }),
-    dealTrust(ctx.installationId, ids),
-    left ? leftOutRows(ctx.installationId, ids, null, 500, 0) : null,
+    left ? null : staleDealsPage(ctx.installationId, { ids, limit: 500, pipeline }),
+    dealTrust(ctx.installationId, ids, pipeline),
+    left ? leftOutRows(ctx.installationId, ids, null, 500, 0, pipeline) : null,
   ]);
   const basis = { counting: countingLine(trust.counted.deals, trust.leftOut), leftOutLine: leftOutLine(trust.leftOut), leftOutDeals: trust.leftOut.deals, notJudged: trust.leftOut.notJudged, howStale: HOW_STALE_WORKED_OUT, howLeftOut: HOW_LEFT_OUT };
   if (lo) {
@@ -1101,7 +1104,8 @@ async function inboxViewRemove(ctx: Ctx, id: string) {
 async function pipelines(ctx: Ctx) {
   const { accounts: visible, links } = await accountsFor(ctx);
   const allowed = new Set(visible.map((a) => a.locationId));
-  const cells = (await pipelineCells(ctx.installationId)).filter((c) => allowed.has(c.locationId));
+  const pick = pipelineParam(ctx.url.searchParams), oneAcct = ctx.url.searchParams.get("location");
+  const cells = (await pipelineCells(ctx.installationId)).filter((c) => allowed.has(c.locationId) && inPipeline(c.pipelineName, pick) && (!oneAcct || c.locationId === oneAcct));
   const stageMap = new Map<string, { pipeline: string; stage: string; order: number; count: number; value: number }>();
   const perAccount = new Map<string, { locationId: string; name: string | null; open: { count: number; value: number }; won: { count: number; value: number }; lost: { count: number; value: number } }>();
   for (const c of cells) {
@@ -1403,7 +1407,7 @@ async function exportCsv(ctx: Ctx, kind: string) {
       ]));
     }
     case "stale": {
-      const rows = (await staleDeals(ctx.installationId, 0, 5000, ctx.limitTo ?? undefined)).filter((d) => permits(d.locationId));
+      const rows = (await staleDeals(ctx.installationId, 0, 5000, ctx.url.searchParams.get("location") ?? ctx.limitTo ?? undefined, pipelineParam(ctx.url.searchParams))).filter((d) => permits(d.locationId));
       return file("subsync-stale-deals", toCsv(rows, [
         { label: "Account", value: (d) => d.locationName }, { label: "Deal", value: (d) => d.name }, { label: "Contact", value: (d) => d.contactName },
         { label: "Value", value: (d) => d.value }, { label: "Pipeline", value: (d) => d.pipelineName }, { label: "Stage", value: (d) => d.stageName },
@@ -1428,7 +1432,7 @@ async function exportCsv(ctx: Ctx, kind: string) {
       ]));
     }
     case "deals": {
-      const deals = await loadDeals(ctx.installationId, await allowedIds(ctx));
+      const deals = await loadDeals(ctx.installationId, await allowedIds(ctx), ctx.url.searchParams.get("location") ?? undefined, pipelineParam(ctx.url.searchParams));
       const risky = riskyDeals(deals, Date.now(), 100000);
       return file("subsync-open-deals", toCsv(risky, [
         { label: "Account", value: (d) => d.locationName }, { label: "Pipeline", value: (d) => d.pipelineName }, { label: "Stage", value: (d) => d.stageName },
@@ -1465,7 +1469,7 @@ async function exportCsv(ctx: Ctx, kind: string) {
 
 async function hygiene(ctx: Ctx) {
   const { permits } = await scope(ctx);
-  const rows = (await dealHygiene(ctx.installationId)).filter((r) => permits(r.locationId));
+  const rows = (await dealHygiene(ctx.installationId, pipelineParam(ctx.url.searchParams), ctx.url.searchParams.get("location"))).filter((r) => permits(r.locationId));
   return json({
     accounts: rows,
     totals: {
@@ -1662,9 +1666,12 @@ async function pipelineIntel(ctx: Ctx) {
   const location = ctx.url.searchParams.get("location") ?? undefined;
   if (location && !LOCATION_ID.test(location)) return json({ error: "Invalid account" }, 400);
   const [allowed, goals] = await Promise.all([allowedIds(ctx), ctx.kind === "client" ? Promise.resolve({} as Awaited<ReturnType<typeof getGoals>>) : getGoals(ctx.installationId)]);
-  const [deals, trend, sc, excluded, rules] = await Promise.all([loadDeals(ctx.installationId, allowed, location), pipelineTrend(ctx.installationId, allowed), scope(ctx), excludedOpenDeals(ctx.installationId, allowed, location), loadStageRules(ctx.installationId)]);
+  const pipeline = pipelineParam(ctx.url.searchParams);
+  const [deals, trend0, sc, excluded, rules] = await Promise.all([loadDeals(ctx.installationId, allowed, location, pipeline), pipelineTrend(ctx.installationId, allowed), scope(ctx), excludedOpenDeals(ctx.installationId, allowed, location, pipeline), loadStageRules(ctx.installationId)]);
   // What the owner decided about stages and pipelines is the agency's own working note: a client's staff get the numbers built on it, never the controls.
   const stageControls = ctx.kind === "client" ? null : await stageControlsFor(ctx, allowed, rules);
+  // The daily history of open money is kept per account, not per pipeline: with one pipeline picked it is not drawn (said in words), never drawn for all pipelines.
+  const trend = pipeline ? { ...trend0, points: [], note: "The daily history is kept for whole accounts, so it is not shown for one pipeline." } : trend0;
   const now = Date.now();
   const opens = deals.filter((d) => d.status === "open");
   const openValue = opens.reduce((s, d) => s + d.value, 0);
@@ -2061,7 +2068,7 @@ async function dealGaps(ctx: Ctx) {
   const allowed = await allowedIds(ctx);
   const asked = Number(ctx.url.searchParams.get("days"));
   const days = [7, 14, 30].includes(asked) ? asked : 7;
-  const gaps = await communicationGaps(ctx.installationId, allowed, days, 200);
+  const gaps = await communicationGaps(ctx.installationId, allowed, days, 200, pipelineParam(ctx.url.searchParams));
   return json({ ...gaps, deals: gaps.deals.map((d) => ({ ...d, url: sc.links.opportunities(d.locationId) })) });
 }
 

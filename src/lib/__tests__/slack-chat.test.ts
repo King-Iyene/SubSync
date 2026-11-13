@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { handleSlackRequest, RATE_MAX, type ChatDeps, type ChatLink } from "../slack-chat/handler.ts";
-import { formatAnswer, formatRefusal, questionFrom, rowsLink } from "../slack-chat/format.ts";
+import { formatAnswer, formatRefusal, questionFrom } from "../slack-chat/format.ts";
 import { signSlack, verifySlackSignature } from "../slack-chat/signature.ts";
 import type { AskResult } from "../ai/data/ask.ts";
 
@@ -30,7 +30,7 @@ function setup(over: Partial<ChatDeps> = {}) {
     recentCount: async () => 0,
     ask: async (link, q, user) => { asks.push({ inst: link.installationId, loc: link.locationId, q, user }); return GOOD; },
     post: async (link, channel, thread, text) => { posts.push({ channel, thread, text, token: link.botToken }); },
-    appUrl: () => "https://app.test", later: (fn) => { later.push(fn); }, log: (c) => { logs.push(c); },
+    crmUrl: async () => "https://crm.test/v2/location/LOC1/dashboard", later: (fn) => { later.push(fn); }, log: (c) => { logs.push(c); },
     ...over,
   };
   const run = async (body: unknown, opts: { secret?: string; ts?: string; sign?: boolean } = {}) => {
@@ -89,7 +89,9 @@ test("a mention is acknowledged at once and answered in a thread from the accoun
   assert.equal(t.posts[0].channel, "C1");
   assert.equal(t.posts[0].token, "xoxb-fake");
   assert.match(t.posts[0].text, /9 leads are waiting/);
-  assert.match(t.posts[0].text, /Leads waiting: 9 \(9 rows\) <https:\/\/app\.test\/app#ask\?rows=leads_waiting~from%3D2026-11-06~to%3D2026-11-13&label=Leads%20waiting\|Open the rows>/);
+  assert.match(t.posts[0].text, /Leads waiting: 9 \(9 rows\)/);
+  assert.match(t.posts[0].text, /<https:\/\/crm\.test\/v2\/location\/LOC1\/dashboard\|Open your CRM, then SubSync to see the rows behind these numbers\.>/);
+  assert.doesNotMatch(t.posts[0].text, /app\.test|subsync\.kdsquares|app#/i);
   assert.match(t.posts[0].text, /Nothing was sent or changed/);
 });
 
@@ -148,7 +150,8 @@ test("switched off or kill switch: acknowledged, nothing asked", async () => {
 test("no AI connected: replies 'AI is not connected yet' with a link", async () => {
   const t = setup({ ask: async () => ({ ok: false, code: "no_connection", message: "Connect your AI account first." }) });
   await t.run(mention());
-  assert.equal(t.posts[0].text, "AI is not connected yet. Connect your AI key here: <https://app.test/app#connections|Connections>.");
+  assert.equal(t.posts[0].text, "AI is not connected yet. Connect your AI key: <https://crm.test/v2/location/LOC1/dashboard|Open your CRM, then SubSync &gt; Settings &gt; Integrations>.");
+  assert.equal(formatRefusal("no_connection", "", null), "AI is not connected yet. Connect your AI key: In your CRM, open SubSync &gt; Settings &gt; Integrations.");
 });
 
 test("a person asking too fast is slowed down before the AI is called", async () => {
@@ -159,21 +162,21 @@ test("a person asking too fast is slowed down before the AI is called", async ()
 });
 
 test("spend cap, kill switch and unverified answers are said in plain words", () => {
-  assert.match(formatRefusal("cap", "", "https://a.test"), /limit .* reached/);
-  assert.equal(formatRefusal("killed", "", "https://a.test"), "AI answers are switched off right now.");
-  assert.match(formatRefusal("unverified", "We could not match the answer to your rows, so it was not shown.", "https://a.test"), /not shown/);
+  assert.match(formatRefusal("cap", "", null), /limit .* reached/);
+  assert.equal(formatRefusal("killed", "", null), "AI answers are switched off right now.");
+  assert.match(formatRefusal("unverified", "We could not match the answer to your rows, so it was not shown.", null), /not shown/);
 });
 
 test("formatting: mentions removed from the question; answers cannot create mentions or links", () => {
   assert.equal(questionFrom("<@UBOT> hi <@U2|bob> there <!channel> <https://x.test|link>", "UBOT"), "hi there https://x.test");
   const evil: Extract<AskResult, { ok: true }> = { ...GOOD, answer: { answer: "<!channel> <https://evil.test|click> & more", cannotAnswer: false, citations: [] } };
-  const text = formatAnswer(evil, { appUrl: "https://a.test", locationId: null });
+  const text = formatAnswer(evil, { crmUrl: null });
   assert.doesNotMatch(text, /<!channel>|<https:\/\/evil/);
   assert.match(text, /&lt;!channel&gt;/);
-  assert.equal(rowsLink("https://a.test/", "x~from=2026-01-01~to=2026-01-02", "L", "loc1"), "https://a.test/app#ask?rows=x~from%3D2026-01-01~to%3D2026-01-02&account=loc1&label=L");
+
 });
 
 test("no vendor words in any reply text", () => {
-  const all = [formatRefusal("no_connection", "", "https://a.test"), formatRefusal("cap", "", "https://a.test"), formatAnswer(GOOD, { appUrl: "https://a.test", locationId: null })].join("\n");
+  const all = [formatRefusal("no_connection", "", null), formatRefusal("cap", "", null), formatAnswer(GOOD, { crmUrl: null })].join("\n");
   assert.doesNotMatch(all, /gohighlevel|highlevel|\bghl\b/i);
 });

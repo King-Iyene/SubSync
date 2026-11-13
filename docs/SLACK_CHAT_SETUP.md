@@ -5,20 +5,20 @@ Flag: `slack_chat` (default OFF). Needs `ai_byo` and `ai_ask_data` on as well. R
 ## What it does
 
 People DM the bot or @mention it in a channel and ask ("who hasn't been answered?", "how many no-shows this week?"). The answer comes from the same read-only
-Ask your data tools as the app, with the customer's own AI key, the number check, and a "Open the rows" link for every figure. It never messages leads and never
+Ask your data tools as the app, with the customer's own AI key, the number check, and a pointer to where the rows are for every figure. It never messages leads and never
 writes to the CRM.
 
 Safety rules built in:
 - Every request is checked against Slack's signature (`X-Slack-Signature`) and must be under 5 minutes old. Anything else gets 401.
 - A Slack workspace maps to ONE company (or one client account). The tenant comes only from that link, never from the words typed. An unknown workspace gets no answer.
-- Slack people are not matched to app roles, so answers are account-level totals and no names go to the AI. The "Open the rows" link opens in the app, where the person signs in with their own role.
+- Slack people are not matched to app roles, so answers are account-level totals and no names go to the AI. SubSync opens only inside the CRM (the CRM signs the person in with their own role), so Slack never links to a SubSync address: alerts about something the CRM has a page for (conversations, calendar, deals, contacts, the account) link straight to that CRM page on the company's own CRM domain; the rest link to that account's CRM dashboard with the words "Open your CRM, then SubSync > ...". A chat for a whole company (not one account) shows the words only, no link.
 - Per-person limit: 8 questions in 10 minutes. The customer's own monthly AI cap and the `AI_KILL_ALL=true` kill switch apply too. Turning the `slack_chat` flag off stops all answers.
 
 ## Alert reports, in Slack and in chat
 
-- Alert messages in Slack are built from the alert's facts (counts, window, usual level, biggest causes, what changed since last time) and a link that opens the exact rows. They no longer repeat every hour: one message per real change, a daily reminder, and one "back to normal" note.
+- Alert messages in Slack are built from the alert's facts (counts, window, usual level, biggest causes, what changed since last time) and a link to the matching CRM page (see above). They no longer repeat every hour: one message per real change, a daily reminder, and one "back to normal" note.
 - Optional AI wording: flag `ai_slack_reports` (default OFF, needs `ai_byo`) plus the account's own switch in Settings > AI ("Alert reports in Slack"). The AI writes only the two sentences under the headline, from the same facts. Any figure not in the facts is rejected, and then the data-specific template is used (never the generic text). No extra Slack or Vercel setting is needed.
-- In chat, people can ask "what alerts fired today?" or "explain the bad records alert". The bot reads the same facts, and each count has an "Open the rows" link.
+- In chat, people can ask "what alerts fired today?" or "explain the bad records alert". The bot reads the same facts, and the reply points to where the rows are (see above).
 
 ## 1. Slack app settings (api.slack.com/apps, your SubSync app)
 

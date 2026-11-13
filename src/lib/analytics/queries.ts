@@ -2,10 +2,11 @@ import { sql } from "../db";
 import { cachedRead } from "../read-cache";
 import type { AccountRow, AccountSettings, AlertDraft } from "./derive";
 import type { DomainReport } from "../dns/email-auth";
-import { DEFAULT_APP_DOMAIN } from "../links";
+import { resolveCompanyDomain, type ResolvedDomain, DEFAULT_APP_DOMAIN } from "../links";
 import { effectiveLogo, validLogoUrl } from "../brand-logo";
 import { countedInScope, dealIsStale, dealScopeJoins, daysInStepSql, outOfScope } from "./stage-rules-sql";
 import { currentSnapshotVersion, snapshotOk } from "./definitions-sql";
+import { inPipelineSql } from "./pipeline-pick";
 
 // Every query is scoped by installation_id. Counts are cast to int/float8 so the driver does
 // not hand back strings.
@@ -84,15 +85,17 @@ async function loadSettings(installationId: string): Promise<Settings> {
     await db`insert into settings (installation_id) values (${installationId}) on conflict do nothing`;
     [r] = await read();
   }
+  // The domain is the COMPANY's, not this install's: a sibling account of the same company may be the one that saw it (sign-in or install event).
+  const company = r.app_domain_source === "manual" ? null : await companyDomain(installationId).catch(() => null);
   const days = Array.isArray(r.stale_deal_days) && r.stale_deal_days.length ? Number(r.stale_deal_days[0]) : 30;
   return {
     staleDays: days,
     dormantDays: r.dormant_days,
     slaHours: r.sla_hours,
     slackWebhookUrl: r.slack_webhook_url,
-    appDomain: r.ghl_app_domain,
-    appDomainSource: r.app_domain_source === "manual" || r.app_domain_source === "sso" || r.app_domain_source === "install" ? r.app_domain_source : "default",
-    detectedDomain: (r.detected_app_domain as string | null) ?? null,
+    appDomain: company?.appDomain ?? r.ghl_app_domain,
+    appDomainSource: company?.source ?? (r.app_domain_source === "manual" || r.app_domain_source === "sso" || r.app_domain_source === "install" ? r.app_domain_source : "default"),
+    detectedDomain: company?.detected ?? (r.detected_app_domain as string | null) ?? null,
     digestEnabled: r.digest_enabled,
     customChecklist: Array.isArray(r.custom_checklist) ? r.custom_checklist.filter((x: unknown): x is string => typeof x === "string") : [],
     digestHour: (r.digest_hour as number | null) ?? null,
@@ -117,6 +120,23 @@ async function loadSettings(installationId: string): Promise<Settings> {
   };
 }
 
+// The installs of one company: its agency install and every client-account install that names it (agency_company_id). Never another company's.
+const COMPANY_INSTALLS = (id: string) => sql()`
+  select i.id from installations me
+  join installations i on i.id = me.id or i.company_id = coalesce(me.agency_company_id, me.company_id) or i.agency_company_id = coalesce(me.agency_company_id, me.company_id)
+  where me.id = ${id} and i.uninstalled_at is null`;
+
+/** The CRM domain for one install, resolved across its whole company (see resolveCompanyDomain for the order). */
+export async function companyDomain(installationId: string): Promise<ResolvedDomain> {
+  const rows = await sql()`
+    select (i.id = ${installationId}) own, s.app_domain_source source, s.ghl_app_domain app_domain, s.detected_app_domain detected
+    from installations me
+    join installations i on i.id = me.id or i.company_id = coalesce(me.agency_company_id, me.company_id) or i.agency_company_id = coalesce(me.agency_company_id, me.company_id)
+    join settings s on s.installation_id = i.id
+    where me.id = ${installationId} and i.uninstalled_at is null`;
+  return resolveCompanyDomain(rows.map((r) => ({ own: r.own === true, source: (r.source as string | null) ?? null, appDomain: (r.app_domain as string | null) ?? null, detected: (r.detected as string | null) ?? null })));
+}
+
 // Keep the company's own login domain, seen at sign-in or in the install event (stored per install, so per company). It is always remembered as
 // "detected"; it becomes the domain links use unless the company typed one in Settings, which always wins.
 export async function captureWhitelabelDomain(installationId: string, domain: string, from: "sso" | "install" = "sso"): Promise<void> {
@@ -129,6 +149,14 @@ export async function captureWhitelabelDomain(installationId: string, domain: st
       app_domain_source = case when app_domain_source = 'manual' then 'manual' else ${from} end
     where installation_id = ${installationId}
       and (detected_app_domain is distinct from ${domain} or (app_domain_source <> 'manual' and ghl_app_domain is distinct from ${domain}))`;
+  // The same company's other installs learn it too (their own typed domain, if any, still wins). Additive: only fills settings rows, never removes anything.
+  const siblings = (await COMPANY_INSTALLS(installationId).catch(() => [])).map((r) => r.id as string).filter((id) => id !== installationId);
+  for (const id of siblings) {
+    await db`insert into settings (installation_id) values (${id}) on conflict do nothing`;
+    await db`
+      update settings set detected_app_domain = ${domain}, ghl_app_domain = ${domain}, app_domain_source = ${from}
+      where installation_id = ${id} and app_domain_source <> 'manual' and (detected_app_domain is distinct from ${domain} or ghl_app_domain is distinct from ${domain})`;
+  }
 }
 
 // Keep the logo address the install event or sign-in carried (already checked to be https). The owner's own address in Settings wins at read time.
@@ -328,7 +356,8 @@ export async function scoreHistory(installationId: string, days = 30): Promise<M
 // Deal hygiene per account: open deals that are missing a value or a contact, or have sat for 90+ days.
 export type HygieneRow = { locationId: string; locationName: string | null; open: number; noValue: number; noContact: number; ancient: number };
 
-export async function dealHygiene(installationId: string): Promise<HygieneRow[]> {
+export async function dealHygiene(installationId: string, pipeline?: string | null, locationId?: string | null): Promise<HygieneRow[]> {
+  const pipe = inPipelineSql(sql(), pipeline), only = locationId ? sql()`and o.location_id = ${locationId}` : sql()``;
   const rows = await sql()`
     select l.location_id, l.name,
       count(*) filter (where o.status = 'open')::int open_n,
@@ -338,7 +367,7 @@ export async function dealHygiene(installationId: string): Promise<HygieneRow[]>
     from locations l
     join (
       select o.*, coalesce(greatest(o.last_stage_change_at, o.last_action_at, o.updated_remote_at, o.last_status_change_at), o.created_remote_at, o.synced_at) act
-      from cached_opportunities o ${dealScopeJoins()} where o.installation_id = ${installationId} and not (o.status = 'open' and ${outOfScope()})
+      from cached_opportunities o ${dealScopeJoins()} where o.installation_id = ${installationId} ${pipe} ${only} and not (o.status = 'open' and ${outOfScope()})
     ) o on o.installation_id = l.installation_id and o.location_id = l.location_id
     where l.installation_id = ${installationId} and not l.ignored
     group by l.location_id, l.name
@@ -442,8 +471,9 @@ export type StaleDealsPage = { rows: DealRow[]; total: number; totalValue: numbe
  * `total` and `totalValue` are the true figures even when `limit` cuts the rows. `floorDays` (optional) also asks for at least that many days in the step; it is never the staleness rule.
  * `ids` is the caller's own accounts (null = every account of the installation, for a caller that already limited by `locationId`).
  */
-export async function staleDealsPage(installationId: string, o: { ids?: string[] | null; locationId?: string; limit?: number; floorDays?: number }): Promise<StaleDealsPage> {
+export async function staleDealsPage(installationId: string, o: { ids?: string[] | null; locationId?: string; limit?: number; floorDays?: number; pipeline?: string | null }): Promise<StaleDealsPage> {
   const db = sql();
+  const pipe = inPipelineSql(db, o.pipeline);
   const scope = o.locationId ? db`and o.location_id = ${o.locationId}` : db``;
   const only = o.ids ? db`and o.location_id = any(${o.ids}::text[])` : db``;
   const floor = o.floorDays && o.floorDays > 0 ? db`and ${daysInStepSql()} >= ${Math.floor(o.floorDays)}` : db``;
@@ -454,7 +484,7 @@ export async function staleDealsPage(installationId: string, o: { ids?: string[]
     from cached_opportunities o
     join locations l on l.installation_id = o.installation_id and l.location_id = o.location_id and not l.ignored
     ${dealScopeJoins()}
-    where o.installation_id = ${installationId} and o.status = 'open' and ${countedInScope()} and ${dealIsStale()} ${scope} ${only} ${floor}
+    where o.installation_id = ${installationId} and o.status = 'open' and ${countedInScope()} and ${dealIsStale()} ${scope} ${only} ${pipe} ${floor}
     order by o.monetary_value desc, o.opportunity_id
     limit ${o.limit ?? 200}`;
   return {
@@ -466,8 +496,8 @@ export async function staleDealsPage(installationId: string, o: { ids?: string[]
   };
 }
 
-export async function staleDeals(installationId: string, floorDays: number, limit = 200, locationId?: string): Promise<DealRow[]> {
-  return (await staleDealsPage(installationId, { locationId, limit, floorDays })).rows;
+export async function staleDeals(installationId: string, floorDays: number, limit = 200, locationId?: string, pipeline?: string | null): Promise<DealRow[]> {
+  return (await staleDealsPage(installationId, { locationId, limit, floorDays, pipeline })).rows;
 }
 
 export type PipelineCell = {

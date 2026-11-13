@@ -90,7 +90,7 @@ export async function targets(limit = 200): Promise<Target[]> {
   const db = sql();
   let rows;
   try {
-    rows = await db`select s.installation_id, s.location_id, s.block_key, s.threshold, l.timezone, coalesce(l.speed_target_minutes, st.speed_target_minutes, 15) speed_target, coalesce(st.alert_quiet_hours, true) quiet, coalesce(st.detected_app_domain, st.ghl_app_domain) app_domain
+    rows = await db`select s.installation_id, s.location_id, s.block_key, s.threshold, l.timezone, coalesce(l.speed_target_minutes, st.speed_target_minutes, 15) speed_target, coalesce(st.alert_quiet_hours, true) quiet, coalesce(st.detected_app_domain, (select s2.detected_app_domain from installations me join installations i2 on i2.id = me.id or i2.company_id = coalesce(me.agency_company_id, me.company_id) or i2.agency_company_id = coalesce(me.agency_company_id, me.company_id) join settings s2 on s2.installation_id = i2.id where me.id = s.installation_id and s2.detected_app_domain is not null limit 1), st.ghl_app_domain) app_domain
       from wfm_settings s join locations l on l.installation_id = s.installation_id and l.location_id = s.location_id and not l.ignored
       left join settings st on st.installation_id = s.installation_id
       where s.enabled and s.block_key in ('subsync_lead_unanswered', 'subsync_no_show', 'subsync_deal_stuck', 'subsync_account_quiet') limit ${limit * 4}`;

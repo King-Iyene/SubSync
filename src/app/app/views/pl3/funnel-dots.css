@@ -1,0 +1,87 @@
+/* THE FUNNEL (dots). Control-room look: full-width rows, rounded glowing bands, tiny dots. Light and dark both come from the theme tokens. Loaded after pl3.css. */
+.fv-wrap { position: relative; width: 100%; --fv-gold: #b8892a; --fv-gold2: #7d5a14; --fv-ember: #c4402f; --fv-stuck: #926d31; --fv-wait: color-mix(in srgb, var(--foreground) 48%, var(--background)); --fv-moved: var(--primary); --fv-lead: 214px; --fv-side: 300px; }
+[data-theme="dark"] .fv-wrap { --fv-gold: #f0c35a; --fv-gold2: #b5862a; --fv-ember: #ef6a56; --fv-stuck: #e0a94f; --fv-wait: color-mix(in srgb, var(--foreground) 55%, var(--background)); --fv-moved: color-mix(in srgb, var(--primary) 82%, #ffffff); }
+.fv-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.fv-row { display: grid; grid-template-columns: var(--fv-lead) minmax(0, 1fr) var(--fv-side); column-gap: 14px; align-items: center; min-height: 78px; }
+.fv-row + .fv-row { border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+.fv-label { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.fv-ico { flex: none; display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); border: 1px solid color-mix(in srgb, var(--primary) 32%, var(--border)); box-shadow: 0 0 10px color-mix(in srgb, var(--primary) 18%, transparent); }
+.fv-row[data-kind="won"] .fv-ico { color: var(--fv-gold); background: color-mix(in srgb, var(--fv-gold) 14%, transparent); border-color: color-mix(in srgb, var(--fv-gold) 45%, var(--border)); box-shadow: 0 0 10px color-mix(in srgb, var(--fv-gold) 25%, transparent); }
+.fv-name { font-weight: 600; font-size: .875rem; line-height: 1.25; overflow-wrap: anywhere; word-break: normal; min-width: 0; }
+.fv-band { display: flex; justify-content: center; min-width: 0; perspective: 900px; }
+.fv-svg { display: block; max-width: 100%; overflow: visible; }
+.fv-glow { fill: var(--primary); opacity: .2; filter: blur(7px); pointer-events: none; }
+.fv-glow-won { fill: var(--fv-gold); opacity: .3; }
+.fv-bandpath { stroke: color-mix(in srgb, var(--primary) 55%, #ffffff); stroke-opacity: .6; stroke-width: 1; stroke-linejoin: round; transition: filter 160ms; }
+.fv-bandpath-won { stroke: var(--fv-gold); stroke-opacity: .9; }
+.fv-bandpath[data-open="1"], .fv-grp[data-open="1"] { cursor: pointer; }
+.fv-bandpath[data-open="1"]:hover { filter: brightness(1.12) saturate(1.15); }
+.fv-leakring { stroke: var(--fv-ember); stroke-opacity: 1; stroke-width: 1.8; }
+.fv-s-b0 { stop-color: color-mix(in srgb, var(--primary) 34%, var(--background)); stop-opacity: .95; } .fv-s-b1 { stop-color: color-mix(in srgb, var(--primary) 16%, var(--background)); stop-opacity: .9; }
+.fv-s-won0 { stop-color: color-mix(in srgb, var(--fv-gold) 36%, var(--background)); } .fv-s-won1 { stop-color: color-mix(in srgb, var(--fv-gold) 16%, var(--background)); }
+.fv-grp circle { stroke: transparent; stroke-width: 5px; paint-order: stroke; }
+.fv-grp:hover circle { filter: brightness(1.25); }
+/* Spherical dots: a light spot, the colour, a darker rim. */
+.fv-s-spec { stop-color: #ffffff; stop-opacity: .95; }
+.fv-s-dot.fv-s-moved { stop-color: var(--fv-moved); } .fv-s-dot.fv-s-waiting { stop-color: var(--fv-wait); } .fv-s-dot.fv-s-stuck { stop-color: var(--fv-stuck); } .fv-s-dot.fv-s-lost { stop-color: var(--fv-ember); } .fv-s-dot.fv-s-won { stop-color: var(--fv-gold); }
+.fv-s-dotedge.fv-s-moved { stop-color: color-mix(in srgb, var(--fv-moved) 55%, #000); } .fv-s-dotedge.fv-s-waiting { stop-color: color-mix(in srgb, var(--fv-wait) 55%, #000); } .fv-s-dotedge.fv-s-stuck { stop-color: color-mix(in srgb, var(--fv-stuck) 55%, #000); } .fv-s-dotedge.fv-s-lost { stop-color: color-mix(in srgb, var(--fv-ember) 55%, #000); } .fv-s-dotedge.fv-s-won { stop-color: var(--fv-gold2); }
+/* Depth: floor shadow, slab thickness, cylinder shading and a glass sheen on the top half. */
+.fv-floor { fill: color-mix(in srgb, var(--foreground) 30%, transparent); opacity: .22; filter: blur(5px); pointer-events: none; }
+.fv-slab { fill: color-mix(in srgb, var(--primary) 38%, #000 22%); stroke: color-mix(in srgb, var(--primary) 30%, transparent); stroke-width: .8; pointer-events: none; }
+.fv-slab-won { fill: color-mix(in srgb, var(--fv-gold2) 78%, #000); stroke: color-mix(in srgb, var(--fv-gold) 40%, transparent); }
+.fv-s-edge { stop-color: #000; stop-opacity: .26; } .fv-s-clear { stop-color: #000; stop-opacity: 0; }
+.fv-s-sheen0 { stop-color: #fff; stop-opacity: .34; } .fv-s-sheen1 { stop-color: #fff; stop-opacity: 0; }
+[data-theme="dark"] .fv-s-sheen0 { stop-opacity: .22; } [data-theme="dark"] .fv-floor { opacity: .5; fill: #000; } [data-theme="dark"] .fv-slab { fill: color-mix(in srgb, var(--primary) 30%, #000 55%); }
+/* Parallax and a gentle sway: the layers slide a little differently, so the funnel has depth. Only with motion allowed; touch and reduced motion stay flat. */
+.fv-wrap[data-motion="1"] .fv-layer-floor { transform: translate(calc(var(--fv-tx, 0) * -7px), calc(var(--fv-ty, 0) * -3px)); transition: transform .3s ease-out; }
+.fv-wrap[data-motion="1"] .fv-layer-slab { transform: translate(calc(var(--fv-tx, 0) * -3px), calc(var(--fv-ty, 0) * -1.5px)); transition: transform .3s ease-out; }
+.fv-wrap[data-motion="1"] .fv-layer-dots { transform: translate(calc(var(--fv-tx, 0) * 3px), calc(var(--fv-ty, 0) * 2px)); transition: transform .3s ease-out; }
+.fv-wrap[data-motion="1"][data-hover="1"] .fv-svg { transform: rotateX(calc(var(--fv-ty, 0) * -5deg)) rotateY(calc(var(--fv-tx, 0) * 6deg)); transition: transform .25s ease-out; will-change: transform; }
+.fv-wrap[data-motion="1"][data-hover="0"] .fv-svg { animation: fv-sway 9s ease-in-out infinite alternate; animation-delay: calc(var(--fv-i, 0) * -0.7s); }
+@keyframes fv-sway { from { transform: rotateY(-2.4deg) rotateX(.8deg); } to { transform: rotateY(2.4deg) rotateX(-.8deg); } }
+.fv-wrap[data-paused="1"] .fv-svg { animation-play-state: paused; }
+/* Time: the replay chip. */
+.fv-replayslot { min-height: 30px; }
+.fv-replaychip { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 3px 12px; border-radius: 999px; font-size: .75rem; border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border)); background: color-mix(in srgb, var(--primary) 10%, transparent); }
+.fv-replaychip i { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 8px var(--primary); animation: fv-pulse 1.2s ease-in-out infinite; }
+.fv-pt { fill: color-mix(in srgb, var(--fv-moved) 70%, #ffffff); opacity: 0; filter: drop-shadow(0 0 3px var(--fv-moved)); animation: fv-fall linear infinite; pointer-events: none; }
+@keyframes fv-fall { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: .95; } 88% { opacity: .95; } 100% { transform: translateY(var(--fv-h, 60px)); opacity: 0; } }
+.fv-wrap[data-paused="1"] .fv-pt { animation-play-state: paused; }
+.fv-stats { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 6px 0; font-size: .8125rem; }
+.fv-big { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.fv-count { font: inherit; font-size: 1.25rem; font-weight: 700; line-height: 1.1; color: var(--foreground); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--primary) 45%, transparent); text-underline-offset: 3px; }
+span.fv-count { cursor: default; text-decoration: none; }
+.fv-unit { color: var(--muted-foreground); font-size: .75rem; }
+.fv-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.fv-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .6875rem; font-weight: 600; border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border)); background: color-mix(in srgb, var(--primary) 9%, transparent); }
+.fv-conv { border-color: color-mix(in srgb, var(--fv-gold) 40%, var(--border)); background: color-mix(in srgb, var(--fv-gold) 10%, transparent); }
+.fv-drop { color: var(--muted-foreground); font-size: .75rem; line-height: 1.4; }
+.fv-n { font: inherit; font-weight: 700; color: var(--foreground); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--foreground) 30%, transparent); text-underline-offset: 2px; }
+span.fv-n { cursor: default; text-decoration: none; }
+.fv-n-lost { color: var(--fv-ember); } .fv-n-stuck { color: var(--fv-stuck); }
+.fv-count:focus-visible, .fv-n:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 3px; }
+.fv-legend, .fv-note { margin: 12px 0 0; font-size: .75rem; color: var(--muted-foreground); line-height: 1.5; }
+.fv-note { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: color-mix(in srgb, var(--foreground) 3%, transparent); color: var(--foreground); }
+.fv-keys { display: inline-flex; flex-wrap: wrap; gap: 4px 14px; margin-left: 10px; }
+.fv-keys > span { display: inline-flex; align-items: center; gap: 5px; }
+.fv-key { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.fv-key.fv-c-moved { background: var(--fv-moved); } .fv-key.fv-c-waiting { background: var(--fv-wait); } .fv-key.fv-c-stuck { background: var(--fv-stuck); } .fv-key.fv-c-lost { background: var(--fv-ember); } .fv-key.fv-c-won { background: var(--fv-gold); }
+.fv-lostline { margin-top: 8px; }
+/* Phone and narrow panels: the label and numbers sit above each band, which takes the full width. */
+.fv-list[data-narrow="1"] .fv-row { grid-template-columns: minmax(0, 1fr); row-gap: 2px; padding: 8px 0 2px; }
+.fv-list[data-narrow="1"] .fv-label { order: 1; } .fv-list[data-narrow="1"] .fv-stats { order: 2; padding: 0 0 2px 40px; } .fv-list[data-narrow="1"] .fv-band { order: 3; }
+/* Loading placeholder with the same grid. */
+.fv-bone { display: inline-block; height: 12px; border-radius: 6px; background: color-mix(in srgb, var(--foreground) 10%, transparent); animation: fv-pulse 1.4s ease-in-out infinite; }
+.fv-bone-band { height: 40px; border-radius: 14px; }
+.fv-skel .fv-ico { background: color-mix(in srgb, var(--foreground) 8%, transparent); border-color: transparent; box-shadow: none; }
+.fv-skel .fv-band { align-items: center; }
+@keyframes fv-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+/* River piles are dots too. */
+.rv-dot { fill: color-mix(in srgb, var(--primary) 75%, var(--background)); }
+.rv-dots-deals .rv-dot { fill: color-mix(in srgb, var(--primary) 85%, #ffffff); }
+.rv-dot-stuck { fill: var(--pl-stuck); }
+[data-settle="1"] .rv-dot { animation: rv-land 420ms ease-out both; }
+.rv-won .rv-dot { fill: var(--pl-gold); }
+@media (prefers-reduced-motion: reduce) {
+  .fv-pt { display: none; } .fv-bone, .fv-replaychip i { animation: none; } .fv-svg { animation: none !important; transform: none !important; } [data-settle="1"] .rv-dot { animation: none; }
+}

@@ -100,6 +100,8 @@ export type Context = {
   /** The company's logo web address for the email header. */
   logoUrl?: string | null;
   appUrl: string;
+  /** The company CRM domain, for links that open the CRM. */
+  crmDomain?: string | null;
   /** The zone of the first client account, for a preference with no zone of its own. */
   fallbackZone: string | null;
   pref: (type: NotificationType) => Pref;
@@ -211,7 +213,7 @@ export async function drain(ctx: Context, ledger: Ledger, transports: Transports
         else if (first.channel === "email") result = await transports.email(first.target, composeEmail(batch.map((b) => b.payload), { company: ctx.company, logoUrl: ctx.logoUrl, appUrl: ctx.appUrl, stopUrl: ctx.stopUrl(first.target) }), batch);
         else {
           const dest = ctx.destinations.find((d) => d.id === first.target);
-          result = dest ? await transports.slack(dest, composeSlack(batch.map((b) => b.payload), { company: ctx.company, appUrl: ctx.appUrl }), batch) : { ok: false, permanent: true, code: "channel_not_available" };
+          result = dest ? await transports.slack(dest, composeSlack(batch.map((b) => b.payload), { company: ctx.company, appUrl: ctx.appUrl, crmDomain: ctx.crmDomain }), batch) : { ok: false, permanent: true, code: "channel_not_available" };
         }
       } catch {
         result = { ok: false, permanent: false, code: "transport_error" };

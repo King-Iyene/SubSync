@@ -164,7 +164,8 @@ test("a Slack message for several alerts is one post with a count", () => {
   const s = composeSlack([alertItem("A"), alertItem("B", "critical")], { company: "Acme", appUrl: "https://app.test" });
   assert.match(s, /^\*Acme: 2 new alerts\*/);
   assert.match(s, /:red_circle: B/);
-  assert.match(s, /<https:\/\/app\.test\/app#speed\|Open it>/);
+  assert.match(s, /Open your CRM, then SubSync/);
+  assert.doesNotMatch(s, /app.test/);
 });
 
 test("the brief and weekly lines say only what was measured", () => {

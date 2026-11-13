@@ -52,7 +52,7 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
   };
   // "Got to this step or further" (a ribbon or a funnel band): the step comes as its key, is turned into its position in the account's own pipeline, and only ever NARROWS the account's deals.
   if (f.bucket === "flow_reach") f.reachOrd = await reachOrdOf(scope, one, f.pipeline, text(sp.get("reach"), 200));
-  f.flowDeals = sp.get("fc") === "1";
+  f.flowDeals = sp.get("fc") === "1"; f.flowWindow = sp.get("fw") === "1"; f.flowStale = sp.get("fs") === "1";
   const p = Math.max(0, int(sp.get("page"), 0)), size = clampSize(int(sp.get("size"), 20)), dir = sp.get("dir") === "asc" ? "asc" : "desc";
   const link = (loc: string, contact: string) => links.contact(loc, contact);
   const key = JSON.stringify([ctx.installationId, allowedAll, part, sp.toString(), ctx.kind]);
@@ -93,7 +93,7 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
       const wk = sp.get("week") ?? "";
       // A receipt is for a Monday-to-Sunday week in the app zone (a Lagos week starts at Lagos midnight).
       const monday = dayStartMs(mondayOfDay(localDay(now - 7 * DAY))) as number;
-      return done(await receipt(scope, one, isRealDay(wk) ? new Date(dayStartMs(wk) as number) : new Date(monday)));
+      return done(await receipt(scope, one, isRealDay(wk) ? new Date(dayStartMs(wk) as number) : new Date(monday), f.pipeline ?? null));
     }
     case "detail": {
       const dl = await ownedAccount(ctx.installationId, allowedAll, sp.get("location"));

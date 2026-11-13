@@ -24,7 +24,7 @@ import type {
 export type Db = ReturnType<typeof sql>;
 export type Frag = ReturnType<Db>;
 export type Scope = { inst: string; allowed: string[] | null };
-export type Filters = { from: Date; to: Date; location?: string | null; pipeline?: string | null; stage?: string | null; stageKey?: string | null; owner?: string | null; source?: string | null; q?: string | null; bucket?: Pl3Bucket | null; reason?: string | null; includeTest?: boolean; /** Pipeline step order: with bucket "flow_reach", deals that got to this step or further (see flowReachCond). */ reachOrd?: number | null; /** Count open deals with no value too (the river in deal-count mode). */ flowDeals?: boolean };
+export type Filters = { from: Date; to: Date; location?: string | null; pipeline?: string | null; stage?: string | null; stageKey?: string | null; owner?: string | null; source?: string | null; q?: string | null; bucket?: Pl3Bucket | null; reason?: string | null; includeTest?: boolean; /** Pipeline step order: with bucket "flow_reach", deals that got to this step or further (see flowReachCond). */ reachOrd?: number | null; /** Count open deals with no value too (the river in deal-count mode). */ flowDeals?: boolean; /** The Funnel: open deals count only when created or moved step in the dates (grouped by the step they are in now). */ flowWindow?: boolean; /** With flowWindow: only the stuck ones. */ flowStale?: boolean };
 export type Rec = Record<string, unknown>;
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -94,16 +94,18 @@ export const P_STALE = (db: Db) => db`d.status = 'open' and d.counted and not d.
 export const P_NO_OWNER = (db: Db) => db`d.status = 'open' and not d.out_of_scope and not d.is_test and d.value > 0 and not d.owner_ok`;
 export const P_NO_VALUE = (db: Db) => db`d.status = 'open' and not d.out_of_scope and not d.is_test and d.value <= 0`;
 /** Open deals the flow draws: counted money deals, plus (in deal-count mode) open deals with no value. The ONE definition behind a river or funnel number and the list that opens behind it. */
-export const flowOpen = (db: Db, dealsMode: boolean): Frag => db`(${P_OPEN(db)} ${dealsMode ? db`or ${P_NO_VALUE(db)}` : db``})`;
+/** A deal is "active in the dates" when it was created or moved step in them (used by the Funnel only; the river shows what is open now). */
+export const inWindow = (db: Db, f: Pick<Filters, "from" | "to">): Frag => db`((d.created_at >= ${f.from} and d.created_at < ${f.to}) or (d.last_stage_change_at >= ${f.from} and d.last_stage_change_at < ${f.to}))`;
+export const flowOpen = (db: Db, dealsMode: boolean, f?: Pick<Filters, "from" | "to" | "flowWindow" | "flowStale">): Frag => db`((${P_OPEN(db)} ${dealsMode ? db`or ${P_NO_VALUE(db)}` : db``}) ${f?.flowWindow ? db`and ${inWindow(db, f)}` : db``} ${f?.flowWindow && f.flowStale ? db`and d.stale` : db``})`;
 /** Won or lost in the chosen dates (test deals left out): the same window the river uses for its vault and drains. */
 export const flowWin = (db: Db, f: Pick<Filters, "from" | "to">): Frag => db`d.last_status_change_at >= ${f.from} and d.last_status_change_at < ${f.to} and not d.is_test`;
 /**
  * "Got past a step": deals that reached the step at `reachOrd` or any later one = open there or later, lost from there or later (in the dates), or won (in the dates). Won deals reached every step.
  * A deal in a step that is no longer in the pipeline (order 999) is not placed, so it is in no step's count and in no step's list.
  */
-export const flowReachCond = (db: Db, f: Pick<Filters, "from" | "to" | "reachOrd" | "flowDeals">): Frag => {
+export const flowReachCond = (db: Db, f: Pick<Filters, "from" | "to" | "reachOrd" | "flowDeals" | "flowWindow">): Frag => {
   const ord = f.reachOrd ?? 0, win = flowWin(db, f);
-  return db`and ((${flowOpen(db, f.flowDeals === true)} and d.stage_ord >= ${ord} and d.stage_ord < 999) or (d.status = 'lost' and ${win} and d.stage_ord >= ${ord} and d.stage_ord < 999) or (d.status = 'won' and ${win}))`;
+  return db`and ((${flowOpen(db, f.flowDeals === true, f)} and d.stage_ord >= ${ord} and d.stage_ord < 999) or (d.status = 'lost' and ${win} and d.stage_ord >= ${ord} and d.stage_ord < 999) or (d.status = 'won' and ${win}))`;
 };
 const P_FLAG = (db: Db) => db`(d.status = 'open' and not d.out_of_scope and (d.is_test or d.stale or d.outlier or (d.value > 0 and not d.owner_ok) or d.value <= 0))`;
 
@@ -122,7 +124,7 @@ function bucketCond(db: Db, s: Scope, f: Filters): Frag {
     case "abandoned": return db`and d.status = 'abandoned' and ${win}`;
     case "no_reason": return db`and d.status = 'lost' and ${win} and d.lost_reason_id is null and d.lost_reason is null`;
     case "booked_appt": return db`and d.contact_id is not null and exists (select 1 from cached_appointments a where a.installation_id = ${s.inst} and a.location_id = d.location_id and a.contact_id = d.contact_id and a.status not in ('cancelled', 'invalid'))`;
-    case "flow_open": return db`and ${flowOpen(db, f.flowDeals === true)}`;
+    case "flow_open": return db`and ${flowOpen(db, f.flowDeals === true, f)}`;
     case "flow_reach": return f.reachOrd ? flowReachCond(db, f) : db`and false`;
     case "no_appt": return db`and (d.contact_id is null or not exists (select 1 from cached_appointments a where a.installation_id = ${s.inst} and a.location_id = d.location_id and a.contact_id = d.contact_id and a.status not in ('cancelled', 'invalid')))`;
     default: return db``;
@@ -401,7 +403,8 @@ export async function forecast(s: Scope, f: Filters): Promise<Pl3Forecast> {
       : { value: p.p, low: p.low, high: p.high, enough: p.enough, estimate: true as const, formula: "Chance a deal that reached this stage is won, from your own history, shrunk toward your overall win rate (80% range).", minNote: p.enough ? null : `Fewer than 20 deals reached this stage (${n}); your overall rate is used.` };
     return { stageId: key, stageName: b.stageNames.get(key) ?? key, p: est, passed: n, assumed: p.assumed };
   }).sort((x, y) => y.passed - x.passed).slice(0, 40);
-  const tr = trackRecord(track.map((r) => ({ day: day(r.day), low: num(r.low), mid: num(r.mid), high: num(r.high), actual: num(r.actual) })));
+  // The saved forecasts and their results are kept per account, not per pipeline: with one pipeline picked there is no honest track record to show.
+  const tr = trackRecord(f.pipeline ? [] : track.map((r) => ({ day: day(r.day), low: num(r.low), mid: num(r.mid), high: num(r.high), actual: num(r.actual) })));
   return {
     next30: forecastEstimate(openValue, b.won, b.closed, b.cycle),
     weightedOpen: weightedPipeline(open.map((o) => ({ value: o.value, p: probOf(b, o.key) })), b.prior, b.closed),
@@ -494,7 +497,7 @@ export async function stageHistory(s: Scope, f: Filters, p: number, size: number
   const by = new Map<string, { key: string; name: string; pipeline: string | null; stays: number; med: number[]; p75: number[]; p90: number[]; lim: number[]; est: boolean }>();
   for (const r of stats) {
     const si = keyOf(sm, r.location_id, r.stage_id);
-    if (!si) continue;
+    if (!si || (f.pipeline && slug(si.pipelineName) !== slug(f.pipeline))) continue;
     const c = by.get(si.key) ?? { key: si.key, name: si.name, pipeline: si.pipelineName, stays: 0, med: [], p75: [], p90: [], lim: [], est: false };
     c.stays += num(r.stays);
     if (r.med !== null) c.med.push(num(r.med)); if (r.p75 !== null) c.p75.push(num(r.p75)); if (r.p90 !== null) c.p90.push(num(r.p90)); c.lim.push(num(r.lim));
@@ -718,8 +721,8 @@ export async function replay(s: Scope, f: Filters, days: number): Promise<Pl3Rep
 
 // ---------- weekly receipt ----------
 
-export async function receipt(s: Scope, location: string | null, weekStart: Date): Promise<Pl3Receipt> {
-  const db = sql(), from = weekStart, to = new Date(weekStart.getTime() + 7 * DAY), f: Filters = { from, to, location: location ?? undefined }, w = deals(s, f);
+export async function receipt(s: Scope, location: string | null, weekStart: Date, pipeline: string | null = null): Promise<Pl3Receipt> {
+  const db = sql(), from = weekStart, to = new Date(weekStart.getTime() + 7 * DAY), f: Filters = { from, to, location: location ?? undefined, pipeline }, w = deals(s, f);
   const win = db`d.last_status_change_at >= ${from} and d.last_status_change_at < ${to} and not d.is_test`;
   const [[t], [mv], [ac], [one]] = await Promise.all([
     db`with ${w} select count(*) filter (where d.status = 'won' and ${win})::int won_n, coalesce(sum(d.value) filter (where d.status = 'won' and ${win}), 0)::float8 won_v,
@@ -732,8 +735,9 @@ export async function receipt(s: Scope, location: string | null, weekStart: Date
         (select sum(m.open_value)::float8 from account_metrics_daily m join (${locs(s, location)}) l on l.location_id = m.location_id where m.installation_id = ${s.inst} and m.day = ${localDay(to.getTime() - 1)}::date) b`,
     location ? db`select name from locations where installation_id = ${s.inst} and location_id = ${location}` : db`select null::text name where false`,
   ]);
-  const flow = await moneyFlow(s, { from, to, location: location ?? undefined }).catch(() => null);
-  const pipelineChange = ac?.a !== null && ac?.a !== undefined && ac?.b !== null && ac?.b !== undefined ? Math.round(num(ac.b) - num(ac.a)) : null;
+  const flow = await moneyFlow(s, { from, to, location: location ?? undefined, pipeline }).catch(() => null);
+  // The daily open-money history is kept per account, so with one pipeline picked there is no honest figure for its change.
+  const pipelineChange = pipeline ? null : ac?.a !== null && ac?.a !== undefined && ac?.b !== null && ac?.b !== undefined ? Math.round(num(ac.b) - num(ac.a)) : null;
   const won = { value: num(t?.won_v), n: num(t?.won_n) }, lost = { value: num(t?.lost_v), n: num(t?.lost_n) };
   const body = { weekStart: localDay(from.getTime()), loc: location, moved: num(mv?.moved), won, lost, newDeals: num(t?.new_n), unclogged: num(mv?.unclogged) };
   const parts: string[] = [];

@@ -24,7 +24,7 @@ type Booking = {
 
 export function BookingCard() {
   const { range } = useSpeedFilter();
-  const { data: d, error, reload } = useData<Booking>(`speed?part=booking${range ? `&from=${range.from}&to=${range.to}` : ""}`);
+  const { data: d, error, reload } = useData<Booking>(range ? `speed?part=booking&from=${range.from}&to=${range.to}` : null); // nothing is asked until the bar's dates are known: a missing date must never become a default window
   const [open, setOpen] = useState<string | null>(null);
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!d) return <SkeletonRows rows={3} label="Counting bookings..." />;

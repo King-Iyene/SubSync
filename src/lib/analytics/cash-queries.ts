@@ -4,6 +4,14 @@ import { accountsCore, accountsIn, type Filters } from "./clients3-queries";
 import { loadHideSettings, notHidden } from "./unanswered-actions-queries";
 import { countedInScope, dealScopeJoins } from "./stage-rules-sql";
 import type { Scope } from "./today3-queries";
+import { inPipelineSql } from "./pipeline-pick";
+
+/** `and` the flagged deal belongs to the picked pipeline (by name, merged across accounts). Empty when nothing is picked. */
+function flagsInPipeline(db: ReturnType<typeof sql>, pick: string | null) {
+  if (!pick) return db``;
+  return db`and exists (select 1 from cached_opportunities o left join pipelines sc_pl on sc_pl.installation_id = o.installation_id and sc_pl.location_id = o.location_id and sc_pl.pipeline_id = o.pipeline_id
+    where o.installation_id = f.installation_id and o.location_id = f.location_id and o.opportunity_id = f.opportunity_id ${inPipelineSql(db, pick)})`;
+}
 import {
   DAY, DEFAULT_LIMIT_DAYS, FORMULA, KIND_WORDS, LOST_DAYS, MIN_DEALS_AT_RISK, MIN_LEADS, MIN_WON, MISSED_CALL_DAYS, money, NOSHOW_DAYS, parseCursor, makeCursor, rankSave, slaSlip, SOON_DAYS,
   UNANSWERED_DAYS, UNANSWERED_MIN_AGE_HOURS, RECOVER_KINDS, type RecoverKind, type SaveInput,
@@ -262,19 +270,19 @@ export async function setRowOwner(inst: string, locationId: string, contactIds: 
 
 const DEAL_FORMULA = "A deal is stale when it has sat in its stage longer than that stage's usual time, worked out from this account's own stage history (30 days where there is not enough history yet, marked assumed). A deal is about to go quiet when it will pass that time within 7 days. Only open deals with a value and an owner are counted, so test and junk deals stay out. Dollars are the deals' own values (estimate of money at risk, not of money lost).";
 
-export async function dealsSummary(s: Scope, one: string | null, now = Date.now(), days = 30): Promise<CfDealsSummary> {
+export async function dealsSummary(s: Scope, one: string | null, now = Date.now(), days = 30, pipeline: string | null = null): Promise<CfDealsSummary> {
   const c = await ctxOf(s, one);
   const none = { count: 0, value: null as number | null, valued: 0 };
   const empty: CfDealsSummary = { stale: none, soon: none, lost: { count: 0, value: null, noReason: 0, days: LOST_DAYS }, moved: { count: 0, value: null, days }, formula: DEAL_FORMULA, historyStarts: null, headline: "No deals are slipping right now." };
   if (!c.ids.length) return empty;
   const db = sql();
   await sweepDeals(s.inst).catch(() => -1);
-  const own = c.level === "self" ? db`and f.owner_id = ${c.selfId ?? "none"}` : db``;
+  const own = c.level === "self" ? db`and f.owner_id = ${c.selfId ?? "none"}` : db`` , pipe = flagsInPipeline(db, pipeline);
   const [rows, mv, hist] = await Promise.all([
     db`select f.kind, count(*)::int n, count(*) filter (where f.value > 0)::int valued, sum(f.value)::float8 v, count(*) filter (where f.kind = 'lost' and f.lost_reason is null)::int no_reason
-       from cf_deal_flags f where f.installation_id = ${c.inst} and f.location_id = any(${c.ids}::text[]) and f.resolved_at is null ${own} group by f.kind`,
+       from cf_deal_flags f where f.installation_id = ${c.inst} and f.location_id = any(${c.ids}::text[]) and f.resolved_at is null ${own} ${pipe} group by f.kind`,
     db`select count(*)::int n, sum(f.value)::float8 v, count(*) filter (where f.value > 0)::int valued from cf_deal_flags f
-       where f.installation_id = ${c.inst} and f.location_id = any(${c.ids}::text[]) ${own} and f.kind in ('stale', 'soon') and f.resolved_how in ('moved', 'won') and f.resolved_at > ${new Date(now - days * DAY)}`,
+       where f.installation_id = ${c.inst} and f.location_id = any(${c.ids}::text[]) ${own} ${pipe} and f.kind in ('stale', 'soon') and f.resolved_how in ('moved', 'won') and f.resolved_at > ${new Date(now - days * DAY)}`,
     historyStarts(s.inst),
   ]);
   const pick = (k: string) => rows.find((r) => r.kind === k);
@@ -289,7 +297,7 @@ export async function dealsSummary(s: Scope, one: string | null, now = Date.now(
   return { stale, soon, lost, moved, formula: DEAL_FORMULA, historyStarts: hist, headline };
 }
 
-export async function dealsList(s: Scope, one: string | null, o: { kind: "slipping" | "stale" | "soon" | "lost"; cursor: string | null; size: number }, links: Links): Promise<CfDealsList> {
+export async function dealsList(s: Scope, one: string | null, o: { kind: "slipping" | "stale" | "soon" | "lost"; cursor: string | null; size: number; pipeline?: string | null }, links: Links): Promise<CfDealsList> {
   const c = await ctxOf(s, one);
   const size = Math.min(100, Math.max(5, o.size));
   const empty: CfDealsList = { rows: [], total: 0, next: null, size, kind: o.kind };
@@ -298,7 +306,7 @@ export async function dealsList(s: Scope, one: string | null, o: { kind: "slippi
   await sweepDeals(s.inst).catch(() => -1);
   const kinds = o.kind === "slipping" ? ["stale", "soon"] : [o.kind];
   const own = c.level === "self" ? db`and f.owner_id = ${c.selfId ?? "none"}` : db``;
-  const base = db`from cf_deal_flags f where f.installation_id = ${c.inst} and f.location_id = any(${c.ids}::text[]) and f.resolved_at is null and f.kind = any(${kinds}::text[]) ${own}`;
+  const base = db`from cf_deal_flags f where f.installation_id = ${c.inst} and f.location_id = any(${c.ids}::text[]) and f.resolved_at is null and f.kind = any(${kinds}::text[]) ${own} ${flagsInPipeline(db, o.pipeline ?? null)}`;
   const cur = parseCursor(o.cursor);
   const rows = await db`
     select * from (

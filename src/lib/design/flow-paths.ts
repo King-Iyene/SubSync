@@ -18,6 +18,8 @@ export type FlowPaths = {
   /** Lost in the dates from a step that is no longer in this pipeline (still in the lost total). */
   lostElsewhere: number;
   minDeals: number;
+  /** When SubSync started recording step moves, and whether that is on or before the first chosen day. When it is not, the funnel says so and shows where deals are now, with no flow claims. */
+  history?: { since: string | null; covers: boolean };
 };
 
 export type Reach = { n: number[]; cents: number[] };

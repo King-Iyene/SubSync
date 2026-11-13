@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useApiClient, useData } from "../session";
+import { pickPath } from "@/lib/design/pipeline-pick-link";
+import { usePick } from "./pl3/pick-context";
 import { anomalyIndices } from "../../../lib/analytics/client-intel";
 import {
   Badge, Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, inputClass, Loading, PageHeader, Sparkline, Stat, Table, Td, Th,
@@ -80,7 +82,8 @@ function DealTable({ rows, extra }: { rows: Array<DealRow & { reasons?: string[]
 /** The older all-in-one screen, now the "More detail" part under the board. It only loads when someone opens it. */
 function PipelineDetails() {
   const api = useApiClient();
-  const { data, error, loading, reload } = useData<Data>("pipeline-intel");
+  const pick = usePick();
+  const { data, error, loading, reload } = useData<Data>(pickPath("pipeline-intel", pick));
   const [target, setTarget] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const [pipe, setPipe] = useState<string>("");
@@ -112,7 +115,7 @@ function PipelineDetails() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Pipeline" subtitle="Forecast, bottlenecks and deal risk across every client account. Everything here is calculated from deals we have synced." actions={<Btn onClick={() => api.download("export/deals", "subsync-open-deals.csv")}>Export open deals</Btn>} />
+      <PageHeader title="Pipeline" subtitle="Forecast, bottlenecks and deal risk across every client account. Everything here is calculated from deals we have synced." actions={<Btn onClick={() => api.download(pickPath("export/deals", pick), "subsync-open-deals.csv")}>Export open deals</Btn>} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Open pipeline" value={fmtMoney(data.totals.openValue)} sub={<>{fmtInt(data.totals.open)} open deals{data.outlier && <span className="mt-1 block text-warning">One deal ({fmtMoney(data.outlier.value)}) is {Math.round(data.outlier.share * 100)}% of this.</span>}</>} />

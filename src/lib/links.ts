@@ -32,6 +32,34 @@ export function deepLinks(source: DomainSource) {
     /** The CRM's own call and text task list (manual actions from workflows). */
     manualActions: (loc: string) => `${base}/${loc}/conversations/manual_actions`,
     opportunities: (loc: string) => `${base}/${loc}/opportunities/list`,
+    /** The CRM's conversations list for one account (CHECK the exact path against a live CRM). */
+    conversations: (loc: string) => `${base}/${loc}/conversations/conversations`,
+    /** The CRM calendar of one account (CHECK). */
+    calendar: (loc: string) => `${base}/${loc}/calendars/view`,
+    /** The CRM contacts list of one account (CHECK). */
+    contacts: (loc: string) => `${base}/${loc}/contacts/smart_list/All`,
     conversation: (loc: string, id: string) => `${base}/${loc}/conversations/conversations/${id}`,
   };
+}
+
+// ---- One CRM domain per COMPANY, not per install ----
+// A white-labelled company has many installs (its own, plus one per client account that opened the app). The domain is seen on only some of them (sign-in or the install
+// event), so a link about any account of the company must use the company's domain. Pure rule, unit tested; the database read lives in analytics/queries.ts.
+export type DomainRow = { own: boolean; source: string | null; appDomain: string | null; detected: string | null };
+export type ResolvedDomain = { appDomain: string; source: "manual" | "sso" | "install" | "default"; detected: string | null };
+
+/** Order: this install's own typed domain, any sibling's typed domain, this install's detected domain, any sibling's detected domain, then the default. Rows must all be of ONE company. */
+export function resolveCompanyDomain(rows: DomainRow[]): ResolvedDomain {
+  const typed = (r: DomainRow) => (r.source === "manual" ? validDomain(r.appDomain) : null);
+  const seen = (r: DomainRow) => validDomain(r.detected);
+  const detected = rows.filter((r) => r.own).map(seen).find(Boolean) ?? rows.map(seen).find(Boolean) ?? null;
+  const own = rows.filter((r) => r.own).map(typed).find(Boolean);
+  if (own) return { appDomain: own, source: "manual", detected };
+  const sib = rows.map(typed).find(Boolean);
+  if (sib) return { appDomain: sib, source: "manual", detected };
+  if (detected) {
+    const from = rows.find((r) => seen(r) === detected);
+    return { appDomain: detected, source: from?.source === "install" ? "install" : "sso", detected };
+  }
+  return { appDomain: DEFAULT_APP_DOMAIN, source: "default", detected: null };
 }
