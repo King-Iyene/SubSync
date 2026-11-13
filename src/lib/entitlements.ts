@@ -222,6 +222,11 @@ export const FEATURES = [
   "ai_anomaly",
   "ai_meeting",
   "ai_one_thing",
+  // The four lead AI jobs (suggest only), each with its own flag on top of ai_byo. Default off.
+  "ai_lead_summary",
+  "ai_call_first",
+  "ai_cold_reasons",
+  "ai_reply_draft",
   // AI data jobs (docs/AI_AGENTS_PLAN.md section 9): each its own switch, all default off, and all need ai_byo.
   "ai_ask_data",
   "ai_data_review",

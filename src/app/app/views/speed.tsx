@@ -21,6 +21,7 @@ import { RaceTab } from "./speed-race";
 import { CoverageTab, JourneyCard, RulesTab } from "./speed-coverage";
 import { IgnoredTab } from "./speed-ignored";
 import { DialMode } from "./dial-mode";
+import { ColdCard } from "./ai-lead-cards";
 import { InboxView } from "./inbox";
 import { SidePopup, TipHost } from "./speed-popup";
 import { Fold } from "./speed6-base";
@@ -190,6 +191,7 @@ export function SpeedView({ go, unanswered = false, start }: { go: GoFn; unanswe
 
             <FastSection d={d} range={range} open={open} showAccount={multi} reload={reload} />
             <SlowSection d={d} accounts={d.compareAccounts} people={d.comparePeople} seePeople={d.seePeople} multi={multi} open={open} reload={reload} />
+            <ColdCard />
           </div>
 
           <section className="mb-4 border-t pt-4 print:hidden" aria-label="More detail" data-testid="speed-more-detail">

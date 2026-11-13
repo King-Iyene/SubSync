@@ -1,3 +1,4 @@
+import { LEAD_JOBS, LEAD_JOB_IDS } from "./jobs-lead";
 import { DEAL_JOB_DEFS } from "./deal-jobs";
 import type { Schema } from "./safety";
 import { TEAM_JOBS, TEAM_JOB_IDS } from "./team/jobs";
@@ -7,7 +8,7 @@ import { DATA_JOB_DEFS } from "./jobs-data";
 // tool whitelist, post-check and the run log. To add a job: add an entry, write its input builder (a pure function that builds the prompt from that tenant's own rows) and its
 // golden tests, and flip `status` to "live". The planned entries below are NOT built; their full specification is in docs/AI_JOBS_SPEC.md.
 
-export const JOB_IDS = ["brief", "data_review", "data_clean", "ask_data", "dup_adjudicate", "setup_audit", "deal_health", "deal_followup", "deal_winloss", "deal_forecast", ...TEAM_JOB_IDS] as const;
+export const JOB_IDS = ["brief", "data_review", "data_clean", "ask_data", "dup_adjudicate", "setup_audit", ...LEAD_JOB_IDS, "deal_health", "deal_followup", "deal_winloss", "deal_forecast", ...TEAM_JOB_IDS] as const;
 export type JobId = (typeof JOB_IDS)[number];
 export const isJobId = (v: unknown): v is JobId => (JOB_IDS as readonly unknown[]).includes(v);
 
@@ -45,6 +46,7 @@ export const JOBS: Record<JobId, JobDef> = {
     output: { kind: "text", maxChars: 900 }, tools: [], maxTokens: 400, maxToolRounds: 0,
     system: `You write the short note at the top of a business owner's morning brief. You are given the numbers already worked out. Write 2 to 4 sentences. Money first (the estimated revenue at risk), then who or what has been waiting, then the one thing to do first. ${WORDS_RULES}`,
   },
+  ...LEAD_JOBS,
   ...DATA_JOB_DEFS, // data and question jobs (ask_data, data_review, data_clean, dup_adjudicate, setup_audit): defined in jobs-data.ts, override the planned entries above
   ...DEAL_JOB_DEFS, // the four deal jobs live in deal-jobs.ts (health, follow-up plan, win/loss review, forecast in words)
 };

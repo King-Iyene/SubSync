@@ -2290,8 +2290,8 @@ async function dispatch(ctx: Ctx): Promise<Response> {
     }
     // Bring your own AI: /api/app/ai?part=... and /api/app/ai/act/<name>. Administrators only for the connection (checked inside); flag ai_byo.
     if (a === "ai-team" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3))) return await handleAiTeam(ctx, { allowed: () => allowedIds(ctx) });
-    if (a === "ai" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3))) {
-      return await handleAi(ctx, { allowed: () => allowedIds(ctx) });
+    if (a === "ai" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3) || (b === "lead" && ctx.segments.length === 3))) {
+      return await handleAi(ctx, { allowed: () => allowedIds(ctx), locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), links: async () => (await scope(ctx)).links });
     }
     // AI data jobs (Ask your data, data review, cleaning proposals, duplicate judge, setup auditor): /api/app/aid?part=... and /api/app/aid/act/<name>. Each job has its own flag; checked inside.
     if (a === "aid" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3))) {

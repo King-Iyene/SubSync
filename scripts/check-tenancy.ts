@@ -154,6 +154,9 @@ async function main() {
       // People (stage PEOPLE): the call lists, the lead panel, the search and the recent list, asked for the other side's accounts, people and words by every parameter they take.
       "/api/app/people/home", "/api/app/people/recent", `/api/app/people/queue?list=waiting&location=${other.locs[0]}`, `/api/app/people/queue?list=hot&accounts=${other.locs.join(",")}`,
       `/api/app/people/queue?list=stale&account=${other.locs[0]}&q=${other.marker}`, `/api/app/people/queue?list=noshows&mine=1&location=${other.locs[0]}`, `/api/app/people/queue?list=followups&q=${other.marker}`,
+      // Lead AI jobs (suggest only, flags on in this run): the status, the ranking, the cold-lead counts and the rows behind them, aimed at the other side by every parameter they take (the POST bodies are covered by the unit tests).
+      "/api/app/ai/lead/status", `/api/app/ai/lead/status?locationId=${other.locs[0]}`, "/api/app/ai/lead/rank?list=missed", `/api/app/ai/lead/rank?list=new_unanswered&f_account=${other.locs[0]}`, `/api/app/ai/lead/rank?list=hot_uncontacted&account=${other.locs[0]}`,
+      "/api/app/ai/lead/cold", `/api/app/ai/lead/cold?account=${other.locs[0]}`, "/api/app/ai/lead/cold-rows?pattern=all", `/api/app/ai/lead/cold-rows?pattern=all&account=${other.locs[0]}`, `/api/app/ai/lead/cold-rows?pattern=source:${other.marker}`,
       `/api/app/people/person/${other.locs[0]}/${other.contacts[0]}`, `/api/app/people/person/${other.locs[0]}/%2e%2e%2f${other.contacts[0]}`, `/api/app/people/search?q=${other.marker}&location=${other.locs[0]}`,
       `/api/app/people/contact/${other.locs[0]}/${other.contacts[0]}`,
       // The deals panel: another account's deal, history and context, by changing every id the request carries.
