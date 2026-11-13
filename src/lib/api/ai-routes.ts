@@ -196,9 +196,14 @@ const jobFlags = (on: (f: string) => boolean): Record<string, boolean> => ({ bri
 const flagsOf = (on: (f: string) => boolean): BriefFlags => ({ cf_save: on("cf_save"), cf_recover: on("cf_recover"), cf_deals: on("cf_deals"), wg_wallet: on("wg_wallet"), pm_module: on("pm_module"), td_today: on("td_today"), fn_today: on("fn_today"), sp_ignored: on("sp_ignored_leads") });
 
 /** The AI wording for today's brief. GET only reads what was already written for exactly today's numbers; POST writes it (once per distinct input) when the account has a connection. */
+/** What the demo shows in the 7 am brief where a connected AI would word it. Fixed text, labelled as a sample; no provider is called and no key exists. */
+export const DEMO_BRIEF_NOTE = "Sample wording (demo, no AI was called): Good morning. Start with the quote waiting at Blue Door Realty, then clear the new leads nobody has answered at Metro Auto Repair. Two client payments need a card update today, and one account has gone quiet for two months.";
+
 async function briefNote(ctx: Ctx, on: (f: string) => boolean, user: string, generate: boolean): Promise<Response> {
   const empty = { note: null, runId: null };
   if (!on("ai_brief") || !on("br_brief") || viewerOf(ctx).level !== "all" || ctx.limitTo !== null) return json(empty);
+  // The demo never calls an AI provider: it shows one fixed, clearly labelled sample of how the wording reads.
+  if (ctx.demo) return json({ note: DEMO_BRIEF_NOTE, runId: null, sample: true });
   const conn = await publicConnection(ctx.installationId, "");
   if (!conn || conn.paused || conn.status !== "connected" || conn.jobs.brief !== true) return json(empty);
   const b = await briefFor(ctx.installationId, await getPrefs(ctx.installationId, user), flagsOf(on));

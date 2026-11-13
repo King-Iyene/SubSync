@@ -1,0 +1,792 @@
+[
+ {
+  "module": "Today",
+  "path": "today3?part=options",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "finance?part=options",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "cash?part=options",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "wg?part=summary",
+  "min": 1,
+  "note": "platform-limit note"
+ },
+ {
+  "module": "Today",
+  "path": "today3?part=today",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "today3?part=proof&page=0&size=20",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "today3?part=numbers&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "today",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "today/clients-flow",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "today/lead-flow?from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "overview",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "pipeline-intel?view=board",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "today/growth?from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "exec-summary",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "today3?part=settings",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "appointments/funnel?part=summary&mini=1&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "today/growth/emails?q=&client=&page=1",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "cash?part=settings",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "cash?part=save",
+  "min": 1
+ },
+ {
+  "module": "Today",
+  "path": "br?part=brief",
+  "min": 1
+ },
+ {
+  "module": "Speed to lead",
+  "path": "speed?part=home&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Speed to lead",
+  "path": "speed?part=race&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Speed to lead",
+  "path": "speed?part=zones",
+  "min": 1
+ },
+ {
+  "module": "Speed to lead",
+  "path": "dial/cq-status",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments?part=overview&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments?part=flow-tree&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments?part=options&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments?part=health&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments?part=needs-outcome&from={d29}&to={d0}&page=0&size=20",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments?part=noshow-recovery&from={d29}&to={d0}&page=0&size=20",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments?part=trends&from={d29}&to={d0}&by=person&grain=week",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments?part=flow-tree&from={d29}&to={d0}&top=12&skip=0",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments?part=booking-share&from={d29}&to={d0}&page=0&size=20&sort=sold&section=active",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments?part=sources&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments?part=calendars&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments/act/caps",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments/meetings/home",
+  "min": 0
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments/meetings/matching?page=0&size=20",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments?part=trends&from={d29}&to={d0}&by=calendar&grain=week",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments?part=receipt&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments/exec?part=pace&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments/exec?part=slots&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments/exec?part=boards&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments/work?from={d29}&to={d0}&cmpFrom=2026-09-15&cmpTo=2026-10-14",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments/exec?part=summary&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments/exec?part=decisions&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointment-insights?from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Appointments",
+  "path": "appointments/funnel?part=options&from={d29}&to={d0}",
+  "min": 0
+ },
+ {
+  "module": "Clients",
+  "path": "clients3?part=options",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients3?part=overview&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients2?part=today",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients/act/owners",
+  "min": 0
+ },
+ {
+  "module": "Clients",
+  "path": "clients3?part=needs-attention&from={d29}&to={d0}&page=0&size=20",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients2?part=views&v=0",
+  "min": 0
+ },
+ {
+  "module": "Clients",
+  "path": "clients2?part=list&sort=attention&size=50&v=0",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients2?part=options&v=0",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients3?part=trends&page=0&size=20&from={d29}&to={d0}&grain=week",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients3?part=compare&from={d29}&to={d0}&ids=demo-loc-7%2Cdemo-loc-1",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients?part=names",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients3?part=money&bucket=all&size=20",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients?part=home&v=0",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients3?part=money-history&size=20",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients2?part=plans&size=20&v=0",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "wg?part=list&bucket=all&page=0&size=20",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "wg?part=settings",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients3?part=setup&page=0&size=20&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients/act/health",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients/act/new-clients",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients/act/workflows",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "client-onboarding?stuck=14",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients3?part=receipt",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients/act/mutes",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients/act/receipt",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "clients/act/setup",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "proof?part=options",
+  "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "proof?part=list&period=2026-10&status=&q=&page=0&size=20&v=0",
+  "min": 1
+ },
+ {
+  "module": "Money",
+  "path": "payments?part=options",
+  "min": 1
+ },
+ {
+  "module": "Money",
+  "path": "payments?part=today&wfrom={d29}&wto={d0}",
+  "min": 1
+ },
+ {
+  "module": "Money",
+  "path": "finance?part=headline",
+  "min": 1
+ },
+ {
+  "module": "Money",
+  "path": "payments?part=upcoming",
+  "min": 1,
+  "note": "platform-limit note"
+ },
+ {
+  "module": "Money",
+  "path": "finance?part=overview&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Money",
+  "path": "finance?part=periods&v=0",
+  "min": 1
+ },
+ {
+  "module": "Money",
+  "path": "finance?part=payouts&basis=won&v=0&from={d29}&to={d0}&size=15",
+  "min": 1
+ },
+ {
+  "module": "Money",
+  "path": "finance?part=ledger&bucket=all&v=0&size=20",
+  "min": 1
+ },
+ {
+  "module": "Money",
+  "path": "finance?part=setup&v=0",
+  "min": 1
+ },
+ {
+  "module": "Find a lead",
+  "path": "people/options",
+  "min": 1
+ },
+ {
+  "module": "Find a lead",
+  "path": "people/lists",
+  "min": 1
+ },
+ {
+  "module": "Find a lead",
+  "path": "people/recent",
+  "min": 0
+ },
+ {
+  "module": "Find a lead",
+  "path": "people/home",
+  "min": 1
+ },
+ {
+  "module": "Find a lead",
+  "path": "people/held",
+  "min": 0
+ },
+ {
+  "module": "Find a lead",
+  "path": "contact-intel",
+  "min": 1
+ },
+ {
+  "module": "Find a lead",
+  "path": "people/going-cold?bucket=quiet&page=1",
+  "min": 1
+ },
+ {
+  "module": "Find a lead",
+  "path": "call-lists",
+  "min": 1
+ },
+ {
+  "module": "Find a lead",
+  "path": "call-queue?preset=hot_uncontacted",
+  "min": 1
+ },
+ {
+  "module": "Account audit",
+  "path": "audit/shares",
+  "min": 0
+ },
+ {
+  "module": "Account audit",
+  "path": "audit",
+  "min": 1
+ },
+ {
+  "module": "Account audit",
+  "path": "audit?part=history",
+  "min": 0
+ },
+ {
+  "module": "Clean-up",
+  "path": "dq/options",
+  "min": 1,
+  "note": "platform-limit note"
+ },
+ {
+  "module": "Clean-up",
+  "path": "dq/overview",
+  "min": 1,
+  "note": "platform-limit note"
+ },
+ {
+  "module": "Clean-up",
+  "path": "dq/dupes?tier=certain",
+  "min": 1,
+  "note": "platform-limit note"
+ },
+ {
+  "module": "Clean-up",
+  "path": "cu/options",
+  "min": 1,
+  "note": "platform-limit note"
+ },
+ {
+  "module": "Clean-up",
+  "path": "cu/home",
+  "min": 1
+ },
+ {
+  "module": "Clean-up",
+  "path": "cleanup",
+  "min": 1
+ },
+ {
+  "module": "Clean-up",
+  "path": "dq/intake?range=30",
+  "min": 1,
+  "note": "platform-limit note"
+ },
+ {
+  "module": "Clean-up",
+  "path": "dq/events",
+  "min": 0,
+  "note": "platform-limit note"
+ },
+ {
+  "module": "Clean-up",
+  "path": "duplicates/history?page=0",
+  "min": 1
+ },
+ {
+  "module": "Team",
+  "path": "people3?part=options",
+  "min": 1
+ },
+ {
+  "module": "Team",
+  "path": "people3?part=today",
+  "min": 1
+ },
+ {
+  "module": "Team",
+  "path": "people3?part=today&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Team",
+  "path": "people3?part=scorecards&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Team",
+  "path": "people3?part=leaderboard&from={d29}&to={d0}&role=setter",
+  "min": 1
+ },
+ {
+  "module": "Team",
+  "path": "team",
+  "min": 1
+ },
+ {
+  "module": "Team",
+  "path": "people3/roles/map",
+  "min": 1
+ },
+ {
+  "module": "Team",
+  "path": "people3?part=workload&from={d29}&to={d0}&sort=waiting&dir=desc",
+  "min": 1
+ },
+ {
+  "module": "Team",
+  "path": "people3?part=money&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Team",
+  "path": "people3?part=coaching&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Team",
+  "path": "people3/roles/list?size=25&role=all",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "pipeline3?part=funnel-settings",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "pipeline3?part=health&from={d29}&to={d0}&size=100",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "pipeline3?part=pipelines&from={d29}&to={d0}&size=24",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "pipeline3?part=overview&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "pipeline3?part=attention&from={d29}&to={d0}&page=0&size=20",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "cash?part=deals",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "cash?part=deals-list&kind=slipping&size=25",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "pipeline3?part=stuck&from={d29}&to={d0}&page=0&size=20",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "stale?left=0",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "pipeline3?part=pipelines&from={d29}&to={d0}&size=12",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "deal-rules/ownerless",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "pipeline3?part=won-lost&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "pipeline3?part=sources&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "deal-events",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "pipeline3?part=stage-history&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "pipeline3?part=funnel&from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Pipeline",
+  "path": "pipeline3?part=people&from={d29}&to={d0}&size=100",
+  "min": 1
+ },
+ {
+  "module": "Meeting notes",
+  "path": "meeting-setup",
+  "min": 0,
+  "note": "platform-limit note"
+ },
+ {
+  "module": "Meeting notes",
+  "path": "meeting-list/home",
+  "min": 1
+ },
+ {
+  "module": "Meeting notes",
+  "path": "meeting-list",
+  "min": 1
+ },
+ {
+  "module": "Meeting notes",
+  "path": "meeting-list?from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Meeting notes",
+  "path": "meeting-list/follow?kind=no_followup",
+  "min": 1
+ },
+ {
+  "module": "Meeting notes",
+  "path": "meeting-list/coach",
+  "min": 1
+ },
+ {
+  "module": "Meeting notes",
+  "path": "meeting-inbox",
+  "min": 1
+ },
+ {
+  "module": "Meeting notes",
+  "path": "meeting-logged",
+  "min": 1
+ },
+ {
+  "module": "Meeting notes",
+  "path": "am/notes",
+  "min": 0
+ },
+ {
+  "module": "Meeting notes",
+  "path": "am/slack",
+  "min": 0
+ },
+ {
+  "module": "Workflows",
+  "path": "workflows/views",
+  "min": 0
+ },
+ {
+  "module": "Workflows",
+  "path": "workflows",
+  "min": 1
+ },
+ {
+  "module": "Workflows",
+  "path": "workflows/delivery?status=all&range=all&source=all",
+  "min": 1,
+  "note": "platform-limit note"
+ },
+ {
+  "module": "Workflows",
+  "path": "workflows/proof?from={d29}&to={d0}",
+  "min": 1
+ },
+ {
+  "module": "Workflows",
+  "path": "workflows/history",
+  "min": 1
+ },
+ {
+  "module": "Workflows",
+  "path": "workflows/library",
+  "min": 1
+ },
+ {
+  "module": "Settings",
+  "path": "st/home",
+  "min": 0
+ },
+ {
+  "module": "Settings",
+  "path": "api-keys",
+  "min": 1
+ },
+ {
+  "module": "What's new",
+  "path": "roadmap",
+  "min": 1
+ },
+ {
+  "module": "Getting started",
+  "path": "start",
+  "min": 1
+ },
+ {
+  "module": "Getting started",
+  "path": "st/progress",
+  "min": 1
+ }
+]

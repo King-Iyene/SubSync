@@ -5,6 +5,8 @@ import { sql } from "../db";
 import { applyLeadRules } from "../sync/lead-rules-apply";
 import { checkDomain, type DnsResolver } from "../dns/email-auth";
 import { ensureDupesDemo } from "./dupes-demo";
+import { fillDemo } from "./fill";
+import { shiftIfStale, wipeDemo } from "./fill-core";
 
 // Demo data: a fictional agency with 14 client accounts of deliberately different health, so
 // every feature has something realistic to show. All names, emails and numbers are invented
@@ -122,7 +124,8 @@ export async function seedDemo(): Promise<{ installationId: string; accounts: nu
   const now = Date.now();
   const ago = (days: number) => new Date(now - days * DAY);
 
-  await db`delete from installations where company_id = ${DEMO_COMPANY_ID}`;
+  await wipeDemo(DEMO_COMPANY_ID); // every row of the old demo, including history tables that are not linked to the installation
+  await db`delete from installations where company_id = ${DEMO_COMPANY_ID} and is_demo`;
   const [inst] = await db`
     insert into installations (company_id, company_name, plan, is_demo, installed_at)
     values (${DEMO_COMPANY_ID}, 'Demo Company', 'paid', true, ${ago(90)}) returning id`;
@@ -580,9 +583,23 @@ async function ensureClientsDemo(installationId: string): Promise<void> {
   if (starlight) await db`insert into onboarding_tasks (installation_id, location_id, task, done, done_at) values (${installationId}, ${starlight}, 'manual:kickoff', true, now()) on conflict do nothing`;
 }
 
+// The demo is made ready once per server process and re-checked at most every 10 minutes. Every request calls this (sign-in, and each screen's data), and each check is a
+// dozen round trips to the database, so without this every screen waited several seconds for nothing. A failed run is not remembered, so the next request tries again.
+const READY_FOR_MS = 10 * 60_000;
+let ready: { at: number; id: string } | null = null;
+let readying: Promise<string> | null = null;
+
 export async function ensureDemo(): Promise<string> {
+  if (ready && Date.now() - ready.at < READY_FOR_MS) return ready.id;
+  readying ??= makeDemoReady().then((id) => { ready = { at: Date.now(), id }; return id; }).finally(() => { readying = null; });
+  return readying;
+}
+
+export async function makeDemoReady(opts: { wait?: boolean } = {}): Promise<string> {
   const [row] = await sql()`select id from installations where company_id = ${DEMO_COMPANY_ID} and is_demo`;
   const id = row ? (row.id as string) : (await seedDemo()).installationId;
+  // First, before anything new is written: when the demo is more than a few hours old, every date of the demo moves forward so its ages are current again.
+  const moved = await shiftIfStale(id).catch((e) => { console.error("[demo fill] date shift failed:", e instanceof Error ? e.message : String(e)); return false; });
   await stampDemoHistory(id);
   await ensureSpeedDemo(id).catch(() => undefined);
   await ensureSpeedDemoF2(id).catch(() => undefined);
@@ -592,5 +609,7 @@ export async function ensureDemo(): Promise<string> {
   await ensureClientsDemo(id).catch(() => undefined);
   await ensureWorkflowsDemo(id).catch(() => undefined);
   await ensureDupesDemo(id).catch(() => undefined);
+  // Every other module (money, deals, people, meetings, workflows, AI sample): src/lib/demo/fill.ts.
+  await fillDemo(id, { moved, wait: opts.wait }).catch((e) => console.error("[demo fill] failed:", e instanceof Error ? e.message : String(e)));
   return id;
 }

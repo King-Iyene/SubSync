@@ -44,7 +44,7 @@ Tools: `portfolio_summary`, `list_accounts`, `get_account`, `search_contacts`, `
 - **Tokens**: AES-256-GCM at rest, refresh rotation with compare-and-swap.
 - **Plan gating**: free up to 5 client accounts (overview, search, onboarding, settings); everything else paid. Off unless `ENFORCE_PLANS=true`. Price is a setting, not a constant.
 - **Data control**: "Delete my data" in Settings (typed confirmation) wipes synced data; uninstall purges everything.
-- **Demo mode** (`DEMO_MODE=true`): 14 fictional agencies' worth of accounts with realistic history, for screenshots and the portal demo video. Off in production.
+- **Demo mode** (`DEMO_MODE=true`): a fictional agency with 14 client accounts of different health, and every module filled (money, payments, plans, deals with owners and stage history, appointments, calls and the connected Fathom, workflows, the sample AI card). For screenshots and the portal demo video. Off in production. Steps, shot list and the check commands: `docs/DEMO_SCREENSHOTS.md`.
 
 ## Added in the overnight build (see REPORT.md for the full list and what is blocked)
 

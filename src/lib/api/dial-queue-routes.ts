@@ -41,7 +41,7 @@ export async function handleCallQueue(ctx: Ctx, h: H): Promise<Response> {
     }
     if (what?.startsWith("cq-wf") && ctx.demo) {
       // The demo never touches a real account: the setup answers as a dry run.
-      if (what === "cq-wf" && m === "GET") return json({ ready: true, state: "none", workflowId: null, updateAvailable: false, lastError: null, live: false, tag: "call-now", folderDefault: "Lead Response Automations", settings: { folderName: "Lead Response Automations", autoSetup: false, assignMode: "round_robin", assignUserId: null } });
+      if (what === "cq-wf" && m === "GET") return json({ ready: true, state: "active", workflowId: "demo-call-queue-workflow", updateAvailable: false, lastError: null, live: false, tag: "call-now", folderDefault: "Lead Response Automations", settings: { folderName: "Lead Response Automations", autoSetup: false, assignMode: "round_robin", assignUserId: null } });
       return json({ state: "would_create", message: 'Would create folder "Lead Response Automations" and workflow "Call queue". Nothing was sent: this is the demo.', lines: [] });
     }
     const a = await account(ctx, h, loc);

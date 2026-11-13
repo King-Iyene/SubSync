@@ -63,7 +63,6 @@ export async function handleMeetingList(ctx: Ctx, h: MnHelpers): Promise<Respons
 }
 
 async function list(ctx: Ctx, h: MnHelpers): Promise<Response> {
-  if (ctx.demo) return json({ demo: true, rows: [], total: 0, next: null });
   const person = personOf(ctx);
   if (!person) return NEED_SIGN_IN();
   // The global bar's client choice narrows the list (`allowed` already holds it); without a choice nothing narrows.
@@ -77,7 +76,6 @@ async function list(ctx: Ctx, h: MnHelpers): Promise<Response> {
 
 async function home(ctx: Ctx): Promise<Response> {
   const flags = { followups: on(ctx, "mn_followups"), tasks: on(ctx, "mn_tasks"), coach: on(ctx, "mn_coach"), logged: on(ctx, "mn_logged"), outcomes: on(ctx, "mn_outcomes") };
-  if (ctx.demo) return json({ demo: true, flags, connection: null, follow: { no_followup: 0, no_next_step: 0, deal_not_moved: 0 }, waiting: 0, week: null });
   const person = personOf(ctx);
   if (!person) return NEED_SIGN_IN();
   const reach = await reachable(person, ctx.installationId);
@@ -91,7 +89,6 @@ async function home(ctx: Ctx): Promise<Response> {
 }
 
 async function detail(ctx: Ctx, h: MnHelpers, id: string): Promise<Response> {
-  if (ctx.demo) return NOT_FOUND();
   const person = personOf(ctx);
   if (!person) return NEED_SIGN_IN();
   const reach = await reachable(person, ctx.installationId);
@@ -128,7 +125,6 @@ async function transcript(ctx: Ctx, id: string): Promise<Response> {
 async function follow(ctx: Ctx, h: MnHelpers): Promise<Response> {
   const kind = ctx.url.searchParams.get("kind");
   if (kind !== "no_followup" && kind !== "no_next_step" && kind !== "deal_not_moved") return json({ error: "Choose a list" }, 400);
-  if (ctx.demo) return json({ demo: true, rows: [], total: 0, next: null, days: FOLLOWUP_DAYS });
   const person = personOf(ctx);
   if (!person) return NEED_SIGN_IN();
   const lim = Math.min(MAX_PAGE, Math.max(1, Number(ctx.url.searchParams.get("limit")) || LIST_PAGE));
@@ -139,7 +135,6 @@ async function follow(ctx: Ctx, h: MnHelpers): Promise<Response> {
 }
 
 async function coach(ctx: Ctx): Promise<Response> {
-  if (ctx.demo) return json({ demo: true, rows: [], team: null, scope: "mine" });
   const person = personOf(ctx);
   if (!person) return NEED_SIGN_IN();
   const scope = statusScope(person, null);
