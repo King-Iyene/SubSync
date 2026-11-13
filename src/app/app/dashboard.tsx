@@ -31,6 +31,7 @@ import { ApiProvider, makeApi, type Api } from "./session";
 import { LeadDrawerHost } from "./ds/lead-drawer-host";
 import { AskRowsLinkHost } from "./views/ask-rows-link";
 const AppointmentInsights = dynamic(() => import("./views/appointment-insights").then((m) => m.AppointmentInsights), { ssr: false });
+import { shotsRequested } from "@/lib/shots";
 import { sampleOn as dqSample } from "./views/dq/dq-data";
 import { GlobalSearch } from "./views/global-search";
 import { AskDataCard } from "./views/ask-data";
@@ -393,6 +394,9 @@ export function Dashboard() {
     remember(`seen-${view.id}`, "1");
   }, [api, view.id]);
 
+  // Screenshot mode (listing images): demo only, never for a real install. Hides every demo label, data untouched. See src/lib/shots.ts.
+  const shots = auth.status === "ready" && auth.demo && shotsRequested();
+  useEffect(() => { if (shots) document.documentElement.setAttribute("data-shots", "1"); return () => document.documentElement.removeAttribute("data-shots"); }, [shots]);
   if (auth.status === "waiting") return <Centered title="Loading SubSync" body="Checking your account..." />;
   if (auth.status === "outside") {
     return <Centered title="Open SubSync from your account menu" body="This page is built to run inside your account. Open SubSync from the left menu of one of your client accounts." />;
@@ -446,7 +450,7 @@ export function Dashboard() {
   // The "Section" of the "Section > Page" trail above each title: the menu group, or the parent module for a page that lives inside one.
   const activeItem = menu.find((n) => n.id === active);
   const trailSection = activeItem ? (PARENT[shown] && activeItem.id !== shown ? activeItem.label : activeItem.group && activeItem.group !== "Settings and help" ? activeItem.group : null) : null;
-  const agency = auth.demo ? "Demo Company" : limited ? "Your business" : "Your company";
+  const agency = auth.demo ? (shots ? "Brightpath Growth" : "Demo Company") : limited ? "Your business" : "Your company";
   const own = auth.locationId;
 
   // People: one module for finding contacts. Its tabs are the pages that used to be separate menu entries (nothing was removed); stage F10 grows it.
@@ -563,7 +567,7 @@ export function Dashboard() {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {auth.demo && (
+          {auth.demo && !shots && (
             <div className="border-b border-amber-500/20 bg-amber-400/15 px-4 py-2 text-center text-xs font-medium text-amber-900 dark:text-amber-200 print:hidden" role="note">
               Demo mode: this is sample data for a fictional company, not real clients.
             </div>

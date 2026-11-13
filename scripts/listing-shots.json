@@ -1,0 +1,18 @@
+[
+  { "file": "01-today.png", "hash": "today", "purpose": "Hero: Today with the money cards, accounts to save and win-back list across all client accounts" },
+  { "file": "02-pipeline-funnel.png", "hash": "pipeline", "click": ["Funnel"], "purpose": "Pipeline funnel flow with the biggest-leak callout and dollar values" },
+  { "file": "03-speed-to-lead.png", "hash": "speed", "purpose": "Speed to lead race and pace charts, who to call next" },
+  { "file": "04-appointments.png", "hash": "appointments", "purpose": "Appointments overview: show rate, no-show recovery, flow" },
+  { "file": "05-pipeline-river.png", "hash": "pipeline", "click": ["River"], "purpose": "Pipeline cash-flow river with dollars" },
+  { "file": "06-account-audit.png", "hash": "audit", "purpose": "Account audit with Send this audit to a client" },
+  { "file": "07-clients.png", "hash": "clients", "purpose": "Clients: health and plans across every account" },
+  { "file": "08-money.png", "hash": "payments", "purpose": "Money: failed payments, recovered money, payouts and commissions" },
+  { "file": "09-find-a-lead.png", "hash": "people", "purpose": "Find a lead: search across all client accounts, hot leads gone quiet, call lists" },
+  { "file": "10-team.png", "hash": "team", "purpose": "Team scoreboard across accounts" },
+  { "file": "11-cleanup-duplicates.png", "hash": "cleanup", "purpose": "Clean-up: duplicate groups (Certain, Likely, Possible) and the safe merge preview" },
+  { "file": "12-data-health.png", "hash": "data-health", "extra": true, "purpose": "Data health: missing phones and emails fixed with preview and undo" },
+  { "file": "13-lead-sources.png", "hash": "cleanup", "click": ["Lead intake|Intake|Sources"], "extra": true, "purpose": "Lead intake and capture sources" },
+  { "file": "14-meeting-notes.png", "hash": "meetings", "extra": true, "purpose": "Meeting notes: calls matched to contacts and appointments" },
+  { "file": "15-client-reports.png", "hash": "audit", "click": ["Proof|Reports|Receipt"], "extra": true, "purpose": "Client reports: weekly receipt and the shareable client one-pager" },
+  { "file": "16-clean-up-overview.png", "hash": "cleanup", "extra": true, "purpose": "Clean-up overview" }
+]
