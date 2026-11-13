@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { agoWords, autoKinds, chooseMode, FULL_EVERY_MS, isSortedNewestFirst, liveStatus, mayCheck, nextWatermark, orderAccounts, quietRefreshDelay, QUIET_REFRESH_GAP_MS, SKEW_MS, takeFresh } from "../sync/incremental.ts";
+import { AUTO_SLICE_MS, AUTO_SLICE_WORKERS, agoWords, autoKinds, chooseMode, FULL_EVERY_MS, isSortedNewestFirst, liveStatus, mayCheck, nextWatermark, orderAccounts, quietRefreshDelay, QUIET_REFRESH_GAP_MS, SKEW_MS, takeFresh } from "../sync/incremental.ts";
 import { emitDataChanged, noteVersion, onDataChanged, resetDataChangedForTests } from "../../app/app/data-changed.ts";
 
 const NOW = 1_800_000_000_000;
@@ -96,4 +96,9 @@ test("a background change re-reads a screen at most once a minute, spread out; a
   assert.equal(quietRefreshDelay({ force: false, nowMs: NOW, lastReadMs: NOW - 10_000, spread01: 0 }), QUIET_REFRESH_GAP_MS - 10_000);
   const spread = quietRefreshDelay({ force: false, nowMs: NOW, lastReadMs: 0, spread01: 1 }) as number;
   assert.ok(spread > 0 && spread <= 3_000);
+});
+
+test("the automatic check inside a request stays small so reads keep their connections", () => {
+  assert.ok(AUTO_SLICE_WORKERS <= 2);
+  assert.ok(AUTO_SLICE_MS <= 4_000);
 });

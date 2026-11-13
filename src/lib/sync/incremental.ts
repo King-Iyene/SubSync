@@ -38,6 +38,11 @@ export function isSortedNewestFirst(times: Array<number | null>): boolean {
   return true;
 }
 
+/** The automatic check runs inside the person's own request, so it is kept small: two workers (the pool has eight connections and the screen's own reads need them) and a short budget.
+ *  Whatever it does not finish stays queued and is picked up by the next check or by cron, so nothing is lost. */
+export const AUTO_SLICE_WORKERS = 2;
+export const AUTO_SLICE_MS = 4_000;
+
 /** Accounts for one automatic call: the one in view first, then the ones checked longest ago, at most `max`. `checkedMs` null = never. */
 export function orderAccounts(ids: string[], focus: string | null, checkedMs: Map<string, number | null>, max = MAX_AUTO_ACCOUNTS): string[] {
   const rest = ids.filter((id) => id !== focus).sort((a, b) => (checkedMs.get(a) ?? 0) - (checkedMs.get(b) ?? 0));
