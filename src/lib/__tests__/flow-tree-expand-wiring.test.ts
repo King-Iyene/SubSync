@@ -32,6 +32,16 @@ test("canvas: zoom buttons, fit, reset, pointer wheel zoom, drag pan, pinch, key
   assert.match(canvas, /ArrowLeft/);
   assert.match(canvas, /useReducedMotion/);
 });
+test("plain wheel resizes in the card and in full screen, with a non-passive listener that stops page scroll", () => {
+  assert.equal((tree.match(/wheelZoom(?![A-Za-z])/g) ?? []).length, 2, "both canvases turn the wheel on");
+  assert.doesNotMatch(tree, /wheelZoom=\{false\}/);
+  assert.match(canvas, /addEventListener\("wheel", onWheel, \{ passive: false \}\)/);
+  assert.match(canvas, /e\.preventDefault\(\)/);
+  assert.match(canvas, /Scroll to resize, drag to move/);
+});
+test("the card keeps a strip where the wheel scrolls the page", () => {
+  assert.match(read("../../app/app/views/ap3/ap3.css"), /\.ap-canvas-inline \.ap-canvas-view \{ right: 12px; \}/);
+});
 test("the tree is fitted on load and whenever the drawing changes", () => {
   assert.match(canvas, /fitKey/);
   assert.match(tree, /fitKey=\{fitKey\}/);

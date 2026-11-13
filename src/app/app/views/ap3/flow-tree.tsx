@@ -191,7 +191,7 @@ export function FlowTree({ filters, onOpen, go }: { filters: ApFilters; onOpen: 
       {!expanded && <>{barEl}{previewEl}</>}
       <div ref={wrap} className="w-full">
         {expanded ? <div className="ap-canvas ap-canvas-inline ap-canvas-ph" data-testid="ap-canvas-ph"><p>The tree is open full screen. Press Esc to come back.</p></div>
-          : layout ? <FlowCanvas ref={canvasRef} className="ap-canvas-inline" contentW={layout.width} contentH={layout.height + 34} fitKey={fitKey} wheelZoom={false} label="Appointment flow tree" extra={expandBtn}>{treeEl}</FlowCanvas>
+          : layout ? <FlowCanvas ref={canvasRef} className="ap-canvas-inline" contentW={layout.width} contentH={layout.height + 34} fitKey={fitKey} wheelZoom label="Appointment flow tree" extra={expandBtn}>{treeEl}</FlowCanvas>
           : <><div className="mb-2 flex justify-end">{expandBtn}</div>{phoneEl}</>}
       </div>
       {!expanded && pagerEl}

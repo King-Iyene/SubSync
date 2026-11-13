@@ -149,7 +149,7 @@ export const FlowCanvas = forwardRef<CanvasHandle, Props>(function FlowCanvas({ 
         <button type="button" onClick={reset} className="ap-canvas-100" title="Reset to 100% (0)" data-testid="ap-zoom-reset">100%</button>
         {extra}
       </div>
-      <span className="ap-canvas-hint" aria-hidden>{wheelZoom ? "Drag to move. Scroll to resize." : "Drag to move. Ctrl + scroll to resize."}</span>
+      <span className="ap-canvas-hint" aria-hidden>Scroll to resize, drag to move</span>
     </div>
   );
 });

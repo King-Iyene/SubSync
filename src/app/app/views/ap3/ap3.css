@@ -291,3 +291,5 @@ details.ap-sec > summary.ap-sec-h::-webkit-details-marker { display: none; }
 .ap-full-foot p { margin: 4px 0; }
 @media (max-width: 640px) { .ap-full-head .ap-legend { display: none; } .ap-canvas-hint { display: none; } .ap-full-foot { max-height: 40vh; } }
 @media (prefers-reduced-motion: reduce) { .ap-canvas-content { transition: none !important; } }
+.ap-canvas-inline .ap-canvas-view { right: 12px; }
+.ap-canvas-inline::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 12px; background: color-mix(in srgb, var(--s6-line) 55%, transparent); }
