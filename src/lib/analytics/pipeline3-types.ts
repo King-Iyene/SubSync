@@ -3,7 +3,7 @@
 // minimum sample is { enough: false } and the screen says "not enough data", never a made-up number. Definitions: docs/METRICS.md "Pipeline 3".
 
 export const PL3_PARTS = [
-  "overview", "money-flow", "attention", "won-lost", "forecast", "people", "sources", "stage-history", "health", "receipt", "list", "detail", "replay", "pipelines", "funnel", "funnel-deals", "stuck", "funnel-settings",
+  "overview", "money-flow", "attention", "won-lost", "forecast", "people", "sources", "stage-history", "health", "receipt", "list", "detail", "replay", "pipelines", "funnel", "funnel-deals", "stuck", "funnel-settings", "flow-paths",
 ] as const;
 export type Pl3Part = (typeof PL3_PARTS)[number];
 
@@ -15,7 +15,7 @@ export type Pl3Query = {
 
 /** Our own groups of deals. `stale` = past its stage's stale limit. `outlier` = single deal over 40% of the total. `no_owner`, `no_value`, `test` feed the health tile, never the dollar tiles. */
 export type Pl3Bucket =
-  | "open" | "won" | "lost" | "abandoned" | "stale" | "healthy" | "outlier" | "no_owner" | "no_value" | "test" | "no_reason" | "booked_appt" | "no_appt";
+  | "open" | "won" | "lost" | "abandoned" | "stale" | "healthy" | "outlier" | "no_owner" | "no_value" | "test" | "no_reason" | "booked_appt" | "no_appt" | "flow_reach" | "flow_open";
 
 export type Estimate = { value: number | null; low: number | null; high: number | null; enough: boolean; estimate: true; formula: string; minNote: string | null };
 export type Rate = { value: number | null; n: number; of: number; enough: boolean };

@@ -1,6 +1,7 @@
 // SAMPLE river: fictional deals, built by a small deterministic simulation (same output every time). It is only ever shown when the person asks, always labelled
 // SAMPLE, and never mixed with real numbers. Every day's piles follow from the day before (a deal moves, is won or is lost), so the replay is internally consistent.
 import type { PlDrain, PlMoneyFlow, PlReplayDay, PlReplayMove, PlStage } from "../analytics/pipeline3-types-interim";
+import type { FlowPaths } from "./flow-paths";
 
 const NAMES = ["New lead", "Contacted", "Appointment booked", "Proposal sent", "Negotiation", "Contract out"];
 const AVG_CENTS = [3_200_00, 4_100_00, 5_800_00, 7_500_00, 9_200_00, 11_000_00];
@@ -54,5 +55,24 @@ export function sampleRiver(): PlMoneyFlow {
     won: { count: wonN, valueCents: wonC, previousValueCents: null },
     leak: { fromStage: worst.name, toStage: stages[Math.min(stages.length - 1, worst.order + 1)].name, lostCents: worst.lostValueCents },
     people: [], replay: days, minDeals: 1, excluded: { zeroValue: 0, noOwner: 0, test: 0 }, outlier: null,
+  };
+}
+
+/** The same SAMPLE, as flow paths (ribbon labels, funnel). Made-up people and sources, marked as samples; shares add up to the won total. */
+export function sampleFlowPaths(f: PlMoneyFlow = sampleRiver()): FlowPaths {
+  const split = (total: number, names: string[]): Array<{ key: string; name: string; n: number; cents: number }> => {
+    const w = [5, 3, 2].slice(0, names.length), sum = w.reduce((a, b) => a + b, 0);
+    let left = total, leftC = f.won.valueCents;
+    return names.map((name, i) => {
+      const last = i === names.length - 1, n = last ? left : Math.floor((total * w[i]) / sum), c = last ? leftC : Math.floor((f.won.valueCents * w[i]) / sum);
+      left -= n; leftC -= c;
+      return { key: `sample-${i}`, name, n, cents: c };
+    });
+  };
+  return {
+    pipelineName: f.pipelineName,
+    stages: f.stages.map((s) => ({ id: s.id, name: s.name, order: s.order, open: s.count, openCents: s.valueCents, noValue: 0, stuck: s.staleCount, stuckCents: s.staleValueCents, lost: s.lostCount, lostCents: s.lostValueCents })),
+    won: { n: f.won.count, cents: f.won.valueCents, medianDays: 14, byOwner: split(f.won.count, ["Ada (sample)", "Tunde (sample)", "Chi (sample)"]), bySource: split(f.won.count, ["Ads (sample)", "Referral (sample)", "Website (sample)"]) },
+    lostElsewhere: 0, minDeals: f.minDeals,
   };
 }
