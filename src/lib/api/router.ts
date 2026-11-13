@@ -154,6 +154,7 @@ import { handleCash, handleCashAct } from "./cash-routes";
 import { handleWg, handleWgAct } from "./wg-routes";
 import { handleBr } from "./br-routes";
 import { handleAi } from "./ai-routes";
+import { handleWfm } from "./wfm-routes";
 import { handleApptActions } from "./appointment-actions-routes";
 import { handleMeetingList } from "./mn2-routes";
 import { handleAm } from "./am-routes";
@@ -2280,6 +2281,10 @@ async function dispatch(ctx: Ctx): Promise<Response> {
     }
     if (a === "wg" && b === "act" && ctx.segments.length === 3) {
       return await handleWgAct(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
+    // Workflow blocks: /api/app/wfm and /api/app/wfm/act/set. Administrators only (checked inside); flag wf_module.
+    if (a === "wfm" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3 && ctx.segments[2] === "set"))) {
+      return await handleWfm(ctx, { allowed: () => allowedIds(ctx) });
     }
     // Bring your own AI: /api/app/ai?part=... and /api/app/ai/act/<name>. Administrators only for the connection (checked inside); flag ai_byo.
     if (a === "ai" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3))) {

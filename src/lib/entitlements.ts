@@ -213,6 +213,7 @@ export const FEATURES = [
   "br_email",
   "br_record",
   "ai_byo",
+  "wf_module",
   "ai_brief",
   "ai_chatgpt",
   "ai_deal_health",
