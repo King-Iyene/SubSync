@@ -29,4 +29,4 @@ Synthesised by `scripts/video/music.py` from sine waves (a soft pad over Am9, Fm
 
 ## On screen
 
-All screens are recorded from the demo company (made-up businesses and people) with the demo and sample labels hidden by `scripts/video/lib.mjs`. The SubSync logo is the app's own file (`public/brand/subsync-logo.svg`). The chat and email cards in the alerts shot are drawn from plain HTML and use no real company marks.
+All screens are recorded from the demo company (made-up businesses and people) with the demo and sample labels hidden by `scripts/video/lib.mjs`. The logo is the real SubSync logo (`assets/brand/subsync-logo-main.png`, cut out to `assets/brand/subsync-logo-main-transparent.png` by `scripts/video/logo-cutout.mjs`, colours unchanged). The chat message is King's own real test alert (`assets/video-in/real-slack-alert.png`). The email and the contacts list are drawn in plain HTML with no company marks. The first minute (people, objects, clocks, calendars) is drawn in code by `scripts/video/scenes.mjs`; nothing is borrowed. Music is synthesised for 225 s.

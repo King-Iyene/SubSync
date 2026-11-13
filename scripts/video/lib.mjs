@@ -18,7 +18,7 @@ const INIT = () => {
     #vd-cursor .ring{position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,.9);opacity:0;transform:scale(.4)}
     #vd-cursor.click .ring{animation:vdring .45s ease-out}
     @keyframes vdring{0%{opacity:.95;transform:scale(.4)}100%{opacity:0;transform:scale(1.9)}}
-    #vd-cap{position:fixed;left:50%;bottom:54px;transform:translateX(-50%) translateY(8px);z-index:2147483646;max-width:1500px;padding:16px 34px;border-radius:16px;background:rgba(6,8,10,.88);color:#fff;font:600 40px/1.25 "Segoe UI",Arial,Helvetica,sans-serif;letter-spacing:.1px;text-align:center;opacity:0;transition:opacity .28s ease,transform .28s ease;pointer-events:none;box-shadow:0 8px 30px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12)}
+    #vd-cap{position:fixed;left:50%;bottom:54px;transform:translateX(-50%) translateY(8px);z-index:2147483646;max-width:1500px;padding:16px 34px;border-radius:16px;background:rgba(6,8,10,.88);color:#fff;font:600 46px/1.25 "Segoe UI",Arial,Helvetica,sans-serif;letter-spacing:.1px;text-align:center;opacity:0;transition:opacity .28s ease,transform .28s ease;pointer-events:none;box-shadow:0 8px 30px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12)}
     #vd-cap.on{opacity:1;transform:translateX(-50%) translateY(0)}
     #vd-cap.hook{font-size:50px;max-width:1500px;padding:22px 44px}
     html{scrollbar-width:none} ::-webkit-scrollbar{display:none}
@@ -86,11 +86,13 @@ export async function scanText(page) {
 // Smooth mouse glide with ease-in-out, ~60 steps per second.
 let mx = 960, my = 540;
 export async function moveTo(page, x, y, ms = 900) {
-  const x0 = mx, y0 = my, steps = Math.max(8, Math.round(ms / 16));
-  for (let i = 1; i <= steps; i++) {
-    const p = i / steps, e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+  // Time-based: the position follows the clock, so a slow browser call never stretches the glide.
+  const x0 = mx, y0 = my, t0 = performance.now();
+  for (;;) {
+    const p = Math.min(1, (performance.now() - t0) / ms), e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
     await page.mouse.move(x0 + (x - x0) * e, y0 + (y - y0) * e);
-    await sleep(ms / steps);
+    if (p >= 1) break;
+    await sleep(8);
   }
   mx = x; my = y;
 }

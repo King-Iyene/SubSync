@@ -11,15 +11,8 @@ const dur = (f) => parseFloat(execFileSync(FFPROBE, ["-v", "error", "-show_entri
 
 const OVERLAP = 0.6, GAP = 0.5;
 // head = quiet time before the first line, tail = hold after the last line (the shot's own end, which also fades into the next shot).
-const SHOTS = [
-  { id: "hook",    head: 0.4, tail: 1.0 },
-  { id: "speed",   head: 0.6, tail: 0.7 },
-  { id: "appts",   head: 0.6, tail: 2.4 },
-  { id: "funnel",  head: 0.6, tail: 3.6 },
-  { id: "clients", head: 0.6, tail: 0.8 },
-  { id: "alerts",  head: 0.6, tail: 0.9 },
-  { id: "close",   head: 0.7, tail: 3.4 },
-];
+const order = [...new Set(lines.map((l) => l.shot))];
+const SHOTS = order.map((id) => ({ id, head: id.startsWith("p_") || id === "what" ? 0.5 : 0.6, tail: id === "p_client" ? 1.2 : id.startsWith("p_") ? 0.4 : id === "what" ? 0.9 : id === "close" ? 3.4 : 1.5 }));
 
 function chunks(text) {
   // Cut at sentence ends and commas, then split anything still over ~58 characters at a space near the middle.

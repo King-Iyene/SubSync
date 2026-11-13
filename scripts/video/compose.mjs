@@ -41,14 +41,17 @@ const fadeOut = 3.8;
 const musicChain = (lufs) => `loudnorm=I=${lufs}:TP=-3:LRA=7,afade=t=in:st=0:d=2,afade=t=out:st=${(total - fadeOut).toFixed(2)}:d=${fadeOut}`;
 run(["-i", w("music.wav"), "-i", w("voice.wav"), "-filter_complex",
   `[0:a]atrim=0:${total.toFixed(2)},${musicChain(-30)}[m];[1:a]asplit=2[vk][vm];[m][vk]sidechaincompress=threshold=0.015:ratio=5:attack=40:release=500:makeup=1[md];[vm]volume=1.0[vv];[md][vv]amix=inputs=2:normalize=0:duration=longest,alimiter=limit=0.89[mix]`,
-  "-map", "[mix]", "-ar", "48000", w("mix-voice.wav")]);
+  "-map", "[mix]", "-ar", "48000", w("mix-pre.wav")]);
+const m2 = spawnSync(FF, ["-hide_banner", "-i", w("mix-pre.wav"), "-af", "loudnorm=I=-16:TP=-1.5:LRA=9:print_format=json", "-f", "null", "-"], { encoding: "utf8", maxBuffer: 1 << 26 }).stderr;
+const j2 = JSON.parse(m2.match(/\{[\s\S]*?"target_offset"[\s\S]*?\}/)[0]);
+run(["-i", w("mix-pre.wav"), "-af", `loudnorm=I=-16:TP=-1.5:LRA=9:measured_I=${j2.input_i}:measured_TP=${j2.input_tp}:measured_LRA=${j2.input_lra}:measured_thresh=${j2.input_thresh}:offset=${j2.target_offset}:linear=true,aresample=48000`, w("mix-voice.wav")]);
 run(["-i", w("music.wav"), "-af", `atrim=0:${total.toFixed(2)},${musicChain(-20)}`, "-ar", "48000", w("mix-silent.wav")]);
 
 // 4. Final files.
 const mux = (audio, dest) => run(["-i", w("video.mp4"), "-i", audio, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-t", total.toFixed(3), "-movflags", "+faststart", dest]);
 mux(w("mix-voice.wav"), path.join(OUT, "subsync-preview.mp4"));
 mux(w("mix-silent.wav"), path.join(OUT, "subsync-preview-silent.mp4"));
-// Poster: the funnel shot with its replay running, 1600x900.
-const posterAt = plan.shots.find((s) => s.id === "funnel").start + 11.5;
+// Poster: the closing card with the logo, 1600x900.
+const posterAt = plan.shots.find((s) => s.id === "close").start + 11.0;
 run(["-ss", posterAt.toFixed(2), "-i", w("video.mp4"), "-frames:v", "1", "-vf", "scale=1600:900:flags=lanczos", path.join(OUT, "subsync-preview-poster.png")]);
 console.log("done", total.toFixed(1), "s");
