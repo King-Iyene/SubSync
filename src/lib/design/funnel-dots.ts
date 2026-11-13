@@ -93,6 +93,8 @@ export type FunnelRow = {
   /** Band width as a share of the widest band (0 to 1): never wider than the step before it, never NaN, never negative. */
   width: number;
   dots: DotParts;
+  /** Open deals in this step with no dollar value. Counted in the Deals measure, never in Money; shown as a hatched count beside the step. */
+  noValue: number;
 };
 export type FunnelModel = { rows: FunnelRow[]; unit: number; totalDots: number; leakIndex: number | null; empty: boolean; money: boolean };
 
@@ -133,7 +135,7 @@ export function funnelModel(p: Pick<FlowPaths, "stages" | "won"> & Partial<FlowP
       index: i, id: won ? "won" : p.stages[i].id, name: won ? "Won" : p.stages[i].name, kind: won ? "won" : "stage", icon: won ? "won" : stageIconKey(p.stages[i].name),
       reach: won ? clean(m.won) : a, moved: won ? 0 : g.moved, waiting: won ? 0 : g.waiting + g.stuck, stuck: won ? 0 : g.stuck, lost: won ? 0 : g.lost,
       frac, pctFirst: total > 0 ? pctText(total, reach[0]) : null, conv: won || !(a > 0) ? null : pctText(b, a),
-      dropOff: won ? 0 : Math.max(0, a - b), width, dots,
+      dropOff: won ? 0 : Math.max(0, a - b), width, dots, noValue: won ? 0 : Math.max(0, p.stages[i].noValue ?? 0),
     });
     if (!won && g.lost > worst) { worst = g.lost; leakIndex = i; }
   }
