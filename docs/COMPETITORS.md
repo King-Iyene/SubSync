@@ -7,7 +7,7 @@ Summary of the overnight research. Vendor claims are marked unverified; check li
 | Tool | What it does | Where SubSync differs |
 | --- | --- | --- |
 | GoCSM | Health scoring and churn signals for agencies on this platform. Closest competitor. | Flat tiers that work out to roughly $1.60 to $2 per account at 100 accounts (vendor claim, unverified), against our $5. We compete on explainable scores, money-at-risk figures, cross-account search and the AI connector, not on price. |
-| ghladmin-style admin tools | Bulk account management and cross-account utilities. | Mostly actions; little analysis. SubSync is read-only and analytical, which also makes it easier to trust and to pass review. |
+| ghladmin-style admin tools | Bulk account management and cross-account utilities. | Mostly actions; little analysis. SubSync is analytical first, and any change it makes in the CRM follows a preview and a confirm, is logged, and can be undone where possible. |
 | AgencyAnalytics and similar reporting suites | Client-facing marketing reports from ad, SEO and social data. | They report marketing channels; SubSync reports what is happening inside the client's CRM account (pipeline, conversations, dormancy). Complementary rather than head to head. |
 | The platform's own agency dashboard | Basic account list and snapshots. | No cross-account search, no scoring, no stale-deal or SLA view. This is the gap, and also the risk if the platform builds it. |
 

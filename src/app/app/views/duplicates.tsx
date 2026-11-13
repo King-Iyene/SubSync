@@ -13,7 +13,7 @@ import { fmtInt } from "../ui";
 import { buttons, Compare, GroupRow, MergeSheet, RecordCard, type Row, type WithUrl } from "./duplicates-parts";
 
 // Duplicate contacts, rebuilt (stage DUP; docs/DUPLICATES_REVIEW.md). One group at a time: the best record is already picked and the reason is in words,
-// only what differs is shown, and one big button starts the merge. SubSync only READS the CRM, so the merge is finished in the CRM's own screen with one
+// only what differs is shown, and one big button starts the merge. SubSync does not merge contacts by itself, so the merge is finished in the CRM's own screen with one
 // click ("Open both in your CRM"); the one-click merge from here is built and switched off (docs/features/DUPLICATES.md). Every number comes from the same
 // open list the stepper walks. The server sends one page and one group, never the whole list, so it stays quick at 100 accounts and thousands of groups.
 

@@ -197,3 +197,14 @@ test("copy: no claim that SubSync is read-only as a whole", () => {
   }
   assert.deepEqual(bad, []);
 });
+
+// The copy test, part 3 (13 Nov 2026): the Calendars card and every card wording that claimed SubSync only reads, or that there is nothing to connect.
+const ONLY_READS = /SubSync only reads|SubSync only READS|Nothing to connect here|whatever tool feeds|never changes anything|never writes anything|SubSync is read-only|It does not change anything in your account/i;
+test("copy: no card, guide, listing doc or scope reason says SubSync only reads", () => {
+  const bad: string[] = [];
+  for (const f of [...walk("src"), "docs/COMPETITORS.md", "docs/features/Z2.md"]) {
+    if (f.includes("__tests__")) continue;
+    read(f).split(/\r?\n/).forEach((line, i) => { if (!/^\s*(\/\/|\/\*|\*)/.test(line) && ONLY_READS.test(line)) bad.push(`${f}:${i + 1}: ${line.trim().slice(0, 120)}`); });
+  }
+  assert.deepEqual(bad, []);
+});

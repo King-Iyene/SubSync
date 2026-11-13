@@ -31,7 +31,7 @@ export function AiToolRow({ data, error, reload }: { data: Status | undefined; e
 
 
   return (
-    <ToolRow id="ai" icon="ai" name="AI" tone={s.tone} status={s.text} line={aiLine(facts)} what={AI_WHAT} owner="Your company account. Only an administrator connects it; the key is stored encrypted and never shown again.">
+    <ToolRow id="ai" icon="ai" name="AI" tone={s.tone} status={s.text} line={aiLine(facts)} what={AI_WHAT} owner="Your company account. Only an administrator connects it; the key is stored encrypted and never shown again." guide="conn-ai">
       {facts.canManage && !facts.notSwitchedOn && !facts.failed && (
         <div className="space-y-3">
           <Btn variant={connected ? "secondary" : "primary"} onClick={() => setOpen((v) => !v)} testId="ai-open">{open ? "Hide" : connected ? "Manage your AI" : "Connect your AI"}</Btn>

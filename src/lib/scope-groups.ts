@@ -18,7 +18,7 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
   { id: "accounts", title: "Your client accounts", summary: "Which accounts SubSync is connected to, and the one-account-at-a-time access it reads them with.", scopes: [
     { scope: "locations.readonly", kind: "read", required: true, why: "Names, time zones and contact details of your client accounts, so every number is shown against the right account and clock." },
     { scope: "oauth.readonly", kind: "read", required: true, why: "Lists the accounts SubSync is installed on, so a new account is found without you doing anything." },
-    { scope: "oauth.write", kind: "change", required: true, why: "Lets SubSync read one client account at a time with a key limited to that account. The platform offers no read-only way to do this. It does not change anything in your accounts by itself." },
+    { scope: "oauth.write", kind: "change", required: true, why: "Lets SubSync read one client account at a time with a key limited to that account. The platform offers no read-only way to do this. Changes in your accounts only happen after you preview and confirm, are logged, and can be undone where possible." },
   ] },
   { id: "contacts", title: "Contacts", summary: "People in your accounts.", scopes: [
     { scope: "contacts.readonly", kind: "read", required: true, why: "Contacts and their tags, source, owner and do-not-contact flag, for search, call lists, data health and lead counts." },

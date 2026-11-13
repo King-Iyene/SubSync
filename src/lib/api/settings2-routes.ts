@@ -1,13 +1,13 @@
 import { sql } from "../db";
 import { groupStatus, parseGranted } from "../scope-groups";
-import { saveDomainCheck } from "../analytics/queries";
+import { getSettings, saveDomainCheck } from "../analytics/queries";
 import { validEmail } from "../analytics/weekly-email";
 import { demoDomainReport } from "../demo/seed";
 import { checkDomain, extractDomain, type DomainReport } from "../dns/email-auth";
 import { emailConfigured } from "../email";
 import { sendConnectionsTest } from "../notifications/transports";
 import { isLive } from "../live-flags";
-import { testResultText } from "../connections/tools-status";
+import { calendarAccounts, calendarItems, testResultText } from "../connections/tools-status";
 import { GUIDE_IDS } from "../guides";
 import { HIDEABLE_IDS, STATE_KINDS, type StateKind } from "../settings2";
 import { NEWS_IDS } from "../whats-new";
@@ -93,11 +93,16 @@ async function connections(ctx: Ctx) {
   const granted = ctx.demo || typeof instRow?.scope !== "string" || instRow.scope.trim() === "" ? null : parseGranted(instRow.scope as string);
   const mappedSql = sql()`exists (select 1 from calendar_members m where m.installation_id = c.installation_id and m.location_id = c.location_id and m.calendar_id = c.calendar_id)`;
   const calList = level === "self" ? [] : await (one
-    ? sql()`select c.name, c.is_active, ${mappedSql} mapped from cached_calendars c where c.installation_id = ${inst} and c.location_id = ${one} order by lower(coalesce(c.name, '')) limit 8`
-    : sql()`select c.name, c.is_active, ${mappedSql} mapped from cached_calendars c where c.installation_id = ${inst} order by lower(coalesce(c.name, '')) limit 8`);
+    ? sql()`select c.location_id, c.name, c.is_active, ${mappedSql} mapped from cached_calendars c where c.installation_id = ${inst} and c.location_id = ${one} order by lower(coalesce(c.name, '')) limit 8`
+    : sql()`select c.location_id, c.name, c.is_active, ${mappedSql} mapped from cached_calendars c where c.installation_id = ${inst} order by lower(coalesce(c.name, '')) limit 8`);
   const [mappedN] = one
     ? await sql()`select count(*)::int n from cached_calendars c where c.installation_id = ${inst} and c.location_id = ${one} and ${mappedSql}`
     : await sql()`select count(*)::int n from cached_calendars c where c.installation_id = ${inst} and ${mappedSql}`;
+  // The CRM links on the Calendars card go through deepLinks only (the one place a CRM address is made), from the saved domain; none when the account id is unknown.
+  const domainSource = (await getSettings(inst)).appDomain;
+  const calAccounts = level === "self" ? [] : await (one
+    ? sql()`select c.location_id, l.name from (select distinct location_id from cached_calendars where installation_id = ${inst} and location_id = ${one}) c left join locations l on l.installation_id = ${inst} and l.location_id = c.location_id`
+    : sql()`select c.location_id, l.name from (select distinct location_id from cached_calendars where installation_id = ${inst}) c left join locations l on l.installation_id = ${inst} and l.location_id = c.location_id order by lower(coalesce(l.name, '')) limit 25`);
   // Slack chat: from the recorded links and the events the bot has handled (kept 2 days). A client account sees only a link made for that account.
   const chatOn = ctx.entitlements.features.slack_chat === true && !ctx.entitlements.locked.includes("slack_chat");
   const links = chatOn ? await (one
@@ -114,7 +119,7 @@ async function connections(ctx: Ctx) {
       address: level === "self" ? null : address, hasAddress: Boolean(address), canManage: level !== "self", sendingLive: isLive("SEND_EMAIL_LIVE"), mailReady: emailConfigured(),
       check: check ? { status: check.status, checkedAt: check.checked_at, domain, findings: (check.result as DomainReport | null)?.findings ?? [] } : null,
     },
-    calendars: { count: cal?.n ?? 0, mapped: mappedN?.n ?? 0, permissionMissing: granted !== null && !granted.includes("calendars.readonly"), items: calList.map((r) => ({ name: (r.name as string | null) ?? "Unnamed calendar", active: r.is_active !== false, mapped: r.mapped === true })) },
+    calendars: { count: cal?.n ?? 0, mapped: mappedN?.n ?? 0, permissionMissing: granted !== null && !granted.includes("calendars.readonly"), items: calendarItems(domainSource, calList.map((r) => ({ name: (r.name as string | null) ?? "Unnamed calendar", active: r.is_active !== false, mapped: r.mapped === true, locationId: (r.location_id as string | null) ?? null }))), accounts: calendarAccounts(domainSource, calAccounts.map((r) => ({ locationId: (r.location_id as string | null) ?? null, name: (r.name as string | null) ?? null }))) },
   });
 }
 

@@ -28,7 +28,7 @@ export function EmailTool({ email, check, onCheck, reload }: { email: EmailData;
       if (what === "save") {
         await api.put("settings", { digestEmail: value.trim() === "" ? null : value.trim() });
         await reload();
-        setMsg({ ok: true, text: value.trim() === "" ? "Address removed." : "Saved. Press Check records to test it." });
+        setMsg({ ok: true, text: value.trim() === "" ? "Address removed." : "Saved. Press Send me a test to try it." });
       } else if (what === "verify") {
         const r = await api.post<{ check: EmailCheck }>("st/email-verify");
         onCheck(r.check);
@@ -40,6 +40,7 @@ export function EmailTool({ email, check, onCheck, reload }: { email: EmailData;
     finally { setBusy(null); }
   };
 
+  const whyOff = !email.hasAddress ? "Save an address first." : changed ? "Save your change first." : busy !== null ? "Please wait." : null;
   const rows = check ? recordResults(check.findings) : [];
   return (
     <div className="space-y-3" data-testid="email-tool">
@@ -49,11 +50,19 @@ export function EmailTool({ email, check, onCheck, reload }: { email: EmailData;
         </label>
         <Btn type="submit" variant="primary" disabled={!changed || busy !== null}>{busy === "save" ? "Saving..." : "Save address"}</Btn>
       </form>
-      <div className="flex flex-wrap gap-2">
-        <Btn disabled={!email.hasAddress || changed || busy !== null} onClick={() => void run("verify")} testId="email-verify">{busy === "verify" ? "Checking..." : check ? "Check again" : "Check records"}</Btn>
-        <Btn disabled={!email.hasAddress || changed || busy !== null} onClick={() => void run("test")} testId="email-test">{busy === "test" ? "Preparing..." : "Send me a test"}</Btn>
+      <div className="flex flex-wrap items-center gap-2">
+        <Btn disabled={whyOff !== null} onClick={() => void run("test")} testId="email-test" title={whyOff ?? undefined}>{busy === "test" ? "Preparing..." : "Send me a test"}</Btn>
+        {whyOff && <span className="text-xs text-muted-foreground" data-testid="email-why-off">{whyOff}</span>}
       </div>
-      <p className="text-sm"><a className="font-medium underline underline-offset-4 max-sm:inline-block max-sm:py-3" href="#email">Open email sender health for every client</a></p>
+      <div className="space-y-2 border-t pt-3">
+        <p className="text-sm font-medium">Check if clients&apos; emails reach the inbox</p>
+        <p className="text-xs text-muted-foreground">We look up each client&apos;s sending domain in public records (SPF, DKIM, DMARC). If one is missing, emails may land in spam. We never sign in to anyone&apos;s email.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Btn disabled={whyOff !== null} onClick={() => void run("verify")} testId="email-verify" title={whyOff ?? undefined}>{busy === "verify" ? "Checking..." : check ? "Check again" : "Check records"}</Btn>
+          {whyOff && <span className="text-xs text-muted-foreground">{whyOff}</span>}
+          <a className="text-sm font-medium underline underline-offset-4 max-sm:inline-block max-sm:py-3" href="#email">See every client</a>
+        </div>
+      </div>
       {msg && <InlineAlert tone={msg.ok ? "success" : "danger"}>{msg.text}</InlineAlert>}
       {check && (
         <div className="rounded-lg border p-3" data-testid="email-records">

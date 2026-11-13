@@ -14,7 +14,7 @@ Which accounts SubSync is connected to, and the one-account-at-a-time access it 
 | --- | --- | --- | --- |
 | `locations.readonly` | read | required | Names, time zones and contact details of your client accounts, so every number is shown against the right account and clock. |
 | `oauth.readonly` | read | required | Lists the accounts SubSync is installed on, so a new account is found without you doing anything. |
-| `oauth.write` | change | required | Lets SubSync read one client account at a time with a key limited to that account. The platform offers no read-only way to do this. It does not change anything in your accounts by itself. |
+| `oauth.write` | change | required | Lets SubSync read one client account at a time with a key limited to that account. The platform offers no read-only way to do this. Changes in your accounts only happen after you preview and confirm, are logged, and can be undone where possible. |
 
 ## Contacts
 
