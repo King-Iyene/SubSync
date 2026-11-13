@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { avgTouchMin, goodRate, pctOf, rate, MIN_LEADS } from "@/lib/dq/dq-core";
+import { avgTouchMin, cleanOf, goodRate, pctOf, rate, MIN_SOURCE_LEADS } from "@/lib/dq/dq-core";
 import { EmptyState, ErrorState, LocalAccountPicker, SkeletonRows } from "../../ds";
 import { InfoTip } from "../../ds/info-tip";
 import { useApiClient } from "../../session";
@@ -95,12 +95,12 @@ export function IntakeTab({ opts, account, setAccount, pick }: { opts: Opts; acc
 }
 
 function SourceItem({ r, rank, open, onDrawer }: { r: SourceRow; rank: number; open: (r: SourceRow, flag: string, title: string) => void; onDrawer: () => void }) {
-  const good = goodRate(r), dup = rate(r.dups, r.leads), reply = avgTouchMin(r);
+  const good = goodRate(r), dup = rate(r.dups, r.leads, MIN_SOURCE_LEADS), reply = avgTouchMin(r);
   return (
     <li className="grid grid-cols-2 items-center gap-x-3 gap-y-1 px-3 py-3 text-sm sm:grid-cols-[minmax(0,1.6fr)_repeat(6,minmax(0,1fr))] sm:gap-2" data-testid="dq-source-row">
       <button type="button" onClick={onDrawer} className="col-span-2 flex min-w-0 items-center gap-2 text-left font-medium hover:underline sm:col-span-1" data-testid="dq-source-name"><span className="w-5 shrink-0 text-xs text-muted-foreground tabular-nums">{rank}</span><span className="truncate">{r.label}</span></button>
       <span><span className="text-xs text-muted-foreground sm:hidden">Leads </span><Count n={r.leads} label="leads" onOpen={() => open(r, "all", "All leads")} testId="dq-count-leads" /></span>
-      <span title={good === null ? `Needs ${MIN_LEADS} leads` : ""}><span className="text-xs text-muted-foreground sm:hidden">Good </span>{good === null ? <span className="text-muted-foreground">{pctOf(good)}</span> : <button type="button" onClick={() => open(r, "clean", "Good leads")} className="min-h-8 font-semibold tabular-nums hover:underline" aria-label={`${r.quality} good leads. Open them.`}>{pctOf(good)}</button>}</span>
+      <span title={good === null ? `Needs ${MIN_SOURCE_LEADS} leads` : "Share of leads that are not duplicates or junk"}><span className="text-xs text-muted-foreground sm:hidden">Good </span>{good === null ? <span className="text-muted-foreground">{pctOf(good)}</span> : <button type="button" onClick={() => open(r, "ok", "Clean leads")} className="min-h-8 font-semibold tabular-nums hover:underline" aria-label={`${cleanOf(r)} clean leads. Open them.`}>{pctOf(good)}</button>}</span>
       <span><span className="text-xs text-muted-foreground sm:hidden">Duplicates </span>{dup === null ? <Count n={r.dups} label="duplicates" onOpen={() => open(r, "dup", "Duplicates")} /> : <><Count n={r.dups} label="duplicates" onOpen={() => open(r, "dup", "Duplicates")} testId="dq-count-dups" /> <span className="text-xs text-muted-foreground">({pctOf(dup)})</span></>}</span>
       <span><span className="text-xs text-muted-foreground sm:hidden">Booked </span><Count n={r.booked} label="booked" onOpen={() => open(r, "booked", "Booked")} /></span>
       <span title="Won deals linked to the same person"><span className="text-xs text-muted-foreground sm:hidden">Sales </span>{r.wonValue > 0 ? <button type="button" onClick={() => open(r, "won", "Won")} className="min-h-8 font-semibold tabular-nums hover:underline" aria-label={`${money(r.wonValue)} from ${r.won} won deals. Open them.`}>{money(r.wonValue)}</button> : <span className="text-muted-foreground">—</span>}</span>

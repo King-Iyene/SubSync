@@ -1,14 +1,15 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
-import { layoutGate, type GateLaneIn } from "@/lib/design/sorting-gate";
+import { layoutGate, passSeconds, type GateLaneIn } from "@/lib/design/sorting-gate";
 import { useReducedMotion } from "../speed6-base";
 
 // "Where do my leads go?": THE SORTING GATE. Leads stream in from their sources (the stream's thickness is how many leads it carries), pass one gate, and are sorted: duplicates are pulled up
 // into a merge circle where the copies become one record, junk drops into a bin, clean leads flow on. Real numbers only. Click a lane, the merge circle, the bin or the clean box to open exactly those
 // contacts (the count on the picture is the number of rows). Calm and flat: one accent, one warm colour for duplicates, grey for junk. With reduced motion (or on a phone) the picture is the same but still.
+// The dots play ONE pass on load (or on Replay) and then rest. Pause/Play sits next to Replay. The pass also pauses while the card is off-screen or the tab is hidden, and nothing loops.
 
 export type GatePick = { src: string | null; flag: "all" | "ok" | "dup" | "junk"; title: string; count: number };
 type Props = { lanes: GateLaneIn[]; groups: number; days: number; onPick?: (p: GatePick) => void; compact?: boolean; testId?: string };
@@ -18,7 +19,9 @@ const fmt = (n: number) => n.toLocaleString("en-US");
 
 export function SortingGate({ lanes, groups, days, onPick, compact = false, testId = "dq-gate" }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const [width, setWidth] = useState(compact ? 520 : 900), [run, setRun] = useState(0), [hot, setHot] = useState<string | null>(null);
+  const [userPaused, setUserPaused] = useState(false), [onScreen, setOnScreen] = useState(false), [tabShown, setTabShown] = useState(true), [done, setDone] = useState(false);
   const reduced = useReducedMotion();
   useEffect(() => {
     const el = wrap.current; if (!el) return;
@@ -27,10 +30,33 @@ export function SortingGate({ lanes, groups, days, onPick, compact = false, test
   }, []);
   const L = useMemo(() => layoutGate({ lanes, groups }, { width, compact }), [lanes, groups, width, compact]);
   const t = L.totals;
+  const total = useMemo(() => passSeconds(L.dots), [L.dots]);
+  const showDots = !reduced && L.dots.length > 0;
+  // Off-screen or a hidden tab: the animation clock stops (no work at all). Back on screen: it carries on where it was.
+  useEffect(() => {
+    const el = wrap.current; if (!el || typeof IntersectionObserver === "undefined") { setOnScreen(true); return; }
+    const io = new IntersectionObserver((es) => setOnScreen(es.some((e) => e.isIntersecting))); io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  useEffect(() => {
+    const on = () => setTabShown(!document.hidden); on(); document.addEventListener("visibilitychange", on);
+    return () => document.removeEventListener("visibilitychange", on);
+  }, []);
+  const playing = showDots && !done && !userPaused && onScreen && tabShown;
+  useEffect(() => {
+    const svg = svgRef.current; if (!svg || !showDots) return;
+    if (playing) svg.unpauseAnimations(); else svg.pauseAnimations();
+  }, [playing, showDots, run, width]);
+  // One pass, then rest: a short check every quarter second, only while the pass is playing, stops itself at the end.
+  useEffect(() => {
+    if (!playing) return;
+    const id = window.setInterval(() => { const svg = svgRef.current; if (svg && svg.getCurrentTime() >= total + 0.2) { setDone(true); window.clearInterval(id); } }, 250);
+    return () => window.clearInterval(id);
+  }, [playing, total, run]);
+  const replay = () => { setDone(false); setUserPaused(false); setRun((n) => n + 1); const svg = svgRef.current; if (svg) { svg.setCurrentTime(0); svg.unpauseAnimations(); } };
   const press = (fn: () => void) => ({ onClick: fn, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(); } }, tabIndex: 0, role: "button" as const });
   const pick = (p: GatePick) => () => onPick?.(p);
   const caption = hot ?? `${fmt(t.leads)} leads in the last ${days} days: ${fmt(t.clean)} clean, ${fmt(t.dups)} duplicates, ${fmt(t.junk)} junk.`;
-  const showDots = !reduced && L.dots.length > 0;
 
   if (t.leads === 0) return <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground" data-testid={`${testId}-empty`}>No new leads in the last {days} days. When leads arrive you will see where they come from and where they go.</p>;
 
@@ -40,9 +66,14 @@ export function SortingGate({ lanes, groups, days, onPick, compact = false, test
     <div ref={wrap} className="w-full" data-testid={testId}>
       <div className="mb-2 flex items-center justify-between gap-3">
         <p className="min-w-0 text-sm text-muted-foreground" aria-live="polite" data-testid={`${testId}-caption`}>{caption}</p>
-        {showDots && <button type="button" onClick={() => setRun((n) => n + 1)} className="ds-press inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border bg-card px-3 text-xs font-medium hover:bg-accent/50" data-testid={`${testId}-replay`}><RotateCcw aria-hidden className="size-3.5" />Replay</button>}
+        {showDots && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            {!done && <button type="button" onClick={() => setUserPaused((v) => !v)} aria-pressed={userPaused} className="ds-press inline-flex min-h-9 items-center gap-1.5 rounded-lg border bg-card px-3 text-xs font-medium hover:bg-accent/50" data-testid={`${testId}-pause`}>{userPaused ? <Play aria-hidden className="size-3.5" /> : <Pause aria-hidden className="size-3.5" />}{userPaused ? "Play" : "Pause"}</button>}
+            <button type="button" onClick={replay} className="ds-press inline-flex min-h-9 items-center gap-1.5 rounded-lg border bg-card px-3 text-xs font-medium hover:bg-accent/50" data-testid={`${testId}-replay`}><RotateCcw aria-hidden className="size-3.5" />Replay</button>
+          </div>
+        )}
       </div>
-      <svg viewBox={`0 0 ${L.width} ${L.height}`} width="100%" height={L.height} role="group" aria-label={`Where leads go: ${fmt(t.leads)} leads, ${fmt(t.dups)} duplicates, ${fmt(t.junk)} junk, ${fmt(t.clean)} clean`} className="block overflow-visible">
+      <svg ref={svgRef} viewBox={`0 0 ${L.width} ${L.height}`} width="100%" height={L.height} role="group" aria-label={`Where leads go: ${fmt(t.leads)} leads, ${fmt(t.dups)} duplicates, ${fmt(t.junk)} junk, ${fmt(t.clean)} clean`} className="block overflow-visible">
         {!L.vertical && <>
           <text x={L.lanes[0]?.labelBox.x ?? 16} y={14} className="fill-muted-foreground" fontSize="10">LEADS IN, BY SOURCE</text>
           <text x={L.outs.merge.x} y={14} className="fill-muted-foreground" fontSize="10">SORTED</text>
@@ -98,17 +129,30 @@ export function SortingGate({ lanes, groups, days, onPick, compact = false, test
           <text x={L.outs.bin.x + tx} y={L.outs.bin.y + (L.vertical ? 44 : L.outs.bin.h / 2 + 14)} fontSize="11" className="fill-muted-foreground">junk</text>
         </g>
 
-        {showDots && (
+        {showDots && !done && (
           <g key={run} aria-hidden pointerEvents="none">
             {L.dots.map((d, i) => (
               <circle key={i} r={d.r} className={d.kind === "dup" ? "fill-warning" : d.kind === "junk" ? "fill-muted-foreground/70" : "fill-primary"} opacity={0}>
-                <animateMotion path={d.d} dur={`${d.dur}s`} begin={`${d.begin}s`} repeatCount="indefinite" rotate="0" />
-                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.9;1" dur={`${d.dur}s`} begin={`${d.begin}s`} repeatCount="indefinite" />
+                <animateMotion path={d.d} dur={`${d.dur}s`} begin={`${d.begin}s`} repeatCount="1" rotate="0" />
+                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.9;1" dur={`${d.dur}s`} begin={`${d.begin}s`} repeatCount="1" />
               </circle>
             ))}
           </g>
         )}
       </svg>
+      <ul className="mt-2 grid gap-x-6 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2" data-testid={`${testId}-sources`}>
+        {L.lanes.map((l) => (
+          <li key={l.key} className="flex items-center justify-between gap-2" data-testid={`${testId}-src-${l.key}`}>
+            <span className="min-w-0 truncate text-foreground">{l.label}</span>
+            <span className="shrink-0 tabular-nums">
+              {l.other ? <>{fmt(l.leads)} leads, {fmt(l.dups)} duplicates, {fmt(l.junk)} junk</> : <>
+                <button type="button" onClick={pick({ src: l.key, flag: "all", title: `Leads from ${l.label}`, count: l.leads })} className="min-h-7 hover:underline" aria-label={`${fmt(l.leads)} leads from ${l.label}. Open them.`}>{fmt(l.leads)} leads</button>{", "}
+                <button type="button" onClick={pick({ src: l.key, flag: "dup", title: `Duplicate leads from ${l.label}`, count: l.dups })} className="min-h-7 hover:underline" aria-label={`${fmt(l.dups)} duplicates from ${l.label}. Open them.`}>{fmt(l.dups)} duplicates</button>{", "}
+                <button type="button" onClick={pick({ src: l.key, flag: "junk", title: `Junk leads from ${l.label}`, count: l.junk })} className="min-h-7 hover:underline" aria-label={`${fmt(l.junk)} junk from ${l.label}. Open them.`}>{fmt(l.junk)} junk</button></>}
+            </span>
+          </li>
+        ))}
+      </ul>
       <p className="sr-only">Each row is a source of leads. The thicker the stream, the more leads. Duplicates go to the merge circle, junk to the bin and clean leads on.</p>
     </div>
   );

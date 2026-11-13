@@ -59,11 +59,11 @@ test("quality score: 100 when clean, parts lose weight in proportion, 'not enoug
 });
 
 const row = (label: string, o: Partial<SourceRow>): SourceRow => ({ key: label.toLowerCase(), label, ...ZERO, ...o });
-test("best and worst source need 20 leads each and two sources; the line is plain", () => {
+test("best and worst source need 10 leads each and two sources; good = the clean share; the line is plain", () => {
   assert.equal(bestWorst([row("A", { leads: 10, quality: 9 })]).best, null);
   const b = bestWorst([row("Facebook ads", { leads: 100, quality: 60, wonValue: 12400, dups: 5 }), row("Quote form", { leads: 50, quality: 10, dups: 22 }), row("Tiny", { leads: 5, quality: 5 })]);
   assert.equal(b.best?.label, "Facebook ads"); assert.equal(b.worst?.label, "Quote form");
-  assert.equal(bestWorstLine(b), "Best: Facebook ads (60% good leads, $12,400 won). Weakest: Quote form (20% good leads, 44% duplicates).");
+  assert.equal(bestWorstLine(b), "Best: Facebook ads (95% good leads, $12,400 won, 5% duplicates). Weakest: Quote form (56% good leads, 44% duplicates).");
   assert.equal(rate(1, MIN_LEADS - 1), null); assert.equal(rate(10, 20), 0.5);
 });
 
