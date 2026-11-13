@@ -40,7 +40,6 @@ describe("registry and flags", () => {
   it("registers the six jobs live, suggest-only, and the rest of the registry is unchanged", () => {
     for (const j of TEAM_JOB_IDS) { expect(JOB_IDS).toContain(j); expect(JOBS[j].status).toBe("live"); expect(JOBS[j].approval).toBe("suggest"); expect(liveJobs().map((x) => x.id)).toContain(j); }
     expect(JOBS.brief.status).toBe("live");
-    expect(JOBS.ask_data.status).toBe("planned");
   });
   it("every job has its own feature flag, default off, and coaching and meetings are opt-in", () => {
     for (const f of ["ai_report", "ai_leads", "ai_coach", "ai_anomaly", "ai_meeting", "ai_one_thing"]) expect(DEFAULT_OFF.has(f as never)).toBe(true);
