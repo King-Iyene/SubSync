@@ -16,7 +16,7 @@ const trust = [
 ];
 
 const faq = [
-  ["How much does it cost?", "A free plan covers the account audit, overview and search. The paid plan is $9 per client account per month, with a 14-day free trial. You can resell it to your clients at your own price."],
+  ["How much does it cost?", "Try it free for 14 days, then $11.50 per client account per month. You can resell it to your clients at your own price."],
   ["Does it work under my own brand?", "Yes. Add your agency name and colour in Settings and SubSync shows as yours."],
   ["Will it message my clients' customers?", "Only when a person on your team presses Send, after a preview. SubSync never sends on its own and never to a contact who asked not to be contacted. It also reads your CRM, alerts you and tells you what to do."],
   ["How fast do I see something useful?", "The audit runs as soon as your accounts finish their first read, usually within minutes."],
