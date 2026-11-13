@@ -93,3 +93,7 @@ The app now asks for 36 scopes: five new OPTIONAL read scopes, `payments/transac
 
 ## Lead intake (stage DQ, release 2.2.0 batch)
 The app now asks for 39 scopes: three new OPTIONAL read scopes, `forms.readonly`, `surveys.readonly` and `funnels/funnel.readonly`. They feed only the Lead intake tab in Clean-up: the names and submission times of forms and surveys (never the answers), and the names and step counts of funnels. Declined, the tab says "Needs permission: reconnect" and everything else keeps working. Verified in the platform docs (docs/research/DATAQUALITY_R1.md): forms and surveys have list and submission endpoints, funnels have a list; funnel views and conversion are not available from the platform. Batch it into the same release as the other scope changes (docs/DECISIONS.md).
+
+## Release 1.1.0 addition (12 Nov 2026): 40 scopes in total (7 required, 33 optional)
+
+One new OPTIONAL change scope, `locations/customFields.write`, joins four already listed ones (`conversations/reports.readonly`, `locations/tasks.readonly`, `locations/tasks.write`, `locations/tags.write`) so the coming AI follow-up tasks, AI data cleaning and richer response-time numbers never force a second approval. None is used by any screen yet, and the Permissions screen says so. Still never requested: `conversations/message.write`, `invoices.write`, `conversations.write` (delete).

@@ -9,7 +9,7 @@ import { Badge, Btn, Card, ErrorBox, Loading, timeAgo } from "../ui";
 
 // The pieces of Settings that are not plain form fields: the permissions panel (N64), the test-account switches (N1), who can open SubSync, and the history of changes.
 
-export type PermissionGroup = { id: string; title: string; summary: string; missing: number; scopes: Array<{ scope: string; kind: "read" | "change"; required: boolean; why: string; granted: boolean }> };
+export type PermissionGroup = { id: string; title: string; summary: string; missing: number; scopes: Array<{ scope: string; kind: "read" | "change"; required: boolean; why: string; granted: boolean; comingSoon?: boolean }> };
 
 // "What SubSync can read": each group of permissions with a plain reason, and which ones this install granted. A missing one says the same words as every
 // other prompt: "Needs permission: reconnect". Nothing here changes anything; the permissions are approved when SubSync is opened from your CRM.
