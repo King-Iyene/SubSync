@@ -1,6 +1,7 @@
 import { isLive, outward, type Deps } from "../live-flags.ts";
 import type { Found, WfClient, Fail } from "./client.ts";
 import { hasVendorWord } from "./naming.ts";
+import { handSteps } from "./hand-steps.ts";
 import { resolveSteps } from "./steps.ts";
 import type { Assign, Template } from "./templates.ts";
 
@@ -8,14 +9,26 @@ import type { Assign, Template } from "./templates.ts";
 // workflow a person has changed. Every write goes through the write gateway (WRITE_GHL_LIVE and the account's own opt-in): with either off, the answer is "Would create folder X and
 // workflow Y" and nothing is sent. One audit line per write. The client is injected, so every rule here is tested with a stub and no network.
 export const SPACING_MS = 2_000;
+/** A new account sets up by itself when installed (the write gateway still keeps it a dry run until the account opts in) and publishes, because the workflow only creates internal call tasks. */
+export const DEFAULT_SETUP = { autoSetup: true, autoPublish: true } as const;
 
 export type RowStatus = "active" | "created_draft" | "unavailable" | "inactive";
 export type Row = { templateKey: string; folderId: string | null; workflowId: string | null; templateVersion: number; status: RowStatus; lastError: string | null };
 export interface Store { get(templateKey: string): Promise<Row | null>; save(row: Row): Promise<void> }
 
 export type Code = "not_enabled" | "missing_scope" | "step_missing" | "rejected" | "failed" | "bad_setting";
-export type State = "ready" | "created" | "update_available" | "missing" | "would_create" | "unavailable";
-export type Result = { state: State; code?: Code; message: string; workflowId?: string | null; lines: string[] };
+export type State = "ready" | "created" | "update_available" | "missing" | "would_create" | "unavailable" | "needs_permission";
+/** `steps` is the hand-built version (plain sentences) whenever automatic setup is not possible, so a person can still finish in a few minutes. */
+export type Result = { state: State; code?: Code; message: string; workflowId?: string | null; lines: string[]; steps?: string[] };
+
+/** The two permissions automatic setup needs. Publishing is part of workflows.write (CHECK: the platform lists Update Workflow Status under it). */
+export const SETUP_SCOPES = ["workflows.readonly", "workflows.write"] as const;
+/** Names what is missing, or null when granted (or when the grant list is not known, as in the demo). */
+export const missingSetupScopes = (granted: string[] | null | undefined): string[] | null => {
+  if (granted == null) return null;
+  const miss = SETUP_SCOPES.filter((x) => !granted.includes(x));
+  return miss.length ? miss : null;
+};
 
 export type Ctx = {
   client: WfClient;
@@ -25,6 +38,10 @@ export type Ctx = {
   /** The account's own write opt-in (Settings). Off means a dry run, always. */
   optedIn: boolean;
   settings: { folderName: string; tag: string; assign: Assign };
+  /** Scopes the install was granted; null when not known. Missing workflow permissions end the run before any request is made. */
+  granted?: string[] | null;
+  /** Publish right after creating (default true: the workflow only creates internal call tasks and sends nothing). False leaves it as a draft. */
+  autoPublish?: boolean;
   /** True when a person pressed "Set up". An automatic run never re-creates a workflow that was deleted. */
   manual: boolean;
   env?: Record<string, string | undefined>;
@@ -40,7 +57,7 @@ const FAIL_TEXT: Record<Fail["kind"], { code: Code; message: string }> = {
   rejected: { code: "rejected", message: "Your CRM did not accept the workflow SubSync prepared. The steps below take about five minutes." },
   failed: { code: "failed", message: "Your CRM could not be reached just now. Try again in a minute, or use the steps below." },
 };
-const unavailable = (f: Fail, lines: string[]): Result => ({ state: "unavailable", ...FAIL_TEXT[f.kind], lines });
+const unavailable = (f: Fail, lines: string[], steps?: string[]): Result => ({ state: "unavailable", ...FAIL_TEXT[f.kind], lines, steps });
 
 export async function provision(t: Template, c: Ctx): Promise<Result> {
   const lines: string[] = [];
@@ -52,10 +69,14 @@ export async function provision(t: Template, c: Ctx): Promise<Result> {
   if (hasVendorWord(c.settings.folderName) || hasVendorWord(t.name) || hasVendorWord(c.settings.tag)) return { state: "unavailable", code: "bad_setting", message: "Choose a plain name for the folder and the tag.", lines };
   if (c.settings.assign.mode === "user" && !c.settings.assign.userId) return { state: "unavailable", code: "bad_setting", message: "Choose which person gets the calls, or switch to round robin.", lines };
 
+  const hand = handSteps(c.settings.tag, c.settings.assign, c.settings.folderName, t.name);
+  // 0. Permission first: no request is made without the two workflow permissions.
+  if (missingSetupScopes(c.granted)) return { state: "needs_permission", code: "missing_scope", message: "Needs permission: reconnect SubSync and allow the optional workflow permissions. Until then, the steps below take about five minutes.", lines, steps: hand };
+
   // 1. What exists already: the stored id first, then the exact name in the folder.
   const row = await c.store.get(t.key);
   const list = await c.client.list();
-  if (!list.ok) { if (row) await save({ ...row, status: "unavailable", lastError: list.kind }); return unavailable(list, lines); }
+  if (!list.ok) { if (row) await save({ ...row, status: "unavailable", lastError: list.kind }); return unavailable(list, lines, hand); }
   const byId: Found | undefined = row?.workflowId ? list.value.find((w) => w.id === row.workflowId) : undefined;
   const byName = !byId ? list.value.find((w) => w.name === t.name && (!row?.folderId || w.folderId === null || w.folderId === row.folderId)) : undefined;
   const existing = byId ?? byName;
@@ -64,7 +85,7 @@ export async function provision(t: Template, c: Ctx): Promise<Result> {
     // Never edited, never re-created. A newer template only produces a notice.
     const version = byId && row ? row.templateVersion : t.version;
     const mine = !!row && row.status === "created_draft" && existing.id === row.workflowId;
-    if (mine && !/publish|active/i.test(existing.status)) {
+    if (mine && c.autoPublish !== false && !/publish|active/i.test(existing.status)) {
       const pub = await publishGated(c, existing.id, lines);
       if (pub === "failed") return { state: "ready", message: "The workflow exists but could not be published. Publish it in your CRM.", workflowId: existing.id, lines };
       if (pub === "would") return { state: "would_create", message: `Would publish the workflow "${t.name}".`, workflowId: existing.id, lines };
@@ -78,24 +99,25 @@ export async function provision(t: Template, c: Ctx): Promise<Result> {
 
   // 2. Step types, resolved now. A step that does not exist is a clear message, never a guess.
   const types = await c.client.stepTypes();
-  if (!types.ok) { await save({ status: "unavailable", lastError: types.kind }); return unavailable(types, lines); }
+  if (!types.ok) { await save({ status: "unavailable", lastError: types.kind }); return unavailable(types, lines, hand); }
   const steps = resolveSteps(types.value);
-  if (!steps.ok) { await save({ status: "unavailable", lastError: "step_missing" }); return { state: "unavailable", code: "step_missing", message: `Your CRM does not offer these workflow steps yet: ${steps.missing.join(", ")}. The steps below take about five minutes.`, lines }; }
+  if (!steps.ok) { await save({ status: "unavailable", lastError: "step_missing" }); return { state: "unavailable", code: "step_missing", message: `Your CRM does not offer these workflow steps yet: ${steps.missing.join(", ")}. The steps below take about five minutes.`, lines, steps: hand }; }
   const def = t.build({ folderName: c.settings.folderName, tag: c.settings.tag, assign: c.settings.assign, steps });
 
   // 3. Create (folder and workflow in one call), then publish. Both gated, 2 seconds apart.
   const live = isLive("WRITE_GHL_LIVE", env) && c.optedIn;
   if (live) {
     const v = await c.client.validate(def);
-    if (!v.ok) { await save({ status: "unavailable", lastError: v.kind }); return unavailable(v, lines); }
+    if (!v.ok) { await save({ status: "unavailable", lastError: v.kind }); return unavailable(v, lines, hand); }
     await gap();
   }
   const made = await outward({ flag: "WRITE_GHL_LIVE", verb: "CREATE", what: "workflow.create", installationId: c.installationId, ids: { locationId: c.locationId, template: t.key } }, () => c.client.create(def), gate(c, live));
   if (!made.live) { lines.push(made.line); return { state: "would_create", message: `Would create folder "${c.settings.folderName}" and workflow "${t.name}".${live ? "" : " Nothing was sent: automatic setup is switched off for this account."}`, lines }; }
-  if (!made.result.ok) { await save({ status: "unavailable", lastError: made.result.kind }); return unavailable(made.result, lines); }
+  if (!made.result.ok) { await save({ status: "unavailable", lastError: made.result.kind }); return unavailable(made.result, lines, hand); }
   const id = made.result.value.id;
   await auditLive(c, "workflow.create", { locationId: c.locationId, workflowId: id });
   await save({ status: "created_draft", workflowId: id, folderId: made.result.value.folderId });
+  if (c.autoPublish === false) return { state: "created", message: `Created "${t.name}" in the "${c.settings.folderName}" folder as a draft. Publish it in your CRM when you are ready.`, workflowId: id, lines };
   await gap();
   const pub = await publishGated(c, id, lines);
   if (pub === "ok") { await save({ status: "active", workflowId: id, folderId: made.result.value.folderId }); return { state: "created", message: `Created "${t.name}" in the "${c.settings.folderName}" folder and published it.`, workflowId: id, lines }; }

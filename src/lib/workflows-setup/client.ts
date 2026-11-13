@@ -14,6 +14,8 @@ export interface WfClient {
   validate(def: Record<string, unknown>): Promise<Res<null>>;
   create(def: Record<string, unknown>): Promise<Res<{ id: string; folderId: string | null }>>;
   publish(id: string): Promise<Res<null>>;
+  /** Used only by the probe script, to remove its own throwaway draft. The provisioner never deletes anything. */
+  remove?(id: string): Promise<Res<null>>;
 }
 
 export function mapFailure(status: number, body: unknown): Fail {
@@ -42,12 +44,21 @@ export function httpClient(token: string, locationId: string, fetchImpl?: typeof
   return {
     async stepTypes() { const r = await call("GET", `/workflows/step-types?${q}`); return ok(r.status) ? { ok: true, value: parseStepTypes(r.json) } : mapFailure(r.status, r.json); },
     async list() {
-      const r = await call("GET", `/workflows/?${q}&limit=100`);
-      if (!ok(r.status)) return mapFailure(r.status, r.json);
-      return { ok: true, value: parseSearch(r.json, locationId).items.map((w) => ({ id: w.workflowId, name: w.name, status: w.status, folderId: w.folderId })) };
+      // Up to 5 pages of 100. A page that adds nothing new (the answer ignored the offset) ends the loop, so the worst case is one repeated read.
+      const seen = new Map<string, Found>();
+      for (let page = 0; page < 5; page++) {
+        const r = await call("GET", `/workflows/?${q}&limit=100&offset=${page * 100}`);
+        if (!ok(r.status)) return page === 0 ? mapFailure(r.status, r.json) : { ok: true, value: [...seen.values()] };
+        const items = parseSearch(r.json, locationId).items;
+        const before = seen.size;
+        for (const w of items) if (!seen.has(w.workflowId)) seen.set(w.workflowId, { id: w.workflowId, name: w.name, status: w.status, folderId: w.folderId });
+        if (items.length < 100 || seen.size === before) break;
+      }
+      return { ok: true, value: [...seen.values()] };
     },
     async validate(def) { const r = await call("POST", `/workflows/definition/validate?${q}`, def); return ok(r.status) ? { ok: true, value: null } : mapFailure(r.status, r.json); },
     async create(def) { const r = await call("POST", `/workflows/?${q}`, def); const got = idOf(r.json); return ok(r.status) && got.id ? { ok: true, value: got } : mapFailure(r.status, r.json); },
+    async remove(wid) { const r = await call("DELETE", `/workflows/${encodeURIComponent(wid)}?${q}`); return ok(r.status) ? { ok: true, value: null } : mapFailure(r.status, r.json); },
     async publish(wid) { const r = await call("PUT", `/workflows/${encodeURIComponent(wid)}/status?${q}`, { status: "published" }); return ok(r.status) ? { ok: true, value: null } : mapFailure(r.status, r.json); },
   };
 }

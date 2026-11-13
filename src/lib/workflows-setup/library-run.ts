@@ -4,7 +4,7 @@ import { writeEnabledFor } from "../analytics/cleanup-config";
 import { locationAccessToken } from "../sync/engine";
 import { httpClient } from "./client";
 import { preview, type PlanInput, type Preview } from "./library";
-import { getSetupSettings, storeFor } from "./run";
+import { getSetupSettings, grantedFor, storeFor } from "./run";
 import { provision, type Result } from "./provisioner";
 import type { Template } from "./templates";
 
@@ -30,7 +30,7 @@ export async function installOne(t: Template, a: { installationId: string; compa
   const token = await locationAccessToken(a.companyId, a.locationId);
   const optedIn = await writeEnabledFor(a.installationId, a.locationId);
   return provision(t, {
-    client: httpClient(token, a.locationId), store: storeFor(a.installationId, a.locationId), installationId: a.installationId, locationId: a.locationId, optedIn, manual: true,
+    client: httpClient(token, a.locationId), store: storeFor(a.installationId, a.locationId), installationId: a.installationId, locationId: a.locationId, optedIn, manual: true, granted: await grantedFor(a.installationId), autoPublish: st.s.autoPublish,
     settings: { folderName: st.s.folderName, tag: t.defaultTag, assign: st.s.assignMode === "user" && st.s.assignUserId ? { mode: "user", userId: st.s.assignUserId } : { mode: "round_robin" } },
   });
 }
