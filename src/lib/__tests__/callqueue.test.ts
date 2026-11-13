@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { BATCH_MAX, cleanQueueTag, DEFAULT_TAG, planQueue, planSend, statusLine, type Cand, type Cfg } from "../dial/callqueue.ts";
+import { CLICK_MAX, cleanQueueTag, DEFAULT_TAG, planQueue, planSend, statusLine, type Cand, type Cfg } from "../dial/callqueue.ts";
 import { execute } from "../dial/callqueue-exec.ts";
 import type { CrmRequest, WriteResult } from "../ghl/crm-writes.ts";
 
@@ -51,9 +51,9 @@ test("un-tag: a lead that no longer qualifies (called, replied, booked) leaves t
   assert.deepEqual(p.remove, ["L1:gone"]);
 });
 
-test("manual send: top of the list, never beyond 50, never a lead already queued", () => {
+test("manual send: top of the list, never beyond 25, never a lead already queued", () => {
   const many = Array.from({ length: 80 }, (_, i) => cand(`c${i}`));
-  assert.equal(planSend(many, new Set(), none, { ...cfg, maxPerRun: 99, maxPerDay: 500, writeBudget: 500 }, NOW, 200).add.length, BATCH_MAX);
+  assert.equal(planSend(many, new Set(), none, { ...cfg, maxPerRun: 99, maxPerDay: 500, writeBudget: 500 }, NOW, 200).add.length, CLICK_MAX);
   assert.equal(planSend(many, new Set(["L1:c0"]), none, cfg, NOW, 5).add.some((c) => c.contactId === "c0"), false);
   assert.equal(planSend(many, new Set(), none, cfg, NOW, 5).remove.length, 0);
 });

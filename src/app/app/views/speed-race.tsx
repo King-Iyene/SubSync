@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal, PhoneCall } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { LeadMark, LeadTag, openOnRowClick, ROW_CLICK } from "./speed-lead-row";
 import { useEffect, useState, useMemo } from "react";
 import { raceState, type Score } from "@/lib/analytics/speed-v4";
@@ -18,6 +18,7 @@ import { rowKey, useLeadActions, whyLine, type LeadRow } from "./speed-rows";
 import { TzNote, useListPopup } from "./speed6-base";
 import { delayReasons, type ReasonKey } from "@/lib/analytics/speed6";
 import { DelayChip } from "./delay-chip";
+import { StartCallingButton } from "./power-dialer";
 import "./speed4.css";
 
 // The first screen of Speed to lead: THE RACE ON NEW LEADS. A headline in money, a live clock on every new lead, one button for the lead closest to losing, and a speed ring per account.
@@ -132,7 +133,7 @@ export function RaceTab({ multi, onCall }: { multi: boolean; onCall?: () => void
         <div className="max-w-3xl">
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
             <h2 className="t-display min-w-0 flex-1 basis-64" data-testid="race-headline" aria-live="polite">{headline}</h2>
-            {onCall && <button type="button" onClick={onCall} data-testid="start-calling" className="spd-cta ds-press inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg px-5 text-[15px] font-semibold focus-visible:outline-2 focus-visible:outline-[var(--ring)]"><PhoneCall aria-hidden className="size-4" />Start calling</button>}
+            {onCall && <StartCallingButton list="new_unanswered" onCallMode={onCall} className="spd-cta ds-press inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg px-5 text-[15px] font-semibold focus-visible:outline-2 focus-visible:outline-[var(--ring)]" />}
           </div>
           <p className="t-small t-quiet mt-2" data-testid="race-money">
             This month, <button type="button" className="s6-link font-semibold underline decoration-dotted underline-offset-4" data-tip="Click to see these leads" data-testid="race-leak-link" onClick={() => openList("No person reply, or a slow one", { status: "slow" })}>{l.leads.toLocaleString("en-US")} {l.leads === 1 ? "lead" : "leads"}</button> got no person reply or a slow one

@@ -65,7 +65,7 @@ export function buildSteps(role: GuideRole, f: Facts): Step[] {
   const today: Step = { id: "today", title: "See what needs you today", done: seen("today") || seen("myday"), ticksOn: ["today", "myday"], art: "today", detail: null, view: "today", cta: "Open Today",
     body: "The first screen ranks what to do first, with the reason and a link. Start at the top." };
   const speed: Step = { id: "speed", title: "Find the leads still waiting", done: seen("speed"), ticksOn: ["speed"], art: "speed", detail: null, view: "speed", cta: "Open Speed to lead",
-    body: "Every new lead is timed from the moment it arrives to the first reply from a person. Open the waiting list, call the oldest first, and open the lead in your CRM from there." };
+    body: "Every new lead is timed from the moment it arrives to the first reply from a person. Press Start calling: after a preview, the waiting leads go to your CRM call queue and its power dialer opens. SubSync never places the call." };
   const calendar: Step = { id: "appointments", title: "Check today's appointments", done: seen("appointments"), ticksOn: ["appointments"], art: "calendar", detail: null, view: "appointments", cta: "Open Appointments",
     body: "See appointments that have passed without being marked showed or no-show, and the no-shows still to rebook." };
   const search: Step = { id: "search", title: "Find any contact", done: seen("search") || seen("people"), ticksOn: ["search", "people"], art: "search", detail: null, view: "people", cta: "Open People",

@@ -9,6 +9,7 @@ import { sourceRows } from "../api/dial-routes";
 import { keyOf } from "./dial";
 import { clampCfg, cleanQueueTag, DEFAULT_TAG, planQueue, planSend, WORKFLOW_ID_RE, WRITES_PER_MIN, type Cand, type Plan } from "./callqueue";
 import { execute, type Done, type Route } from "./callqueue-exec";
+import { setupState, type SetupState } from "./powerdialer";
 
 // CRM call queue, server side (docs/features/DIALQUEUE.md). SubSync cannot start a call itself: it fills the CRM's own queue (a tag a customer workflow listens for, or a workflow enrolment)
 // through the one write gateway (WRITE_GHL_LIVE + the account's opt-in; off, every call is a "WOULD WRITE" line). Tables come from the not-yet-applied migration 20261116090000: until it
@@ -54,7 +55,8 @@ export const modeFor = async (installationId: string, locationId: string, demo =
 async function memory(installationId: string, locationId: string) {
   const db = sql();
   const rows = await db`select contact_id, max(at) at, count(*) filter (where at > now() - interval '24 hours' and status = 'saved' and action <> 'remove')::int today from call_queue_log
-    where installation_id = ${installationId} and location_id = ${locationId} and at > now() - interval '24 hours' and status = 'saved' and action <> 'remove' group by contact_id`;
+    where installation_id = ${installationId} and location_id = ${locationId} and at > now() - interval '24 hours' and status = 'saved' and action <> 'remove'
+      and not exists (select 1 from call_queue_log u where u.installation_id = call_queue_log.installation_id and u.location_id = call_queue_log.location_id and u.contact_id = call_queue_log.contact_id and u.action = 'remove' and u.source = 'undo' and u.status = 'saved' and u.at > call_queue_log.at) group by contact_id`;
   const last = new Map(rows.map((r) => [`${locationId}:${r.contact_id as string}`, new Date(r.at as string).getTime()]));
   return { last, addedToday: rows.length };
 }
@@ -98,17 +100,19 @@ export async function preview(installationId: string, locationId: string, o: { a
 }
 
 /** Carries a plan out through the one write gateway. Off (switch or opt-in): a dry run, nothing sent, nothing recorded as queued. */
-export async function apply(a: { installationId: string; companyId: string; locationId: string; actor: string | null; source: "auto" | "manual"; plan: Plan; settings: Settings; demo?: boolean }): Promise<Done & { live: boolean }> {
+export async function apply(a: { installationId: string; companyId: string; locationId: string; actor: string | null; source: "auto" | "manual" | "undo"; plan: Plan; settings: Settings; demo?: boolean }): Promise<Done & { live: boolean; sentIds: string[] }> {
   const route = routeOf(a.settings);
   const mode = await modeFor(a.installationId, a.locationId, a.demo);
   const db = sql();
-  if (!route) return { added: 0, removed: 0, wouldAdd: 0, wouldRemove: 0, failed: 0, needsPermission: false, stoppedEarly: false, live: mode.live };
+  if (!route) return { added: 0, removed: 0, wouldAdd: 0, wouldRemove: 0, failed: 0, needsPermission: false, stoppedEarly: false, live: mode.live, sentIds: [] };
   const write = async (request: Parameters<typeof writeToCrm>[0]["request"], contactId: string, op: string) => {
     const r = await writeToCrm({ installationId: a.installationId, locationId: a.locationId, contactId, request, token: () => locationAccessToken(a.companyId, a.locationId) }, mode.optedIn ? {} : { env: {} });
     await recordWrite({ installationId: a.installationId, actor: a.actor, locationId: a.locationId, contactId, op, fields: Object.keys(request.body), result: r.outcome }).catch(() => undefined);
     return r;
   };
+  const sentIds: string[] = [];
   const done = await execute(a.plan, route, write, async (x) => {
+    if (x.status === "saved" && x.action !== "remove") sentIds.push(x.contactId);
     if (x.status === "dry_run") return;
     await db`insert into call_queue_log (installation_id, location_id, contact_id, action, source, status) values (${a.installationId}, ${a.locationId}, ${x.contactId}, ${x.action}, ${a.source}, ${x.status})`.catch(() => undefined);
     if (x.status === "saved" && route.route === "tag") {
@@ -119,7 +123,7 @@ export async function apply(a: { installationId: string; companyId: string; loca
     }
   });
   if (mode.live) await db`update call_queue_settings set last_run_at = now(), last_added = ${done.added} where installation_id = ${a.installationId} and location_id = ${a.locationId}`.catch(() => undefined);
-  return { ...done, live: mode.live };
+  return { ...done, live: mode.live, sentIds };
 }
 
 /** The scheduled path (the existing sync cron): every account with Auto switched on and not paused, each held to 30 writes a run. */
@@ -166,4 +170,62 @@ export async function status(installationId: string, locationIds: string[]) {
     }
     return { ready: true, accounts: out };
   } catch (e) { if (missing(e)) return { ready: false, accounts: [] }; throw e; }
+}
+
+// ---- Power dialer hand-off (docs/features/DIALQUEUE.md) ----
+
+const WF_NAMES = ["call queue (tag)", "call queue"];
+
+/** Is the call queue workflow in place for this account? Reads only. The workflow list needs the optional workflows permission; without it the answer rests on "Mark as set up" and on seeing a tagged lead lose its tag again. */
+export async function readyState(installationId: string, companyId: string, locationId: string, demo = false): Promise<{ state: SetupState; tag: string; marked: boolean; observed: boolean; listed: "published" | "draft" | "missing" | "unreadable"; canMark: boolean }> {
+  const { s } = await getSettings(installationId, locationId);
+  if (demo) return { state: "not_sure", tag: s.tag, marked: false, observed: false, listed: "unreadable", canMark: false };
+  const db = sql();
+  let marked = false, canMark = true;
+  try { const [r] = await db`select workflow_marked_at from call_queue_settings where installation_id = ${installationId} and location_id = ${locationId}`; marked = !!r?.workflow_marked_at; } catch (e) { if (missing(e)) canMark = false; else throw e; }
+  let observed = false;
+  try {
+    const [o] = await db`select count(*)::int n from call_queue_log l join cached_contacts c on c.installation_id = l.installation_id and c.location_id = l.location_id and c.contact_id = l.contact_id
+      where l.installation_id = ${installationId} and l.location_id = ${locationId} and l.action = 'add' and l.status = 'saved' and l.at between now() - interval '14 days' and now() - interval '3 minutes'
+        and not exists (select 1 from unnest(coalesce(c.tags, '{}')) t where lower(t) = ${s.tag.toLowerCase()})
+        and not exists (select 1 from call_queue_log r where r.installation_id = l.installation_id and r.location_id = l.location_id and r.contact_id = l.contact_id and r.action = 'remove' and r.at > l.at)`;
+    observed = (o?.n ?? 0) > 0;
+  } catch (e) { if (!missing(e)) throw e; }
+  let listed: "published" | "draft" | "missing" | "unreadable" = "unreadable";
+  try {
+    const r = await listWorkflows({ token: await locationAccessToken(companyId, locationId), locationId }, 300);
+    if (r.ok) {
+      const hit = r.value.filter((w) => WF_NAMES.includes(String(w.name).trim().toLowerCase()));
+      listed = hit.length === 0 ? "missing" : hit.some((w) => /publish|active/i.test(String(w.status))) ? "published" : "draft";
+    }
+  } catch { /* unreadable */ }
+  return { state: setupState({ listed, marked, observed }), tag: s.tag, marked, observed, listed, canMark };
+}
+
+/** "Mark as set up" / "Not set up": the person says they built (or removed) the workflow. Stored per account; it only changes what SubSync says, never the CRM. */
+export async function markSetup(installationId: string, locationId: string, done: boolean): Promise<{ ok: boolean; message?: string }> {
+  const cur = await getSettings(installationId, locationId);
+  if (!cur.ready) return { ok: false, message: "This needs the latest database update, which has not run yet." };
+  try {
+    await sql()`insert into call_queue_settings (installation_id, location_id, tag, workflow_marked_at, updated_at) values (${installationId}, ${locationId}, ${cur.s.tag}, ${done ? new Date() : null}, now())
+      on conflict (installation_id, location_id) do update set workflow_marked_at = excluded.workflow_marked_at, updated_at = now()`;
+    return { ok: true };
+  } catch (e) { if (missing(e)) return { ok: false, message: "This needs the latest database update, which has not run yet." }; throw e; }
+}
+
+/** Undo the last batch: takes the call tag off the leads the person names, but only leads SubSync itself added by hand in the last 24 hours and has not already taken off. Through the same gateway. */
+export async function undoBatch(a: { installationId: string; companyId: string; locationId: string; actor: string | null; contactIds: string[]; demo?: boolean }): Promise<{ ok: boolean; removed: number; wouldRemove: number; message: string; live: boolean }> {
+  const { ready, s } = await getSettings(a.installationId, a.locationId);
+  const mode = await modeFor(a.installationId, a.locationId, a.demo);
+  if (!ready) return { ok: false, removed: 0, wouldRemove: 0, live: false, message: "This needs the latest database update, which has not run yet." };
+  if (s.route !== "tag") return { ok: false, removed: 0, wouldRemove: 0, live: mode.live, message: "Nothing to undo: your call queue uses a workflow enrolment, which SubSync cannot take back." };
+  const ids = [...new Set(a.contactIds)].slice(0, 100);
+  const rows = ids.length ? await sql()`select distinct l.contact_id from call_queue_log l where l.installation_id = ${a.installationId} and l.location_id = ${a.locationId} and l.contact_id = any(${ids}::text[])
+      and l.action = 'add' and l.source = 'manual' and l.status = 'saved' and l.at > now() - interval '24 hours'
+      and not exists (select 1 from call_queue_log r where r.installation_id = l.installation_id and r.location_id = l.location_id and r.contact_id = l.contact_id and r.action = 'remove' and r.at > l.at)` : [];
+  const ok = rows.map((r) => r.contact_id as string);
+  if (ok.length === 0) return { ok: false, removed: 0, wouldRemove: 0, live: mode.live, message: "Nothing to undo: these leads were not sent from here in the last 24 hours, or were already taken off." };
+  const plan: Plan = { add: [], remove: ok.map((c) => `${a.locationId}:${c}`), skipped: { dnd: 0, noPhone: 0, outsideHours: 0, recent: 0, cap: 0 }, sendNote: "" };
+  const d = await apply({ installationId: a.installationId, companyId: a.companyId, locationId: a.locationId, actor: a.actor, source: "undo", plan, settings: s, demo: a.demo });
+  return { ok: true, removed: d.removed, wouldRemove: d.wouldRemove, live: d.live, message: d.live ? `Took the call tag off ${d.removed} ${d.removed === 1 ? "lead" : "leads"}.${d.failed ? ` ${d.failed} could not be changed.` : ""}` : `Would take the tag off ${ok.length} ${ok.length === 1 ? "lead" : "leads"}. Nothing was changed: writing to your CRM is switched off here.` };
 }

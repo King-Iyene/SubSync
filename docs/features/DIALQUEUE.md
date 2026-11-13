@@ -50,3 +50,20 @@ SubSync cannot start a call itself. The call queue is the CRM's own dialer: SubS
 - Un-tag on outcome or reply: a lead leaves the queue when it falls off the lists (called, answered, booked, replied where the list excludes replies, asked not to be contacted). Webhook-triggered fill is not built: the cron path is every few minutes (INFERENCE: closer to 45 to 60 s needs the fast delta path hooked in).
 - The CRM's own smart list on the tag `call-now` is a live view of the queue.
 - Adding to the queue cannot be undone from SubSync; the screen says so.
+
+## 2. One click to the power dialer (13 Nov 2026)
+
+Customer view: a setter or owner presses Start calling in Speed to lead (or Send to power dialer in Call mode), checks one preview, confirms once, and lands on the CRM's own Manual Actions page, where its "Let's Start" power dialer runs. Without it they would copy leads into the queue by hand.
+
+VERIFIED live by King (test account): a hand-built workflow "Call queue (tag)" (trigger Contact Tag added call-now; Manual Action: Call; Remove Contact Tag call-now) turns a tag added from SubSync's contact panel into a Manual Actions task (type Call, Yet To Start). SubSync cannot place calls or start the dialer by API.
+
+Flow (`src/app/app/views/power-dialer.tsx`, `src/lib/dial/powerdialer.ts`):
+1. Button asks `cq-ready` per account: the workflow state. Not set up: the 5 hand-built steps, Copy steps, Mark as set up (nothing is sent). Not sure: goes on with a warning. Set up: goes on.
+2. `cq-preview`: the top leads of the list. Rules: lead's own calling hours, do-not-disturb, no phone, sent in the last 24 hours, already carrying the tag; at most 25 per click (CLICK_MAX, across accounts), the rest wait for the next click and the screen says how many. Text: "Send 12 leads to your CRM call queue. They get the tag call-now; your CRM adds a call task for each."
+3. Confirm: the new tab is reserved inside the click (a browser refuses a tab opened after waiting for the server); `cq-send` tags through the one gateway (`writeToCrm`: WRITE_GHL_LIVE plus the account's opt-in, idempotent, one audit line per write); when something was tagged the tab goes to the Manual Actions deep link (`links.ts`, white-label domain). Writes off: a dry run, nothing tagged, the tab is closed and the screen says nothing was changed. A blocked pop-up (or a frame that may not open tabs) shows the link "Open your CRM call queue".
+4. After sending, the leads sent are listed with Open buttons and Undo (`cq-undo`: removes the tag, only for leads SubSync added by hand in the last 24 hours and not already taken off; they are released from the 24-hour memory). Undo cannot delete a call task the CRM already made; the screen says so.
+5. The tag is the account's configured tag (default call-now). A lead that already has the tag is not sent again (tagging it changes nothing, so the workflow would not fire); the workflow's last step removes the tag so that lead can be sent later. The screen explains this.
+
+Setup state (`setupState`): the workflow list wins when the optional workflows permission is granted (found by name "Call queue (tag)" or "Call queue", published = set up, missing or draft = not set up). Without it: "Mark as set up" (stored in `call_queue_settings.workflow_marked_at`, migration 20261231160000, additive), or a lead SubSync tagged lost the tag again within 14 days (INFERENCE: the workflow removed it; the contact cache can lag), otherwise "not sure".
+
+Not built: reading the CRM's Manual Actions tasks directly (no documented endpoint), so success is judged by the tag disappearing, not by seeing the task.

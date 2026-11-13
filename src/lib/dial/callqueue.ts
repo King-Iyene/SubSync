@@ -9,7 +9,8 @@ export const DEFAULT_TAG = "call-now";
 export const TAG_RE = /^[a-z0-9][a-z0-9 _-]{1,48}$/i;
 export const cleanQueueTag = (v: unknown): string => (typeof v === "string" && TAG_RE.test(v.trim()) ? v.trim().toLowerCase() : DEFAULT_TAG);
 export const WORKFLOW_ID_RE = /^[A-Za-z0-9-]{8,64}$/;
-export const BATCH_MAX = 50; // one manual send
+export const BATCH_MAX = 50; // the most one manual send could ever carry
+export const CLICK_MAX = 25; // the most one click on "Send to power dialer" carries (the rest waits for the next click)
 export const RUN_MAX = 25; // default per automatic run
 export const DAY_MAX = 100; // default per day
 export const WRITES_PER_MIN = 30; // the per-company write limit this feature stays under
@@ -58,9 +59,9 @@ export function planQueue(cands: readonly Cand[], tagged: ReadonlySet<string>, l
   return { add, remove, skipped, sendNote: `Would add ${n} ${n === 1 ? "lead" : "leads"} to your call queue${remove.length ? ` and take ${remove.length} off` : ""}.` };
 }
 
-/** A manual send: the top `limit` of a chosen list (or the ticked people), same guards, nobody tagged or enrolled twice. Nothing is taken off. */
-export function planSend(cands: readonly Cand[], tagged: ReadonlySet<string>, lastAdded: ReadonlyMap<string, number>, cfg: Cfg, now: number, limit = BATCH_MAX): Plan {
-  const p = planQueue(cands.filter((c) => !tagged.has(c.key)), new Set<string>(), lastAdded, { ...cfg, maxPerRun: Math.min(limit, BATCH_MAX) }, now);
+/** A manual send (one click, never more than CLICK_MAX = 25): the top `limit` of a chosen list (or the ticked people), same guards, nobody tagged or enrolled twice. Nothing is taken off. */
+export function planSend(cands: readonly Cand[], tagged: ReadonlySet<string>, lastAdded: ReadonlyMap<string, number>, cfg: Cfg, now: number, limit = CLICK_MAX): Plan {
+  const p = planQueue(cands.filter((c) => !tagged.has(c.key)), new Set<string>(), lastAdded, { ...cfg, maxPerRun: Math.min(limit, CLICK_MAX) }, now);
   return { ...p, remove: [], sendNote: `Would add ${p.add.length} ${p.add.length === 1 ? "lead" : "leads"} to your call queue.` };
 }
 

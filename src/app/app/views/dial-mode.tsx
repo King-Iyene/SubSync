@@ -140,7 +140,7 @@ function DialInner() {
         <h2 className="text-xl font-semibold tracking-tight">Who do I call next?</h2>
         <InfoTip label="How calling works here" testId="dial-how" text="Calls go through your CRM's own phone, with your own number and provider. SubSync costs nothing extra for calling: it puts the people in order, feeds them to you one at a time, and writes down how each call went." />
       </div>
-      <p className="s6-sub">Pick a list and press Start. SubSync never places a call.</p>
+      <p className="s6-sub">Pick a list and press Start, or press Send to power dialer to fill your CRM call queue and open its dialer. SubSync never places a call.</p>
       <TzNote />
       <div className="cm-seg" role="group" aria-label="Choose a list">
         {(d?.lists ?? [{ id: "missed", label: "Missed calls, no callback", help: "" }]).map((l) => {

@@ -82,7 +82,7 @@ test("Start calling on the Race opens Call mode, whose tab carries New until it 
   await open(page, "/app#speed");
   await tab(page, "Race").click();
   await expect(page.getByTestId("call-new")).toBeVisible({ timeout: 90_000 });
-  await page.getByTestId("start-calling").click();
+  await page.getByTestId("start-calling-mode").click();
   await expect(page.getByRole("tab", { name: /^Call mode/, selected: true })).toBeVisible();
   await expect(page.getByTestId("call-new")).toHaveCount(0);
 });
