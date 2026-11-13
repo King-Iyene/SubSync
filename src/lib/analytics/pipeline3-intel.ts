@@ -234,6 +234,24 @@ export function buildReplay(days: string[], current: Array<{ stageId: string; co
   return frames.reverse();
 }
 
+/** One group of deal-date events (a deal created, a deal's last step change, a deal won or lost) with its step already matched to the replay's step keys. */
+export type RebuildRow = { day: string; ev: "created" | "stage" | "status"; moved: boolean; status: "won" | "lost" | null; stageKey: string | null; firstKey: string | null; count: number; value: number };
+/**
+ * Day moves rebuilt from the deals' OWN dates when step-by-step history does not reach the window. A deal appears on its created day (in the pipeline's first step when it later moved, else where it is now),
+ * moves to its current step on its last step-change day, and leaves on its won or lost day. Feeding these to buildReplay gives frames whose last day is exactly today's stock.
+ */
+export function rebuiltMoves(rows: RebuildRow[]): DayMove[] {
+  const out: DayMove[] = [];
+  for (const r of rows) {
+    if (!r.stageKey || r.count <= 0) continue;
+    const first = r.firstKey ?? r.stageKey;
+    if (r.ev === "created") out.push({ day: r.day, from: null, to: r.moved ? first : r.stageKey, status: null, count: r.count, value: r.value });
+    else if (r.ev === "stage") { if (first !== r.stageKey) out.push({ day: r.day, from: first, to: r.stageKey, status: null, count: r.count, value: r.value }); }
+    else if (r.status) out.push({ day: r.day, from: r.stageKey, to: null, status: r.status, count: r.count, value: r.value });
+  }
+  return out;
+}
+
 /** Track record of past forecasts: coverage = how often the won dollars landed inside the logged range; bias = forecast mid / actual. Needs 6 forecasts 30 or more days old. */
 export function trackRecord(rows: Array<{ day: string; low: number; mid: number; high: number; actual: number }>): { enough: boolean; coverage: Rate; bias: number | null; months: Array<{ month: string; forecast: number; actual: number }> } {
   const enough = rows.length >= MIN_TRACK;

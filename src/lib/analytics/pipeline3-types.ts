@@ -94,6 +94,8 @@ export type Pl3Replay = {
     moved: Array<{ from: string | null; to: string; count: number; value: number }>; closed?: Array<{ from: string | null; status: "won" | "lost"; count: number; value: number }>;
   }>;
   enough: boolean; historySince: string | null;
+  /** "history" = played from the moves SubSync recorded; "deals" = rebuilt from the deals' own dates (created, last step change, won or lost) because the recorded history does not reach these dates. */
+  source?: "history" | "deals";
 };
 
 export type Pl3Attention = Page<Pl3Row> & {

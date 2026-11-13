@@ -7,8 +7,8 @@ import { dealScopeJoins, outOfScope, valueSuspect } from "./stage-rules-sql";
 import { dealTrust } from "./deal-trust-queries";
 import { TEST_NAME_PATTERN, HOW_LEFT_OUT, HOW_STALE_WORKED_OUT, countingLine, leftOutLine, MIN_STAGE_STAYS, STAGE_LIMIT_CAP_DAYS, STAGE_LIMIT_FLOOR_DAYS } from "./deal-trust";
 import {
-  atRiskEstimate, bucketOf, buildReplay, buildStages, clampSize, coachingLine, DAY, DEFAULT_LIMIT_DAYS, eventText, findLeak, forecastEstimate, headlineOf, healthScore, dealHealth, MIN_CLOSED, MIN_LOST_REASONS,
-  MIN_STAYS, median, money, NO_EST, pickButton, rate, slug, stageKey, stageProbability, trackRecord, velocityEstimate, weightedPipeline, type DayMove, type StageAgg, type StageLoss, type StageMeta,
+  atRiskEstimate, bucketOf, buildReplay, buildStages, rebuiltMoves, clampSize, coachingLine, DAY, DEFAULT_LIMIT_DAYS, eventText, findLeak, forecastEstimate, headlineOf, healthScore, dealHealth, MIN_CLOSED, MIN_LOST_REASONS,
+  MIN_STAYS, median, money, NO_EST, pickButton, rate, slug, stageKey, stageProbability, trackRecord, velocityEstimate, weightedPipeline, type DayMove, type RebuildRow, type StageAgg, type StageLoss, type StageMeta,
   parseDealCursor,
 } from "./pipeline3-intel.ts";
 import type {
@@ -707,8 +707,32 @@ export async function replay(s: Scope, f: Filters, days: number): Promise<Pl3Rep
   };
   const dayList: string[] = [];
   for (let i = n - 1; i >= 0; i--) dayList.push(localDay(end.getTime() - 1 - i * DAY));
-  const frames = buildReplay(dayList, stockOf(cur), movesOf(moves));
-  const framesNv = buildReplay(dayList, stockOf(curNv), movesOf(movesNv));
+  let histMoves = movesOf(moves), histMovesNv = movesOf(movesNv), source: "history" | "deals" = "history";
+  // The recorded history is used only when it reaches back to the first day of the window and has something in it. Otherwise the replay is rebuilt from the deals' own dates (never a dead control).
+  const covers = since?.since instanceof Date && since.since.getTime() <= from.getTime();
+  if (!(covers && (histMoves.length || histMovesNv.length))) {
+    source = "deals";
+    const firstOf = new Map<string, string>();
+    for (const v of sm.values()) if (v.order === 1) firstOf.set(`${v.locationId}|${v.pipelineKey}`, v.key);
+    const rebuild = (cond: Frag, nv: boolean) => db`with ${w}, e as (
+        select d.location_id, d.stage_id cur_stage, d.status, ${nv ? db`0::float8` : db`d.value`} v, d.created_at, d.last_stage_change_at, d.last_status_change_at,
+          (d.last_stage_change_at is not null and d.created_at is not null and (d.last_stage_change_at at time zone ${APP_TZ})::date > (d.created_at at time zone ${APP_TZ})::date
+            and (d.status = 'open' or d.last_status_change_at is null or d.last_stage_change_at <= d.last_status_change_at)) moved
+        from d where ${cond})
+      select (created_at at time zone ${APP_TZ})::date dy, 'created' ev, moved, null::text status, location_id, cur_stage, count(*)::int n, coalesce(sum(v), 0)::float8 v from e where created_at >= ${from} and created_at < ${end} group by 1, 3, 5, 6
+      union all
+      select (last_stage_change_at at time zone ${APP_TZ})::date, 'stage', true, null::text, location_id, cur_stage, count(*)::int, coalesce(sum(v), 0)::float8 from e where moved and last_stage_change_at >= ${from} and last_stage_change_at < ${end} group by 1, 5, 6
+      union all
+      select (last_status_change_at at time zone ${APP_TZ})::date, 'status', false, status, location_id, cur_stage, count(*)::int, coalesce(sum(v), 0)::float8 from e where status in ('won', 'lost') and last_status_change_at >= ${from} and last_status_change_at < ${end} group by 1, 4, 5, 6`;
+    const [rb, rbNv] = await Promise.all([rebuild(db`d.counted`, false), rebuild(db`not d.out_of_scope and not d.is_test and d.value <= 0`, true)]);
+    const rowsOf = (rows: typeof rb): RebuildRow[] => rows.map((r) => {
+      const si = sm.get(`${r.location_id}|${r.cur_stage}`);
+      return { day: day(r.dy), ev: r.ev as RebuildRow["ev"], moved: r.moved === true, status: r.status === "won" || r.status === "lost" ? r.status : null, stageKey: si?.key ?? null, firstKey: si ? firstOf.get(`${si.locationId}|${si.pipelineKey}`) ?? null : null, count: num(r.n), value: num(r.v) };
+    });
+    histMoves = rebuiltMoves(rowsOf(rb)); histMovesNv = rebuiltMoves(rowsOf(rbNv));
+  }
+  const frames = buildReplay(dayList, stockOf(cur), histMoves);
+  const framesNv = buildReplay(dayList, stockOf(curNv), histMovesNv);
   frames.forEach((fr, i) => {
     const nv = framesNv[i]; if (!nv) return;
     const nvBy = new Map(nv.stages.map((x) => [x.stageId, x.count]));
@@ -716,7 +740,7 @@ export async function replay(s: Scope, f: Filters, days: number): Promise<Pl3Rep
     fr.stages = [...ids].map((id) => { const a = fr.stages.find((x) => x.stageId === id); return { stageId: id, count: a?.count ?? 0, value: a?.value ?? 0, noValueCount: nvBy.get(id) ?? 0 }; });
     fr.wonCount += nv.wonCount; fr.lostCount += nv.lostCount; fr.moved = [...fr.moved, ...nv.moved]; fr.closed = [...fr.closed, ...nv.closed];
   });
-  return { days: n, frames, enough: num(since?.n) >= 20, historySince: iso(since?.since) };
+  return { days: n, frames, enough: true, historySince: iso(since?.since), source };
 }
 
 // ---------- weekly receipt ----------
