@@ -114,7 +114,7 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
       case "overview": return <><Overview {...sp} />{drillList}</>;
       case "flow": return filters.pipeline && filters.locationId
         ? <><p className="ap-fine mb-2"><button type="button" className="ap-link" onClick={() => { setPicked(null); setFilters((f) => ({ ...f, pipeline: "" })); }} data-testid="pl-allpipes">All pipelines</button>{picked ? ` / ${picked.account} / ${picked.name}` : ""}</p><MoneyFlow filters={filters} onPick={onPick} />{drillList}</>
-        : <PipelineGrid filters={filters} onOpen={openCard} />;
+        : <PipelineGrid filters={filters} onOpen={openCard} onIncludeTest={(v) => setFilters((f) => ({ ...f, includeTest: v }))} />;
       case "needs": return <NeedsAttention {...sp} />;
       case "wonlost": return <><WonLost {...sp} />{drillList}</>;
       case "people": return <><People {...sp} />{drillList}</>;

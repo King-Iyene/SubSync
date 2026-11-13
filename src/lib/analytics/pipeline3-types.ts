@@ -165,11 +165,15 @@ export type PipeCard = {
   locationId: string; pipelineId: string; accountName: string; name: string;
   openCount: number; openValue: number; wonCount: number; wonValue: number; lostCount: number; lostValue: number;
   staleCount: number; noOwnerCount: number; zeroValueCount: number; outlierCount: number; outlierValue: number; empty: boolean;
+  /** Open deals with a test-looking name (left out of the money unless counted; see Pl3Cards.totals.countsTests). */
+  testCount?: number; testValue?: number;
   mini: Array<{ name: string; value: number }>; // open money per stage in the pipeline's own order; a stage it no longer has is "Other stage"
 };
 export type Pl3Cards = {
   cards: PipeCard[]; next: string | null;
   /** True when the totals come from the live scan because the stored totals are empty or older than two hours (the screen says so). */
   refreshing?: boolean;
-  totals: { pipelines: number; emptyHidden: number; openValue: number; wonValue: number; lostValue: number; openCount: number; wonCount: number; lostCount: number; staleCount: number; noOwnerCount: number };
+  totals: { pipelines: number; emptyHidden: number; openValue: number; wonValue: number; lostValue: number; openCount: number; wonCount: number; lostCount: number; staleCount: number; noOwnerCount: number;
+    /** Deals with a test-looking name, in money and count; how many pipelines in all (empty ones too); and whether they are counted now: by the company's setting, by this screen's toggle, or not. */
+    testCount?: number; testValue?: number; all?: number; countsTests?: "setting" | "toggle" | null };
 };

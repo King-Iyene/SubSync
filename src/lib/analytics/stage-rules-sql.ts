@@ -11,7 +11,7 @@ import {
 // Written for the alias `o` (cached_opportunities). The treatment is the same as treatmentOf() in stage-rules.ts: the owner's rule wins; with
 // none, the name decides.
 
-/** Joins to put after `from cached_opportunities o`. Adds sc_pl (pipeline), sc_st (stage name), sc_pr (pipeline rule) and sc_sr (stage rule). */
+/** Joins to put after `from cached_opportunities o`. Adds sc_pl (pipeline), sc_st (stage name), sc_pr (pipeline rule), sc_sr (stage rule) and sc_cfg (the company's settings row: count_test_deals). */
 export function dealScopeJoins() {
   const db = sql();
   return db`
@@ -21,6 +21,7 @@ export function dealScopeJoins() {
     left join stage_rules sc_pr on sc_pr.installation_id = o.installation_id and sc_pr.pipeline_key = lower(btrim(coalesce(sc_pl.name, ''))) and sc_pr.stage_key = ''
     left join stage_rules sc_sr on sc_sr.installation_id = o.installation_id and sc_sr.pipeline_key = lower(btrim(coalesce(sc_pl.name, '')))
       and sc_sr.stage_key = lower(btrim(coalesce(sc_st.nm, ''))) and sc_sr.stage_key <> ''
+    left join settings sc_cfg on sc_cfg.installation_id = o.installation_id
     ${trustJoins()}`;
 }
 
@@ -57,10 +58,10 @@ export function pipelineLooksLikeOutreach() {
  * Why a valued, owned open deal's dollars are left out, or null when they count: 'test', 'outlier' (a round million, or 100 times the account's median), 'outreach' (the pipeline is a bulk
  * outreach list) or 'default_value' (the same amount on many deals in the stage). A pipeline the owner marked "in use" is never judged outreach or default value. Needs dealScopeJoins().
  */
-export function valueSuspect() {
+export function valueSuspect(includeTest = false) {
   const db = sql();
   return db`(case
-    when coalesce(o.name, '') ~* ${TEST_NAME_PATTERN} or coalesce(o.contact_name, '') ~* ${TEST_NAME_PATTERN} then 'test'
+    when not ${includeTest}::boolean and not coalesce(sc_cfg.count_test_deals, false) and (coalesce(o.name, '') ~* ${TEST_NAME_PATTERN} or coalesce(o.contact_name, '') ~* ${TEST_NAME_PATTERN}) then 'test'
     when o.monetary_value >= ${ROUND_AMOUNT}::numeric and mod(o.monetary_value, ${ROUND_AMOUNT}::numeric) = 0 then 'outlier'
     when sc_md.n >= ${OUTLIER_MIN_DEALS}::numeric and o.monetary_value >= ${OUTLIER_MULTIPLE}::numeric * sc_md.med then 'outlier'
     when ${pipelineLooksLikeOutreach()} then 'outreach'

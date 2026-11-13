@@ -4,7 +4,7 @@ import { rollupCloses, rollupFlow, rollupFresh, rollupHeadline, rollupOpenByStag
 import { ttlCache } from "../ttl-cache";
 import { dealScopeJoins, outOfScope, valueSuspect } from "./stage-rules-sql";
 import { dealTrust } from "./deal-trust-queries";
-import { HOW_LEFT_OUT, HOW_STALE_WORKED_OUT, countingLine, leftOutLine, MIN_STAGE_STAYS, STAGE_LIMIT_CAP_DAYS, STAGE_LIMIT_FLOOR_DAYS } from "./deal-trust";
+import { TEST_NAME_PATTERN, HOW_LEFT_OUT, HOW_STALE_WORKED_OUT, countingLine, leftOutLine, MIN_STAGE_STAYS, STAGE_LIMIT_CAP_DAYS, STAGE_LIMIT_FLOOR_DAYS } from "./deal-trust";
 import {
   atRiskEstimate, bucketOf, buildReplay, buildStages, clampSize, coachingLine, DAY, DEFAULT_LIMIT_DAYS, eventText, findLeak, forecastEstimate, headlineOf, healthScore, dealHealth, MIN_CLOSED, MIN_LOST_REASONS,
   MIN_STAYS, median, money, NO_EST, pickButton, rate, slug, stageKey, stageProbability, trackRecord, velocityEstimate, weightedPipeline, type DayMove, type StageAgg, type StageLoss, type StageMeta,
@@ -34,8 +34,8 @@ const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v ? new Date(
 const day = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
 export const plCache = ttlCache<unknown>(30_000, 300);
 
-/** Whole words that make a deal look like a test (the same words the cleanup rules use for test contacts). A user toggle can include them. */
-const TEST_RE = "(^|[^a-z0-9])(test|testing|demo|dummy|sample|fake)([^a-z0-9]|$)|^xtest-";
+/** Whole words that make a deal look like a test: the one pattern in deal-trust.ts. The company switch (settings.count_test_deals) or the per-screen toggle counts such deals anyway. */
+const TEST_RE = TEST_NAME_PATTERN;
 
 export function locs(s: Scope, location?: string | null): Frag {
   const db = sql();
@@ -58,8 +58,8 @@ export function deals(s: Scope, f: Filters): Frag {
         df.lost_reason_id, df.lost_reason,
         (case when ss.stays >= ${MIN_STAGE_STAYS} and ss.p75_days is not null then greatest(${STAGE_LIMIT_FLOOR_DAYS}::numeric, least(${STAGE_LIMIT_CAP_DAYS}::numeric, ss.p75_days)) end)::float8 limit_days, false limit_est, ss.median_days::float8 norm_days, coalesce(ss.stays, 0) stays,
         extract(epoch from (now() - coalesce(o.last_stage_change_at, o.created_remote_at, o.synced_at))) / 86400 days_in_stage,
-        (coalesce(o.name, '') ~* ${TEST_RE} or coalesce(o.contact_name, '') ~* ${TEST_RE}) is_test,
-        ${outOfScope()} out_of_scope, ${valueSuspect()} suspect
+        ((coalesce(o.name, '') ~* ${TEST_RE} or coalesce(o.contact_name, '') ~* ${TEST_RE}) and not coalesce(sc_cfg.count_test_deals, false)) is_test,
+        ${outOfScope()} out_of_scope, ${valueSuspect(f.includeTest === true)} suspect
       from cached_opportunities o
       join (${locs(s, f.location)}) l on l.location_id = o.location_id
       ${dealScopeJoins()}
