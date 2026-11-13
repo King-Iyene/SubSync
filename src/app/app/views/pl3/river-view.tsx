@@ -2,13 +2,14 @@
 
 import { useMemo, useRef, useState } from "react";
 import type React from "react";
-import { centerPath, particleCounts, pileCards, pileUnit, ribbonPath, riverLayout, MAX_PILE_CARDS, type Pt } from "@/lib/design/river-layout";
+import { centerPath, particleCounts, ribbonPath, riverLayout, type Pt } from "@/lib/design/river-layout";
+import { dotLegend, dotsFor, dotUnit, pileGrid, wrapLabel } from "@/lib/design/funnel-dots";
 import type { ReplayMover } from "@/lib/design/river-replay";
 import type { PathStep } from "@/lib/design/flow-paths";
 import type { PlStage } from "@/lib/analytics/pipeline3-types-interim";
 import { money, moneyShort } from "./format";
 
-// THE RIVER. Cash (or cards, when no deal has a dollar value) flows through the stages as ribbons, piles up where deals sit,
+// THE RIVER. Cash (or dots, when no deal has a dollar value) flows through the stages as ribbons, piles up where deals sit,
 // stops and turns ochre where deals are stuck, drains into a muted channel when lost, and lands in the vault (Won).
 // Drawn from per-stage totals only (never rows), so it is fast with 100k deals. Text lives in SVG text with a halo; every pile, ribbon and drain is a button.
 
@@ -23,7 +24,6 @@ export type RiverProps = {
 };
 type Tip = { x: number; y: number; title: string; lines: string[] };
 
-const trunc = (s: string, n: number) => (s.length > n ? `${s.slice(0, Math.max(1, n - 1))}…` : s);
 const NODE_W = 34;
 
 export function River(p: RiverProps) {
@@ -43,7 +43,7 @@ export function River(p: RiverProps) {
       const pitch = 104, T = Math.max(200, width - 12), L = n * pitch + NODE_W;
       return { L: riverLayout(ins, won, { length: L, thick: T, nodeW: NODE_W, enough }), vertical: true, w: width, h: 34 + L + 56, T, off: 34 };
     }
-    const T = Math.max(220, Math.min(320, Math.round(width * 0.3))), off = 54;
+    const T = Math.max(220, Math.min(320, Math.round(width * 0.3))), off = 70;
     return { L: riverLayout(ins, won, { length: width - 24, thick: T, nodeW: NODE_W, enough }), vertical: false, w: width, h: off + T + 64, T, off };
   }, [stages, counts, enough, width, vertical, p.wonCount, p.wonCents, n]);
 
@@ -73,10 +73,10 @@ export function River(p: RiverProps) {
     if (s.lostCount > 0) a.push(`${s.lostCount} left from here`);
     return a;
   };
-  // ONE scale for every pile: one card per deal (or per bill of money) until a pile would pass MAX_PILE_CARDS, then the scale steps up and the legend says so.
+  // ONE scale for every pile: tiny dots, never one shape per deal. One dot is one deal (or $1) until the whole picture would pass the dot cap, then the scale steps up and the legend says so.
   const scaleOf = (nd: { open: number }) => (counts ? nd.open : nd.open / 100);
-  const cardUnit = pileUnit(L.nodes.map(scaleOf), MAX_PILE_CARDS);
-  const legend = counts ? (cardUnit === 1 ? "1 card = 1 deal" : `1 card = about ${cardUnit.toLocaleString("en-US")} deals (a pile draws at most ${MAX_PILE_CARDS} cards)`) : `1 bill = about ${money(cardUnit * 100)} (the smallest piles still show one bill)`;
+  const cardUnit = dotUnit(L.nodes.map(scaleOf));
+  const legend = dotLegend(cardUnit, !counts);
   const dls = particleCounts(L.links.map((l) => l.th), 60);
   const animate = settle && !reduced;
   const leakTail = L.tails.find((t) => t.leak);
@@ -115,8 +115,9 @@ export function River(p: RiverProps) {
         })}
         {L.nodes.map((nd) => {
           const s = nd.kind === "stage" ? stages[nd.index] : null;
-          const top = nd.ac + nd.flowH, rows = pileCards(scaleOf(nd), cardUnit), step = rows ? Math.max(4, Math.min(12, nd.openH / rows)) : 0;
-          const stuckRows = nd.kind === "stage" && nd.open > 0 && nd.stuck > 0 ? Math.min(rows, Math.max(1, Math.round((rows * nd.stuck) / nd.open))) : 0;
+          const top = nd.ac + nd.flowH, dots = dotsFor(scaleOf(nd), cardUnit), grid = pileGrid(dots, nd.w, nd.openH), rows = grid.rows, step = grid.step;
+          const stuckDots = nd.kind === "stage" && nd.open > 0 && nd.stuck > 0 && dots > 0 ? Math.min(dots, Math.max(1, Math.round((dots * nd.stuck) / nd.open))) : 0;
+          const stuckRows = stuckDots ? rows - Math.floor((dots - stuckDots) / grid.cols) : 0;
           // A pile with nothing in it opens nothing, so it is not a button. An empty Won column is an empty vault, with no card drawn in it.
           const nothing = nd.open <= 0, emptyVault = nd.kind === "won" && nothing;
           const tipLines = s ? stageTip(s) : emptyVault ? ["No wins in these dates"] : [`${unit(nd.open)} won`, "Landed in the vault"];
@@ -131,14 +132,13 @@ export function River(p: RiverProps) {
           }
           return <g key={nd.id} className={`rv-node rv-${nd.kind}`} data-open={nothing ? "0" : "1"} {...hover(s ? s.name : "Won", tipLines)} {...(nothing ? {} : press(go))} aria-label={label} data-testid={nd.kind === "won" ? "pl-vault" : `pl-seg-${nd.id}`}>
             {rows > 0 && <rect className="rv-slot" {...R(nd.al, base, nd.w, rows * step + 2)} rx={3} />}
-            {Array.from({ length: rows }, (_, r) => {
-              const j = ((r * 7) % 3 - 1) * 1.4, bad = r >= rows - stuckRows, h = Math.max(1.5, step - 1.1);
-              return <g key={r} className={`rv-bill${bad ? " rv-bill-stuck" : ""}${counts ? " rv-card" : ""}`} style={{ animationDelay: `${Math.min(900, 120 + r * 18)}ms` }}>
-                <rect {...R(nd.al + 1.5 + j, base + r * step, nd.w - 3 - Math.abs(j), h)} rx={1.6} />
-                {!counts && h >= 5 && <rect className="rv-bill-in" {...R(nd.al + 5 + j, base + r * step + 1.4, nd.w - 10 - Math.abs(j), Math.max(1, h - 2.8))} rx={1} />}
-                {counts && h >= 5 && <rect className="rv-bill-in" {...R(nd.al + 6 + j, base + r * step + h / 2 - 0.6, nd.w - 12 - Math.abs(j), 1.2)} rx={0.6} />}
-              </g>;
-            })}
+            {dots > 0 && <g className={`rv-dots${counts ? " rv-dots-deals" : ""}`} aria-hidden>
+              {Array.from({ length: dots }, (_, i) => {
+                const c = i % grid.cols, r = Math.floor(i / grid.cols), bad = i >= dots - stuckDots;
+                const [cx, cy] = pt(nd.al + (nd.w - grid.cols * step) / 2 + step / 2 + c * step, base + r * step + step / 2);
+                return <circle key={i} className={bad ? "rv-dot rv-dot-stuck" : "rv-dot"} cx={cx} cy={cy} r={grid.r} style={{ animationDelay: `${Math.min(900, 100 + r * 22)}ms` }} />;
+              })}
+            </g>}
             {stuckRows > 0 && <rect className="rv-stuckmark" {...R(nd.al, base + (rows - stuckRows) * step, nd.w, stuckRows * step)} fill="url(#rv-hatch)" rx={2} pointerEvents="none" />}
             {stuckRows > 0 && s && <rect className="rv-stuckhit" {...R(nd.al, base + (rows - stuckRows) * step, nd.w, stuckRows * step)} fill="transparent" onClick={(e) => { e.stopPropagation(); p.onStage(s, true); }} onKeyDown={(e) => e.stopPropagation()} aria-label={`${s.staleCount} stuck deals in ${s.name}. Open them.`} data-testid={`pl-stuck-${nd.id}`}><title>{`${s.staleCount} stuck in ${s.name}`}</title></rect>}
             {stuckRows > 0 && (() => { const [x, y] = pt(nd.al + nd.w / 2, base + (rows - stuckRows) * step); return <g className="rv-stop" transform={`translate(${x} ${y})`} aria-hidden><rect x={-6} y={-8} width={12} height={14} rx={3} /><path d="M-2.5 -5v8M2.5 -5v8" /></g>; })()}
@@ -149,8 +149,8 @@ export function River(p: RiverProps) {
           const s = nd.kind === "stage" ? stages[nd.index] : null, x = pt(nd.al + nd.w / 2, 0)[0];
           const noWins = !s && nd.open === 0;
           const name = s ? s.name : "Won", val = noWins ? (vertical ? "No wins in these dates" : "No wins") : unitShort(nd.open), sub = s ? `${nd.stuck > 0 ? `${s.staleCount} stuck` : ""}` : noWins && !vertical ? "in these dates" : "";
-          if (vertical) { const ly = pt(nd.al, 0)[1]; return <text key={`x${nd.id}`} className="rv-text" x={6} y={ly - 9}><tspan className="rv-name">{trunc(name, 22)}</tspan><tspan className="rv-val" dx={8}>{val}</tspan>{sub && <tspan className="rv-stucktxt" dx={8}>{sub}</tspan>}<title>{`${name}: ${val}`}</title></text>; }
-          return <text key={`x${nd.id}`} className="rv-text" x={x} y={16} textAnchor="middle"><tspan className="rv-name" x={x}>{trunc(name, Math.max(6, Math.floor((width - 24) / (n * 7.2))))}</tspan><tspan className="rv-val" x={x} dy={17}>{val}</tspan>{sub && <tspan className="rv-stucktxt" x={x} dy={14}>{sub}</tspan>}<title>{`${name}: ${val}`}</title></text>;
+          if (vertical) { const ly = pt(nd.al, 0)[1]; return <text key={`x${nd.id}`} className="rv-text" x={6} y={ly - 9}><tspan className="rv-name">{name}</tspan><tspan className="rv-val" dx={8}>{val}</tspan>{sub && <tspan className="rv-stucktxt" dx={8}>{sub}</tspan>}<title>{`${name}: ${val}`}</title></text>; }
+          return <text key={`x${nd.id}`} className="rv-text" x={x} y={16} textAnchor="middle">{wrapLabel(name, Math.max(7, Math.floor((width - 24) / (n * 7.2)))).map((ln, li) => <tspan key={li} className="rv-name" x={x} dy={li === 0 ? 0 : 12}>{ln}</tspan>)}<tspan className="rv-val" x={x} dy={17}>{val}</tspan>{sub && <tspan className="rv-stucktxt" x={x} dy={14}>{sub}</tspan>}<title>{`${name}: ${val}`}</title></text>;
         })}
         {leakTail && enough && (() => {
           const [x, y] = pt(leakTail.al1, leakTail.ac1 + 4), s = stages[leakTail.from];

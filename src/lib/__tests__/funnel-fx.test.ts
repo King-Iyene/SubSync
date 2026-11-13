@@ -67,15 +67,13 @@ test("plain words: tooltip text, initials and the leak line", () => {
   assert.deepEqual(HOW_TO_READ.map((h) => h.kind), ["moved", "lost", "won", "stuck", "waiting"]);
 });
 
-test("the screen: always-visible legend, leak line, motion safety and no vendor words", () => {
-  const v = read("funnel-flow-view.tsx"), css = read("funnel-fx.css");
-  assert.ok(v.includes('data-testid="ff-howto"') && !v.includes("<details"), "how to read is never collapsed");
+test("the screen: leak line, motion safety and no vendor words (the Funnel itself: funnel-dots.test.ts)", () => {
+  const v = read("funnel-dots-view.tsx"), who = read("funnel-flow-view.tsx"), css = read("funnel-fx.css");
   assert.ok(v.includes("LEAK_LINE") && v.includes('data-testid="ff-leakline"'));
-  assert.ok(v.includes("IntersectionObserver") && v.includes("visibilitychange") && v.includes("pauseAnimations"), "pauses off screen and when the tab is hidden");
-  assert.ok(v.includes("motion && L.links.map") && v.includes("reduced"), "no flow dots with reduced motion");
-  assert.ok(v.includes("tabIndex") || v.includes("press("), "bands are keyboard buttons");
+  assert.ok(v.includes("IntersectionObserver") && v.includes("visibilitychange"), "pauses off screen and when the tab is hidden");
+  assert.ok(v.includes("reduced"), "no falling dots with reduced motion");
   assert.match(css, /prefers-reduced-motion: reduce[\s\S]*ff-wipe/);
   assert.ok(css.includes('[data-theme="dark"]') || read("pl3.css").includes('[data-theme="dark"] .ff-wrap'));
-  for (const s of [v, css]) assert.ok(!/gohighlevel|highlevel|\bghl\b/i.test(s));
-  assert.ok(!/Where deals drop out|drop-off/i.test(v), "plain words only");
+  for (const s of [v, who, css]) assert.ok(!/gohighlevel|highlevel|\bghl\b/i.test(s));
+  assert.ok(!/Where deals drop out/i.test(v), "plain words only");
 });
