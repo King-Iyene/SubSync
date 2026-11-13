@@ -128,6 +128,8 @@ export async function scheduleDailyRefresh(): Promise<number> {
     select i.id from installations i
     where i.uninstalled_at is null and not i.is_demo and i.refresh_token_enc is not null
       and not exists (select 1 from sync_jobs j where j.installation_id = i.id and j.status in ('pending', 'running'))
+      -- An install whose account list could not be read (for example a token that no longer decrypts) is tried again after half an hour, not on every five-minute tick for ever.
+      and not exists (select 1 from sync_jobs j where j.installation_id = i.id and j.type = 'locations' and j.status = 'failed' and j.finished_at > now() - interval '30 minutes')
       and (
         coalesce((select max(j.finished_at) from sync_jobs j where j.installation_id = i.id and j.type = 'locations' and j.status = 'done'), 'epoch') < now() - interval '20 hours'
         or (

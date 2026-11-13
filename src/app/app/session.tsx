@@ -1,6 +1,7 @@
 "use client";
 
 import { onDataChanged } from "./data-changed";
+import { quietRefreshDelay } from "@/lib/sync/incremental";
 import { plainError } from "@/lib/design/plain-error";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
@@ -194,9 +195,11 @@ export function useData<T>(path: string | null) {
 
   // Only the newest request of this screen may answer: an older one that is still stuck must not overwrite a retry that came back.
   const seq = useRef(0);
+  const lastRead = useRef(0); // when this screen last asked the server (a background change is not re-read sooner than a minute after it)
   const run = useCallback(async (fresh: boolean, quiet = false) => {
     if (path === null) return;
     const mine = ++seq.current;
+    lastRead.current = Date.now();
     const key = `${api.scope ?? ""}#${rangeKeyOfPath(path)}`;
     // A quiet re-read (after a sync landed): ask the server again, keep what is on screen untouched until the answer arrives (no spinner, no skeleton, no jump), and keep it if the read fails.
     if (quiet) {
@@ -222,7 +225,24 @@ export function useData<T>(path: string | null) {
   const load = useCallback(() => run(true), [run]);
 
   // After any sync lands (automatic, real-time, manual or full) every open read of this screen is asked again quietly. Counts and lists come from the same answer, so they still agree.
-  useEffect(() => (path === null ? undefined : onDataChanged(() => { void run(true, true); })), [path, run]);
+  // A person's sync re-reads at once. A background change (the server finishes a read every few minutes on a busy account) is held back: at most one quiet re-read a minute per screen, spread out so the
+  // screen's reads do not all hit the server together, and not at all while the tab is hidden (it re-reads when the tab comes back). Before this every finished background read made every open screen reload.
+  useEffect(() => {
+    if (path === null) return undefined;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let waiting = false;
+    const go = () => { timer = null; waiting = false; lastRead.current = Date.now(); void run(true, true); };
+    const off = onDataChanged((d) => {
+      const delay = quietRefreshDelay({ force: d.force === true, nowMs: Date.now(), lastReadMs: lastRead.current, spread01: Math.random() });
+      if (delay === null) { if (timer) clearTimeout(timer); go(); return; }
+      if (timer || waiting) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") { waiting = true; return; }
+      timer = setTimeout(go, delay);
+    });
+    const onVisible = () => { if (waiting && document.visibilityState === "visible") { waiting = false; timer = setTimeout(go, quietRefreshDelay({ force: false, nowMs: Date.now(), lastReadMs: lastRead.current, spread01: Math.random() }) ?? 0); } };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { off(); document.removeEventListener("visibilitychange", onVisible); if (timer) clearTimeout(timer); };
+  }, [path, run]);
 
   useEffect(() => {
     // Subscribing to the server for this path; the result is stored when it arrives.

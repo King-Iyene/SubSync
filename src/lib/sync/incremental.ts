@@ -63,6 +63,15 @@ export function liveStatus(i: { hidden: boolean; pending: number; failed: boolea
   return i.pending > 0 ? "catching" : "live";
 }
 
+export const QUIET_REFRESH_GAP_MS = 60_000; // a screen re-reads quietly after a background change no more often than this
+export const QUIET_REFRESH_SPREAD_MS = 3_000; // and spread over this long, so ten reads on one screen do not all hit the server in the same instant
+
+/** When a screen should re-read after a background "data changed" signal: null = now (a person pressed sync), otherwise a delay in ms. Never sooner than the gap since its last read, so a busy account whose sync finishes every few minutes does not keep every screen reloading; `spread01` (0..1) staggers the screens. */
+export function quietRefreshDelay(i: { force: boolean; nowMs: number; lastReadMs: number; spread01: number }): number | null {
+  if (i.force) return null;
+  return Math.max(0, i.lastReadMs + QUIET_REFRESH_GAP_MS - i.nowMs) + Math.round(i.spread01 * QUIET_REFRESH_SPREAD_MS);
+}
+
 /** "12 seconds ago", "3 minutes ago". */
 export function agoWords(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
