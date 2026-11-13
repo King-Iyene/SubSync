@@ -237,6 +237,8 @@ export const FEATURES = [
   "ai_deal_followup",
   "ai_deal_winloss",
   "ai_deal_forecast",
+  "slack_chat",
+  "ai_slack_reports",
   "st_settings",
   "st_guides",
   "st_news",

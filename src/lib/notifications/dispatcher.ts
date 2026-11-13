@@ -45,6 +45,8 @@ export type Intent = {
   details?: string[];
   alertId?: string | null;
   link?: Link;
+  /** The specific words of an alert (alert-text.ts). Used unless the person wrote their own wording for this kind. */
+  specific?: { title: string; body: string; details: string[]; link: Link; linkLabel: string; meta: Record<string, unknown> };
 };
 
 export type Row = {
@@ -112,8 +114,11 @@ export type PlanReport = { planned: number; held: number; duplicates: number; sk
 
 /** The words of one message, from the person's wording (or the default) and the values. */
 export function itemFor(intent: Intent, pref: Pref): Item {
+  const sp = intent.specific;
+  const custom = Boolean(pref.copy && ((pref.copy.title && pref.copy.title.trim()) || (pref.copy.body && pref.copy.body.trim())));
+  if (sp && !custom) return { title: sp.title, body: sp.body, details: sp.details.slice(0, 16), severity: intent.severity, link: sp.link, linkLabel: sp.linkLabel, meta: sp.meta };
   const copy = renderCopy(intent.type, resolveCopy(intent.type, pref.copy), intent.values);
-  return { title: copy.title, body: copy.body, details: (intent.details ?? []).slice(0, 16), severity: intent.severity, link: intent.link ?? { view: CATALOG[intent.type].openView, locationId: intent.locationId } };
+  return { title: copy.title, body: copy.body, details: [...(sp?.details ?? []), ...(intent.details ?? [])].slice(0, 16), severity: intent.severity, link: sp?.link ?? intent.link ?? { view: CATALOG[intent.type].openView, locationId: intent.locationId }, ...(sp ? { linkLabel: sp.linkLabel, meta: sp.meta } : {}) };
 }
 
 type Target = { channel: Channel; target: string };

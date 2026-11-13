@@ -3,6 +3,7 @@ import { postToSlack } from "../notify";
 import { connectError, MESSAGE } from "./messages";
 import { completeDestination } from "../notifications/store";
 import { destinationLabel } from "../notifications/slack";
+import { saveLink as saveChatLink } from "../slack-chat/store";
 import {
   authorizeUrl, deleteFathomWebhook, exchangeSlack, keysFor, redirectUri, revokeZoom,
 } from "./oauth";
@@ -23,7 +24,7 @@ export function startLink(provider: Provider, s: OAuthState): { ok: true; url: s
   const keys = keysFor(provider);
   const base = appUrl();
   if (!keys || !base) return { ok: false, error: `Connecting ${NAMES[provider]} is not switched on yet. It needs the ${NAMES[provider]} app set up first.` };
-  return { ok: true, url: authorizeUrl(provider, { clientId: keys.clientId, redirectUri: redirectUri(base, provider), state: signState(s) }) };
+  return { ok: true, url: authorizeUrl(provider, { clientId: keys.clientId, redirectUri: redirectUri(base, provider), state: signState(s), chat: provider === "slack" && process.env.SLACK_CHAT_SCOPES === "true" }) };
 }
 
 type Done = { ok: true; message: string } | { ok: false; error: string; code?: string; providerCode?: string };
@@ -37,6 +38,9 @@ export async function completeSignIn(provider: Provider, code: string, s: OAuthS
   if (!keys || !base) return connectError("P-OFF", NAMES[provider]);
   const got = await exchangeSlack(code, keys, redirectUri(base, provider), f);
   if (!got.ok) return got;
+  // With chat scopes granted, remember which company (or single account) this workspace belongs to. A workspace already linked to another company is left as it was.
+  // The link is only ever read when the slack_chat flag is on, so saving it is harmless while chat is off.
+  if (got.bot) await saveChatLink({ installationId: s.installationId, locationId: s.onlyLocationId, teamId: got.bot.teamId, channelId: got.bot.channelId, botToken: got.bot.token, botUserId: got.bot.userId, actor: s.actor }).catch(() => false);
   // A channel added from Notifications (F9): the waiting row made when the person pressed "Add to Slack" is completed. Several channels, one sign-in each.
   if (s.destinationId) {
     const saved = await completeDestination(s.installationId, s.destinationId, { webhookUrl: got.webhookUrl, label: destinationLabel(got.team, got.channel) }, s.actor);

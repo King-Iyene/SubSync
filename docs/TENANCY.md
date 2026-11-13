@@ -39,6 +39,7 @@ A person in one client account never sees another client account's data. An agen
 | `api/sso` | signature | Shared-secret decryption; role from the payload only; staff refused |
 | `api/webhooks/ghl` | signature | Ed25519 signature on the raw body; duplicate ids dropped; bad signature gets 401 and changes nothing |
 | `api/hooks/zoom` | signature | Zoom signature with a freshness window |
+| `api/slack/events` | signature | Slack signature over the raw body with the signing secret, 5 minute window, event ids claimed once; tenant only from the linked workspace (flag `slack_chat`, default off) |
 | `api/hooks/workflow/action` | secret | Shared secret header (constant-time) from the CRM's custom action call; tenant resolved only from the verified body; per-account opt-in; contact must belong to the account |
 | `api/hooks/workflow/subscription` | secret | Same shared secret; target address must be https on the CRM's workflow host |
 | `api/cron/workflow-triggers` | secret | Bearer CRON_SECRET |

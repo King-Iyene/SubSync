@@ -1,5 +1,6 @@
 "use client";
 
+import "@/lib/design/boot-hash";
 import { TODAY_FONTS } from "./views/today-fonts";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -28,6 +29,7 @@ import { useTheme } from "./ds/theme";
 import { remember, remembered } from "./ds/remember";
 import { ApiProvider, makeApi, type Api } from "./session";
 import { LeadDrawerHost } from "./ds/lead-drawer-host";
+import { AskRowsLinkHost } from "./views/ask-rows-link";
 const AppointmentInsights = dynamic(() => import("./views/appointment-insights").then((m) => m.AppointmentInsights), { ssr: false });
 import { sampleOn as dqSample } from "./views/dq/dq-data";
 import { GlobalSearch } from "./views/global-search";
@@ -600,6 +602,7 @@ export function Dashboard() {
         </div>
       </div>
       <LeadDrawerHost />
+      <AskRowsLinkHost />
       </StProvider>
     </ApiProvider>
   );

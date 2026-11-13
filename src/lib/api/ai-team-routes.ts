@@ -22,7 +22,7 @@ import { ownedLocation } from "./tenant-guard";
 
 type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
 type Deps = { allowed: () => Promise<string[] | null> };
-const FLAG = { report_summary: "ai_report", lead_story: "ai_leads", coach_note: "ai_coach", anomaly_explain: "ai_anomaly", meeting_summary: "ai_meeting", one_thing: "ai_one_thing" } as const satisfies Record<TeamJobId, string>;
+const FLAG = { report_summary: "ai_report", lead_story: "ai_leads", coach_note: "ai_coach", anomaly_explain: "ai_anomaly", meeting_summary: "ai_meeting", one_thing: "ai_one_thing", alert_report: "ai_slack_reports" } as const satisfies Record<TeamJobId, string>;
 export const TEAM_FLAGS = Object.values(FLAG);
 
 const body = async (ctx: Ctx): Promise<Record<string, unknown>> => { try { const x = await ctx.request.json(); return x && typeof x === "object" ? (x as Record<string, unknown>) : {}; } catch { return {}; } };

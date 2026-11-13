@@ -10,6 +10,7 @@ import { countedInScope, dealIsStale, dealScopeJoins } from "../../analytics/sta
 import { addDays, dayStartMs, isRealDay, localDay, windowMs, zoneWord } from "../../design/zone";
 import { coverageFor, coverageFindings, findingsFor, rankFindings } from "../../workflows/health";
 import { accountNames, loadItems } from "../../workflows/store";
+import { factsFor, factsText } from "../../notifications/alert-text";
 import type { AiTool, Tenant, ToolResult } from "../tools";
 
 // The READ-ONLY analytics whitelist for "Ask your data" and the data review (docs/AI_JOBS_SPEC.md). Every tool wraps one of OUR existing query functions; there is no raw SQL from a model and no write.
@@ -282,6 +283,23 @@ const DEFS: Def[] = [
           }
           return out;
         },
+      };
+    },
+  },
+  {
+    name: "alerts_report", description: "SubSync's alerts for the client accounts. view=open: alerts still open now (as of now). view=in_window: alerts raised inside the date bar's window. Use it for 'what alerts fired today?' and to explain an alert: the top alerts come with the facts behind them (counts, window, usual level, biggest causes).",
+    props: { view: { type: "string", enum: ["open", "in_window"], description: "open (default) or in_window." } },
+    async build(t, a) {
+      const db = sql(), ids = await idsOnly(t), w = windowOf(t), inWindow = a.view === "in_window";
+      const cond = inWindow ? db`a.created_at >= ${new Date(w.fromMs)} and a.created_at <= ${new Date(w.toMs)}` : db`a.resolved_at is null`;
+      const base = db`from alerts a join locations l on l.installation_id = a.installation_id and l.location_id = a.location_id and not l.ignored where a.installation_id = ${t.installationId} and a.location_id = any(${ids}::text[]) and a.recipient_user_key is null and a.severity <> 'info' and ${cond}`;
+      const [s] = await db`select count(*)::int c, count(*) filter (where a.severity = 'critical')::int crit ${base}`;
+      const top = await db`select a.kind, a.severity, a.title, a.detail, a.id, a.location_id, l.name loc ${base} order by case a.severity when 'critical' then 0 else 1 end, a.created_at desc limit 5`;
+      const facts = top.map((r) => factsText(factsFor({ id: r.id as string, kind: r.kind as string, severity: r.severity as "warning" | "critical", title: r.title as string, locationId: r.location_id as string, detail: (r.detail ?? {}) as Record<string, unknown> }, nameFor(t, "Account", (r.loc as string | null) ?? "Account"))));
+      return {
+        summary: { view: inWindow ? "in_window" : "open", asOfNow: !inWindow, alerts: n(s?.c), critical: n(s?.crit), topAlertFacts: facts }, total: n(s?.c), columns: ["Account", "Alert", "Kind", "Severity", "Raised", "Status"],
+        page: async (o, l) => (await db`select l.name loc, a.title, a.kind, a.severity, a.created_at, a.resolved_at ${base} order by a.created_at desc, a.id limit ${l} offset ${o}`)
+          .map((r) => [(r.loc as string | null) ?? "Account", r.title as string, r.kind as string, r.severity as string, iso(r.created_at), r.resolved_at ? "Cleared" : "Open"]),
       };
     },
   },

@@ -9,6 +9,7 @@ export const ROUTE_GUARDS: RouteGuard[] = [
   { route: "api/webhooks/ghl", kind: "signature", guard: "Ed25519 signature on the raw body; duplicates dropped by webhook id. Unsigned or wrongly signed requests get 401 and change nothing." },
   { route: "api/hooks/zoom", kind: "signature", guard: "Zoom's signature over the body with the app's secret token, with a freshness window; unsigned requests refused." },
   { route: "api/hooks/fathom/[key]", kind: "token", guard: "A long random key per connection plus the provider's signature. An unknown key returns 404." },
+  { route: "api/slack/events", kind: "signature", guard: "Slack's signature over the raw body with the app's signing secret (constant-time), five minute freshness window, event ids claimed once; the tenant comes only from the linked workspace (flag slack_chat, default off). Unsigned requests are refused." },
   { route: "api/hooks/meeting/[token]", kind: "token", guard: "A private address token stored only as a hash; an unknown token returns 404." },
   { route: "api/integrations/ai/callback", kind: "state", guard: "A single-use random state made when the signed-in administrator pressed Connect, valid ten minutes and deleted as it is read; it names the company, the connection and the person. An unknown, used or expired state shows an error and changes nothing." },
   { route: "api/integrations/[provider]/callback", kind: "state", guard: "A signed, expiring state value tied to the installation that started the sign-in; a forged state returns 400." },
