@@ -85,3 +85,12 @@ span.fv-n { cursor: default; text-decoration: none; }
 @media (prefers-reduced-motion: reduce) {
   .fv-pt { display: none; } .fv-bone, .fv-replaychip i { animation: none; } .fv-svg { animation: none !important; transform: none !important; } [data-settle="1"] .rv-dot { animation: none; }
 }
+
+/* Deals with no dollar value: a hatched outline and a hatched count, so they are shown but never mistaken for money. */
+.fv-hatch { stroke: color-mix(in srgb, var(--foreground) 45%, transparent); stroke-width: 1.2; stroke-dasharray: 4 3; pointer-events: none; }
+.fv-hatch-line { stroke: color-mix(in srgb, var(--foreground) 22%, transparent); stroke-width: 1; }
+.fv-nvchip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .6875rem; font-weight: 600; border: 1px dashed color-mix(in srgb, var(--foreground) 45%, transparent); color: var(--foreground);
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--foreground) 12%, transparent) 0 3px, transparent 3px 6px); }
+button.fv-nvchip { cursor: pointer; }
+.fv-nvlabel { margin: 0 0 8px; padding: 6px 12px; border-radius: 10px; font-size: .8125rem; font-weight: 600; border: 1px dashed color-mix(in srgb, var(--foreground) 45%, transparent);
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--foreground) 8%, transparent) 0 4px, transparent 4px 8px); }

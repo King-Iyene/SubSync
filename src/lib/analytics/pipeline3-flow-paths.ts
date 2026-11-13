@@ -30,13 +30,16 @@ export async function flowPaths(s: Scope, f: Filters, opts: { people: boolean })
   const base: Filters = { ...f, bucket: null, stage: null, stageKey: null, reachOrd: null };
   const w = deals(s, base), win = flowWin(db, base);
   // The Funnel (fw=1): open deals count only when created or moved step in the dates, grouped by the step they are in now, so 7, 30 and 90 days give different numbers.
-  const aw = f.flowWindow ? db`and ${inWindow(db, f)}` : db``;
-  const [byStage, [won], owners, sources, label, [hist]] = await Promise.all([
-    db`with ${w} select d.location_id, d.stage_id,
+  const byStageQ = (windowed: boolean) => {
+    const aw = windowed ? db`and ${inWindow(db, f)}` : db``;
+    return db`with ${w} select d.location_id, d.stage_id,
         count(*) filter (where ${P_OPEN(db)} ${aw})::int open_n, coalesce(sum(d.value) filter (where ${P_OPEN(db)} ${aw}), 0)::float8 open_v, count(*) filter (where ${P_NO_VALUE(db)} ${aw})::int nv_n,
         count(*) filter (where ${P_STALE(db)} ${aw})::int stuck_n, coalesce(sum(d.value) filter (where ${P_STALE(db)} ${aw}), 0)::float8 stuck_v,
         count(*) filter (where d.status = 'lost' and ${win})::int lost_n, coalesce(sum(d.value) filter (where d.status = 'lost' and ${win}), 0)::float8 lost_v
-      from d group by 1, 2`,
+      from d group by 1, 2`;
+  };
+  const [byStage0, [won], owners, sources, label, [hist]] = await Promise.all([
+    byStageQ(!!f.flowWindow),
     db`with ${w} select count(*)::int n, coalesce(sum(d.value), 0)::float8 v,
         percentile_cont(0.5) within group (order by extract(epoch from (d.last_status_change_at - d.created_at)) / 86400) filter (where d.created_at is not null and d.last_status_change_at >= d.created_at) med
       from d where d.status = 'won' and ${win}`,
@@ -45,6 +48,12 @@ export async function flowPaths(s: Scope, f: Filters, opts: { people: boolean })
     names(s.inst),
     db`select min(h.at) since from deal_history h where h.installation_id = ${s.inst} and h.kind in ('created', 'stage') and h.location_id in (select x.location_id from (${locs(s, f.location)}) x)`,
   ]);
+  // Nothing entered or moved in the dates and nothing closed in them: show where the open deals are NOW instead of an empty picture (nowOnly says so).
+  let byStage = byStage0, nowOnly = false;
+  if (f.flowWindow && num(won?.n) === 0 && byStage.every((r) => num(r.open_n) + num(r.nv_n) + num(r.lost_n) === 0)) {
+    const now = await byStageQ(false);
+    if (now.some((r) => num(r.open_n) + num(r.nv_n) > 0)) { byStage = now; nowOnly = true; }
+  }
   const since = hist?.since ? new Date(hist.since as string) : null;
   let lostElsewhere = 0;
   for (const r of byStage) {
@@ -63,6 +72,7 @@ export async function flowPaths(s: Scope, f: Filters, opts: { people: boolean })
       bySource: seg(sources as Array<Record<string, unknown>>, (k) => (k === "none" ? "No source recorded" : k)),
     },
     lostElsewhere, minDeals: MIN_CLOSED,
+    ...(nowOnly ? { nowOnly: true } : {}),
     history: { since: since ? since.toISOString() : null, covers: since !== null && since.getTime() <= f.from.getTime() },
   };
 }

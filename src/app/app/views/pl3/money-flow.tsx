@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { riverLayout } from "@/lib/design/river-layout";
 import { buildReplayFrames, nextFrame, REPLAY_SPEEDS, replayHasMovement } from "@/lib/design/river-replay";
 import { sampleFlowPaths, sampleFunnelPaths, sampleRiver } from "@/lib/design/river-sample";
-import { dealsText, lostTotal as lostAllOf, pathSteps, type FlowPaths, type PathSeg, type PathStep } from "@/lib/design/flow-paths";
+import { dealsText, lostTotal as lostAllOf, pathSteps, pathsAllNoValue, type FlowPaths, type PathSeg, type PathStep } from "@/lib/design/flow-paths";
 import type { Measure } from "@/lib/design/funnel-flow-layout";
 import type { PlDrain, PlMoneyFlow, PlStage } from "@/lib/analytics/pipeline3-types-interim";
 import { useData } from "../../session";
@@ -73,6 +73,8 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
   const pathsReq = useData<{ paths: FlowPaths | null }>(pathsKey);
   const samplePaths = useMemo(() => (sample && sampleData ? sampleFlowPaths(sampleData) : null), [sample, sampleData]);
   const paths: FlowPaths | null = sample ? samplePaths : pathsReq.data?.paths ?? null;
+  // Paths where no deal carries money (even in a pipeline that has some elsewhere): the funnel counts deals and says so.
+  const pathsNoMoney = !!paths && !sample && pathsAllNoValue(paths);
   const ready = data !== null && data.stages.length > 0;
   useEffect(() => {
     const el = wrap.current; if (!el) return;
@@ -82,7 +84,7 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
   useEffect(() => { if (!settle) return; const t = setTimeout(() => setSettle(false), 5600); return () => clearTimeout(t); }, [settle, run]);
   // No deal has a dollar value (and we are not showing the sample): count deals so the screen is never blank.
   const counts = noValued && !sample;
-  const measure: Measure = counts || fm !== "money" ? "deals" : "money";
+  const measure: Measure = counts || pathsNoMoney || fm !== "money" ? "deals" : "money";
   const frames = useMemo(() => (data && replayHasMovement(data.replay) ? buildReplayFrames(data.replay ?? [], data.stages, counts) : null), [data, counts]);
   const replayOn = !!frames && !person;
   const cur = replayOn && frame !== null ? frames[Math.min(frame, frames.length - 1)] : null;
@@ -129,7 +131,7 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
 
   const pickStage = (s: PlStage, stale = false) => onPick({ title: stale ? `${s.name}, stuck deals` : `${s.name}, open deals`, count: stale ? s.staleCount : s.count, params: { stageId: s.id, stale, ownerId: person || undefined } });
   const pickNoValue = (s: PlStage) => onPick({ title: `${s.name}, deals without a value`, count: s.noValueCount ?? 0, params: { stageId: s.id, bucket: "no_value" } });
-  const noValueSteps = person || cur ? [] : view.stages.filter((s) => (s.noValueCount ?? 0) > 0);
+  const noValueSteps = person || cur || flowView === "funnel" ? [] : view.stages.filter((s) => (s.noValueCount ?? 0) > 0);
   const pickWon = () => onPick({ title: "Won deals", count: view.wonCount, params: { status: "won", ownerId: person || undefined } });
   const pickLostFrom = (s: PlStage) => onPick({ title: `Lost from ${s.name}`, count: s.lostCount, params: { stageId: s.id, status: "lost", ownerId: person || undefined } });
   const pickLost = (d?: PlDrain) => onPick(d ? { title: `Lost: ${d.reason}`, count: d.count, params: { status: "lost", lostReason: d.reason } } : { title: "Lost deals", count: view.drains.reduce((a, x) => a + x.count, 0), params: { status: "lost" } });
@@ -157,7 +159,7 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
   return (
     <div className="pl-flow" data-testid="pl-flow" aria-busy={loading}>
       {sample && <p className="ap-fine mb-2 rv-sample" role="status" data-testid="pl-example-banner"><b>SAMPLE.</b> These are made-up deals so you can see how the river moves. They are not your deals, and clicking them opens nothing. <button type="button" className="ap-link" onClick={stopSample} data-testid="pl-example-off">Back to my deals</button></p>}
-      {counts && <p className="ap-fine mb-2" role="status" data-testid="pl-counts-note">Showing deal counts: no deal here has a dollar value yet. Add a value to a deal and the money appears. <button type="button" className="ap-link" onClick={startSample} data-testid="pl-example-on">See an example with money</button></p>}
+      {counts && <p className="ap-fine mb-2" role="status" data-testid="pl-counts-note">{flowView === "river" ? "These deals have no value, so this shows deal counts, not money. " : ""}Add a value to a deal and the money appears here too.{flowView === "river" && <> <button type="button" className="ap-link" onClick={startSample} data-testid="pl-example-on">See an example with money</button></>}</p>}
       <div className="pl-flow-bar">
         <h3 className="pl-flow-title">{data.pipelineName}<span className="ap-sub"> · {sample ? data.periodLabel : `${bar.label}, ${zoneWord()} time`}</span></h3>
         <div className="pl-viewtog" role="group" aria-label="Choose the picture" data-testid="pl-viewtog">
@@ -167,7 +169,7 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
         {flowView === "funnel" && (
           <div className="pl-viewtog" role="group" aria-label="Count deals or money" data-testid="pl-ff-measure">
             <button type="button" className="pl-vt" aria-pressed={measure === "deals"} onClick={() => setFm("deals")} data-testid="pl-ff-deals">Deals</button>
-            <button type="button" className="pl-vt" aria-pressed={measure === "money"} disabled={counts} title={counts ? "No deal here has a dollar value yet" : undefined} onClick={() => setFm("money")} data-testid="pl-ff-money">Money</button>
+            <button type="button" className="pl-vt" aria-pressed={measure === "money"} disabled={counts || pathsNoMoney} title={counts || pathsNoMoney ? "No deal here has a dollar value yet" : undefined} onClick={() => setFm("money")} data-testid="pl-ff-money">Money</button>
           </div>
         )}
         <label className="sr-only" htmlFor="pl-person">Whose deals</label>
@@ -204,8 +206,9 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
           {pathsReq.error && !sample ? <ErrorState error={pathsReq.error} onRetry={pathsReq.reload} />
             : !paths ? (pathsReq.data ? <p className="ap-fine" role="status" data-testid="ff-nopipe">No steps were found for this pipeline, so there is no funnel to draw.</p> : <FunnelSkeleton width={Math.max(300, width)} />)
             : <DotFunnel paths={sample ? sampleFunnelPaths() : (cur && pathsAtFrame(paths, cur)) || paths} sample={sample || (!!cur && !!pathsAtFrame(paths, cur))} replayLabel={cur && pathsAtFrame(paths, cur) ? cur.date : null} measure={measure} width={Math.max(300, width)} reduced={reduced} windowLabel={sample ? data.periodLabel : `${bar.label}, ${zoneWord()} time`}
-                onReach={(i) => { const st = paths.stages[i]; const n = pathSteps(paths, measure === "deals"); if (i >= paths.stages.length) return pickWon(); onPick({ title: `${dealsText(n[i].fromN)} got to ${st.name} or further`, count: n[i].fromN, params: { reach: st.id, fc: measure === "deals", fw: true, ownerId: person || undefined } }); }}
-                onWaiting={(i, stuck) => { const st = paths.stages[i], n = pathSteps(paths, measure === "deals")[i]; onPick(stuck ? { title: `${st.name}, stuck deals`, count: st.stuck, params: { stageId: st.id, flowOpen: true, fs: true, fw: true, ownerId: person || undefined } } : { title: `${st.name}, still here`, count: n.stillHere, params: { stageId: st.id, flowOpen: true, fc: measure === "deals", fw: true, ownerId: person || undefined } }); }}
+                onReach={(i) => { const st = paths.stages[i]; const n = pathSteps(paths, measure === "deals"); if (i >= paths.stages.length) return pickWon(); onPick({ title: `${dealsText(n[i].fromN)} got to ${st.name} or further`, count: n[i].fromN, params: { reach: st.id, fc: measure === "deals", fw: !paths.nowOnly, ownerId: person || undefined } }); }}
+                onNoValue={(i) => { const st = paths.stages[i]; onPick({ title: `${st.name}, deals without a value`, count: st.noValue, params: { stageId: st.id, bucket: "no_value", fw: !paths.nowOnly, ownerId: person || undefined } }); }}
+                onWaiting={(i, stuck) => { const st = paths.stages[i], n = pathSteps(paths, measure === "deals")[i]; onPick(stuck ? { title: `${st.name}, stuck deals`, count: st.stuck, params: { stageId: st.id, flowOpen: true, fs: true, fw: !paths.nowOnly, ownerId: person || undefined } } : { title: `${st.name}, still here`, count: n.stillHere, params: { stageId: st.id, flowOpen: true, fc: measure === "deals", fw: !paths.nowOnly, ownerId: person || undefined } }); }}
                 onLost={(i) => { const st = paths.stages[i]; onPick({ title: `Lost from ${st.name}`, count: st.lost, params: { stageId: st.id, status: "lost", ownerId: person || undefined } }); }}
                 onLostAll={() => onPick({ title: "Lost deals", count: lostAllOf(paths), params: { status: "lost", ownerId: person || undefined } })}
                 onWon={() => onPick({ title: "Won deals", count: paths.won.n, params: { status: "won", ownerId: person || undefined } })}

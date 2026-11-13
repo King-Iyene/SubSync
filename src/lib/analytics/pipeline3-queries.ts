@@ -117,7 +117,7 @@ function bucketCond(db: Db, s: Scope, f: Filters): Frag {
     case "healthy": return db`and ${P_OPEN(db)} and not d.stale`;
     case "outlier": return db`and d.outlier`;
     case "no_owner": return db`and ${P_NO_OWNER(db)}`;
-    case "no_value": return db`and ${P_NO_VALUE(db)}`;
+    case "no_value": return db`and ${P_NO_VALUE(db)} ${f.flowWindow ? db`and ${inWindow(db, f)}` : db``}`;
     case "test": return db`and d.is_test and d.status = 'open' and not d.out_of_scope`;
     case "won": return db`and d.status = 'won' and ${win}`;
     case "lost": return db`and d.status = 'lost' and ${win}`;
