@@ -114,8 +114,9 @@ test("Slack message is specific, links to the exact list, and the person's own w
   const item = itemFor(intent, pref);
   const text = composeSlack([item], { company: "Co", appUrl: "https://app.test" });
   assert.match(text, /Sample Dental: 9 new leads have waited more than 15 minutes/);
-  assert.match(text, /\|Open the waiting leads>$/);
-  assert.match(text, /app#speed\?accounts=loc123\|/);
+  assert.match(text, /\|Open the waiting leads in your CRM>$/);
+  assert.match(text, /<https:\/\/app\.gohighlevel\.com\/v2\/location\/loc123\/conversations\/conversations\|/);
+  assert.doesNotMatch(text, /app\.test/);
   assert.doesNotMatch(text, /Open the linked page/);
   const own = itemFor(intent, { ...pref, copy: { title: "Custom {account}", body: null } });
   assert.match(own.title, /^Custom Sample Dental/);

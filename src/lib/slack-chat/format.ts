@@ -25,7 +25,7 @@ export function formatAnswer(r: Extract<AskResult, { ok: true }>, o: { appUrl: s
   const out = [esc(r.answer.answer)];
   if (r.answer.citations.length) {
     out.push("", "*Where this comes from*");
-    for (const c of r.answer.citations.slice(0, 6)) out.push(`• ${esc(c.label)}: ${esc(c.value)} (${c.rowCount.toLocaleString("en-US")} ${c.rowCount === 1 ? "row" : "rows"}) <${rowsLink(o.appUrl, c.rowsHash, c.label, o.locationId)}|Open the rows>`);
+    for (const c of r.answer.citations.slice(0, 6)) out.push(`• ${esc(c.label)}: ${esc(c.value)} (${c.rowCount.toLocaleString("en-US")} ${c.rowCount === 1 ? "row" : "rows"}) <${rowsLink(o.appUrl, c.rowsHash, c.label, o.locationId)}|Open the rows in SubSync>`);
   }
   out.push("", `_${esc(r.window)}. Answered from your numbers. Nothing was sent or changed._`);
   return out.join("\n");
@@ -36,8 +36,8 @@ const SETTINGS = (appUrl: string) => `${appUrl.replace(/\/+$/, "")}/app#connecti
 /** What a refused question says, in plain words and with the link to fix it where there is one. */
 export function formatRefusal(code: string, message: string, appUrl: string): string {
   switch (code) {
-    case "no_connection": return `AI is not connected yet. Connect your AI key here: <${SETTINGS(appUrl)}|Connections>.`;
-    case "needs_attention": return `Your AI key needs attention. Replace it here: <${SETTINGS(appUrl)}|Connections>.`;
+    case "no_connection": return `AI is not connected yet. Connect your AI key here: <${SETTINGS(appUrl)}|Connections in SubSync>.`;
+    case "needs_attention": return `Your AI key needs attention. Replace it here: <${SETTINGS(appUrl)}|Connections in SubSync>.`;
     case "killed": return "AI answers are switched off right now.";
     case "paused": case "job_off": return "AI answers are switched off for this account.";
     case "cap": return "This month's AI limit for your account has been reached, so I cannot answer until it renews or the limit is raised.";

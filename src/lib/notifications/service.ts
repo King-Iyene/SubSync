@@ -66,7 +66,7 @@ export async function loadContext(installationId: string): Promise<Loaded> {
   const company = settings.brandName ?? (inst?.name as string | undefined) ?? "Your company";
   const fallbackZone = (zone[0]?.timezone as string | undefined) ?? null;
   const ctx: Context = {
-    installationId, mode, company, logoUrl: settings.brandLogoUrl, appUrl: appUrl(), fallbackZone, pref: (t) => prefs[t], destinations: asDispatchDestinations(destinations), stopUrl: stopUrlFor(installationId),
+    installationId, mode, company, logoUrl: settings.brandLogoUrl, appUrl: appUrl(), crmDomain: settings.appDomain, fallbackZone, pref: (t) => prefs[t], destinations: asDispatchDestinations(destinations), stopUrl: stopUrlFor(installationId),
   };
   return { ctx, prefs, destinations, mode, company, fallbackZone, legacy, lastDailyOn: (last[0]?.d as string | null) ?? null, lastWeeklyOn: (last[0]?.w as string | null) ?? null };
 }
@@ -295,4 +295,4 @@ export async function sendEmailTest(installationId: string, l: Loaded, type: Not
   return sendTestMail(to, pref.recipients, mail, testSendDeps(installationId, l.ctx.stopUrl, () => isLive("SEND_EMAIL_LIVE")));
 }
 
-export const sampleSlack = (l: Loaded, type: NotificationType) => composeSlack([sampleItem(type, l.prefs[type])], { company: l.company, appUrl: appUrl(), test: true });
+export const sampleSlack = (l: Loaded, type: NotificationType) => composeSlack([sampleItem(type, l.prefs[type])], { company: l.company, appUrl: appUrl(), crmDomain: l.ctx.crmDomain, test: true });
