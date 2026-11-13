@@ -26,7 +26,7 @@ import { createKey, listKeys, MAX_KEYS, revokeKey } from "../mcp/store";
 import { postToSlack } from "../notify";
 import { changedLine, runState, stepRows, SYNC_THROTTLE_MS, throttle, type RunStatus } from "../sync/run-status";
 import { enqueueFullSync, enqueueHardSync, enqueueJobs, enqueueLocationSync, enqueueQuickSync, runSlice, syncStatus } from "../sync/engine";
-import { autoKinds, mayCheck, orderAccounts } from "../sync/incremental";
+import { AUTO_SLICE_MS, AUTO_SLICE_WORKERS, autoKinds, mayCheck, orderAccounts } from "../sync/incremental";
 import { readDataVersion } from "../sync/data-version";
 import { freshnessFor, syncPanel } from "../sync/freshness-queries";
 import {
@@ -1609,7 +1609,6 @@ async function syncStart(ctx: Ctx) {
   return json({ ok: true, ...slice, full, status: await syncStatus(ctx.installationId) });
 }
 
-const AUTO_SLICE_MS = 6_000;
 // The automatic check: called when SubSync opens, when the tab comes back and about once a minute while it is visible. For the account on screen first (then the ones checked longest ago,
 // at most five) it queues the cheap incremental reads, never twice for one account (the queue refuses a duplicate while one is pending or running), and works them for a few seconds.
 // Nothing changed = one small read per kind and no refresh signal. Returns the data version: when it moves, the screen re-reads its own data.
@@ -1634,7 +1633,7 @@ async function syncAuto(ctx: Ctx) {
     const row = rows.find((r) => r.location_id === id);
     await enqueueQuickSync(ctx.installationId, [id], autoKinds({ nowMs: now, conversationsSyncedMs: ms(row?.conversations_synced_at) }));
   }
-  if (pick.length > 0) await runSlice(AUTO_SLICE_MS, { installationId: ctx.installationId, locationId: ctx.limitTo ?? null, focusLocationId: focus, concurrency: SYNC_WORKERS });
+  if (pick.length > 0) await runSlice(AUTO_SLICE_MS, { installationId: ctx.installationId, locationId: ctx.limitTo ?? null, focusLocationId: focus, concurrency: AUTO_SLICE_WORKERS });
   const scopeIds = focus ? [focus] : ids;
   const [[p], [f], [u]] = await Promise.all([
     db`select count(*)::int n from sync_jobs where installation_id = ${ctx.installationId} and status in ('pending', 'running') and location_id = any(${scopeIds}::text[])`,
