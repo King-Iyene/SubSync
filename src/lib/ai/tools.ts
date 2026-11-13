@@ -8,7 +8,17 @@ import type { ToolSpec } from "./providers";
 //   - a result carries the numbers and a `rows` link (the exact list in the app), so an answer can cite its numbers and open the rows; a count must equal the number of rows it opens.
 // No tool is registered yet: this PR ships the platform and the 7 am brief writer. A job that lists tool names its registry does not hold is refused.
 
-export type Tenant = { installationId: string; /** Null means the whole company; a string means that one client account only. */ locationId: string | null };
+export type Tenant = {
+  installationId: string; /** Null means the whole company; a string means that one client account only. */ locationId: string | null;
+  /** The client accounts this person may see when the company view is limited (agency staff). Null: all of the company's. Set by the server from the verified session. */
+  allowed?: string[] | null;
+  /** The date bar's window (days, inclusive, in the app's one time zone: docs/DATE_RULES.md). Set by the server from the request; the model cannot pick dates. */
+  range?: { from: string; to: string };
+  /** Names (accounts, team members) go to the model only after the account's own opt-in; otherwise tools use stable aliases and the server swaps the real names back for display. */
+  shareNames?: boolean;
+  /** alias -> real name, filled by tools as they alias; used by the caller to restore names in the answer shown to the person. */
+  aliases?: Map<string, string>;
+};
 export type ToolResult = {
   /** Plain numbers and short rows the model may quote. */
   data: unknown;
@@ -39,7 +49,7 @@ export async function runTool(registry: Record<string, AiTool>, allowed: readonl
   const parsed = tool.parse(call.args);
   if (!parsed.ok) return refuse(parsed.error);
   try {
-    const r = await tool.run({ installationId: tenant.installationId, locationId: tenant.locationId }, parsed.args);
+    const r = await tool.run({ installationId: tenant.installationId, locationId: tenant.locationId, allowed: tenant.allowed, range: tenant.range, shareNames: tenant.shareNames, aliases: tenant.aliases }, parsed.args);
     const content = JSON.stringify({ data: r.data, rowCount: r.rowCount }).slice(0, MAX_RESULT_CHARS);
     return { content, ok: true, name: call.name, rowsHash: r.rowsHash, rowCount: r.rowCount };
   } catch {

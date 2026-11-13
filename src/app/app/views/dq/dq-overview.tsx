@@ -9,6 +9,7 @@ import { ScoreRing } from "../cleanup-parts";
 import { sampleOn, SAMPLE, useDq, type Opts, type Overview } from "./dq-data";
 import type { LeadsPick } from "./dq-leads";
 import { SortingGate, type GatePick } from "./sorting-gate";
+import { AiDataCards } from "../ai-data-cards";
 
 // OVERVIEW: one headline, four big numbers, the sorting gate (where leads go), the quality score with its four parts, and the accounts that need cleaning first. Numbers first, words last.
 
@@ -55,6 +56,7 @@ export function OverviewTab({ opts, account, go, pick }: { opts: Opts; account: 
         </div>
       </div>
       {msg && <p className="text-sm text-muted-foreground" role="status">{msg}</p>}
+      <AiDataCards account={account} accounts={opts.accounts} go={() => go("fix", account)} />
       {empty && <EmptyState title="Nothing scanned yet" body="Press Scan now, or wait for tonight. The first scan finds duplicates, bad numbers and where your leads come from." />}
 
       {!empty && (
