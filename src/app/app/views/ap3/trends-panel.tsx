@@ -1,5 +1,6 @@
 "use client";
 
+import { zoneWord } from "@/lib/design/zone";
 import { useState } from "react";
 import type { Appt3Trends } from "@/lib/analytics/appointments3-types";
 import { useApiClient, useData } from "../../session";
@@ -23,6 +24,7 @@ export function TrendsPanel({ filters, by, onOpen }: { filters: ApFilters; by: "
     <div className="s6-card mt-4" data-testid={`ap-trends-${by}`}>
       <div className="flex flex-wrap items-center gap-3"><h3 className="s6-q">{by === "person" ? "Bookings per person" : "Bookings per calendar"}, {unit} over {unit}</h3>
         <span className="ml-auto inline-flex gap-2"><button type="button" className="s6-btn" aria-pressed={grain === "week"} onClick={() => setGrain("week")}>Weekly</button><button type="button" className="s6-btn" aria-pressed={grain === "month"} onClick={() => setGrain("month")}>Monthly</button></span></div>
+      {res.data && <p className="ap-fine mt-1" data-testid="ap-trends-window">Always this {unit} against last {unit} and the 8 {unit}s before ({shortDay(res.data.currentFrom)} to {shortDay(res.data.currentTo)}, {zoneWord()} time). It does not change with the dates in the bar at the top; the filters above still apply.</p>}
       {!res.data ? <p className="ap-fine" role="status">{res.error ? "Could not load trends." : "Loading..."}</p> : !res.data.rows.length ? <p className="ap-fine">No bookings in the last 8 {unit}s.</p> : (
         <div className="ap-scroll"><table className="ap-t"><thead><tr><th>{by === "person" ? "Person" : "Calendar"}</th><th data-num>This {unit}</th><th data-num>Last {unit}</th><th data-num>Change</th><th>Last 8 {unit}s</th></tr></thead><tbody>
           {res.data.rows.slice(0, 30).map((r) => (

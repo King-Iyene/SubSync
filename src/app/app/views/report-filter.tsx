@@ -5,6 +5,8 @@ import { FLOW_PRESETS, type FlowPreset } from "@/lib/analytics/lead-flow";
 import { isDefaultState, rangeOf, readReportState, writeReportState, type ReportState } from "@/lib/analytics/report-filter";
 import { WhatIs } from "../ds/what-is";
 import { usePageRange } from "../ds/page-range";
+import { todayOf } from "@/lib/design/range";
+import { zoneWord } from "@/lib/design/zone";
 import { useApiClient, useRootApi, type Api } from "../session";
 
 // ONE filter bar for every report tab of Today (Growth, Lead flow, Clients coming and going, Proof, Forecast, Sources, Coverage): dates and a client. It is the date choice Lead flow
@@ -18,7 +20,8 @@ export function useReportFilter(prefix: string, defaultPreset: FlowPreset) {
   const [today, setToday] = useState<string | null>(null);
   useEffect(() => {
     const read = () => setState(readReportState(window.location.hash, prefix));
-    setToday(new Date().toISOString().slice(0, 10)); read();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setToday(todayOf(Date.now())); read();
     window.addEventListener("popstate", read); window.addEventListener("subsync-report-filter", read);
     return () => { window.removeEventListener("popstate", read); window.removeEventListener("subsync-report-filter", read); };
   }, [prefix]);
@@ -53,7 +56,7 @@ export function ReportFilterBar({ f, label, clients, noDates, datesNote }: { f: 
       {!noDates && (
         <>
           <select className={field} aria-label={`${label}: dates`} value={state.preset ?? ""} onChange={(e) => (e.target.value ? pickPreset(e.target.value as FlowPreset) : f.patch({ preset: null, from: "", to: "" }))} data-testid="filter-preset">
-            <option value="">Dates at the top of the page</option>
+            <option value="">Use the dates above (the date bar)</option>
             {FLOW_PRESETS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
           </select>
           {preset === "custom" && (
@@ -74,9 +77,9 @@ export function ReportFilterBar({ f, label, clients, noDates, datesNote }: { f: 
           </select>
         </>
       )}
-      {range && !noDates && <span className="t-small t-quiet" data-testid="filter-window">{range.problem ? "" : range.from === range.to ? range.from : `${range.from} to ${range.to}`}</span>}
+      {range && !noDates && <span className="t-small t-quiet" data-testid="filter-window">{range.problem ? "" : range.from === range.to ? range.from : `${range.from} to ${range.to}`}{state.preset !== null ? " (this tab only, not the dates in the bar above)" : `, ${zoneWord()} time`}</span>}
       {datesNote && <WhatIs text={datesNote} />}
-      {f.differs && <button type="button" onClick={f.reset} className="ds-press cursor-pointer text-sm text-primary underline underline-offset-4" data-testid="filter-reset">Reset to header</button>}
+      {f.differs && <button type="button" onClick={f.reset} className="ds-press cursor-pointer text-sm text-primary underline underline-offset-4" data-testid="filter-reset">{state.preset !== null ? "Use the dates above" : "Reset to header"}</button>}
       {range?.problem && <p className="t-small basis-full border-l-2 border-[var(--t-soon)] pl-2" role="status" data-testid="filter-problem">{range.problem} Showing the tab&apos;s usual dates instead.</p>}
     </div>
   );

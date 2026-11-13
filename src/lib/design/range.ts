@@ -1,10 +1,15 @@
 import { MAX_RANGE_DAYS } from "./range-limits.ts";
+import { addDays, localDay, mondayOfDay, monthStartOf, prevMonthOf } from "./zone.ts";
 
 // The window and comparison of ONE card (KF-4): "Last 30 days, 3 Oct to 1 Nov, compared with 3 Sep to 2 Oct". Pure: no clock of its own (the caller passes
 // today), no React. A card's range overrides the page range for that card only, is carried in the page address as `r.<card>=30d.prev`, and the comparison
 // obeys the same minimum-sample rule as the rest of the app: no percentage change on a tiny base.
 
-export type RangePreset = "7d" | "30d" | "90d" | "custom";
+export type RangePreset = "today" | "yday" | "7d" | "30d" | "90d" | "week" | "lweek" | "month" | "lmonth" | "custom";
+/** The calendar presets (days in the account time zone, weeks start on Monday). "This" ones end today, never in the future. */
+export const CALENDAR_PRESETS: Array<{ key: "today" | "yday" | "week" | "lweek" | "month" | "lmonth"; label: string }> = [{ key: "today", label: "Today" }, { key: "yday", label: "Yesterday" }, { key: "week", label: "This week" }, { key: "lweek", label: "Last week" }, { key: "month", label: "This month" }, { key: "lmonth", label: "Last month" }];
+/** Every preset the date bar offers, in order. */
+export const BAR_PRESETS: Array<{ key: Exclude<RangePreset, "custom">; label: string }> = [{ key: "today", label: "Today" }, { key: "yday", label: "Yesterday" }, { key: "7d", label: "Last 7 days" }, { key: "30d", label: "Last 30 days" }, { key: "90d", label: "Last 90 days" }, { key: "week", label: "This week" }, { key: "lweek", label: "Last week" }, { key: "month", label: "This month" }, { key: "lmonth", label: "Last month" }];
 export type Compare = "none" | "previous" | "month" | "year";
 export type RangeSpec = { preset: RangePreset; from?: string; to?: string; compare: Compare };
 
@@ -42,7 +47,16 @@ export function resolveRange(specIn: RangeSpec, today: string): Resolved {
   let problem: string | null = null;
   let from: string, to: string;
   const preset = PRESETS.find((p) => p.key === spec.preset);
+  const cal = CALENDAR_PRESETS.find((p) => p.key === spec.preset);
   if (preset) { to = today; from = toIso(toMs(today) - (preset.days - 1) * DAY); }
+  else if (cal) {
+    if (cal.key === "today") { from = to = today; }
+    else if (cal.key === "yday") { from = to = addDays(today, -1); }
+    else if (cal.key === "week") { from = mondayOfDay(today); to = today; }
+    else if (cal.key === "lweek") { const m = mondayOfDay(today); from = addDays(m, -7); to = addDays(m, -1); }
+    else if (cal.key === "month") { from = monthStartOf(today); to = today; }
+    else { const pm = prevMonthOf(today); from = pm.from; to = pm.to; }
+  }
   else if (validDate(spec.from) && validDate(spec.to)) {
     if (spec.from > spec.to) problem = "The end date is before the start date.";
     else if (spec.to > today) problem = "The end date is in the future.";
@@ -51,7 +65,8 @@ export function resolveRange(specIn: RangeSpec, today: string): Resolved {
     else { from = spec.from; to = spec.to; }
   } else { problem = "Pick a start and an end date."; spec = { ...DEFAULT_RANGE, compare: spec.compare }; to = today; from = toIso(toMs(today) - 29 * DAY); }
   const withYear = from.slice(0, 4) !== to.slice(0, 4) || to.slice(0, 4) !== today.slice(0, 4);
-  const name = preset ? `${preset.label}, ${short(from, withYear)} to ${short(to, withYear)}` : undefined;
+  const named = preset ?? cal;
+  const name = named ? (from === to ? `${named.label}, ${short(from, withYear)}` : `${named.label}, ${short(from, withYear)} to ${short(to, withYear)}`) : undefined;
   const current = win(from, to, withYear, name);
   let compare: Window | null = null;
   if (spec.compare === "previous") { const end = toIso(toMs(from) - DAY); compare = win(toIso(toMs(end) - (current.days - 1) * DAY), end, withYear); }
@@ -65,12 +80,12 @@ export function resolveRange(specIn: RangeSpec, today: string): Resolved {
 // `30d`, `7d.prev`, `custom:2026-10-01~2026-10-30.year`. Anything that does not parse is ignored, so a hand-edited link cannot break a card.
 const CMP_CODE: Record<Compare, string> = { none: "", previous: ".prev", month: ".month", year: ".year" };
 export function encodeRange(spec: RangeSpec): string {
-  const head = spec.preset === "custom" && validDate(spec.from) && validDate(spec.to) ? `custom:${spec.from}~${spec.to}` : PRESETS.some((p) => p.key === spec.preset) ? spec.preset : "30d";
+  const head = spec.preset === "custom" && validDate(spec.from) && validDate(spec.to) ? `custom:${spec.from}~${spec.to}` : BAR_PRESETS.some((p) => p.key === spec.preset) ? spec.preset : "30d";
   return `${head}${CMP_CODE[spec.compare] ?? ""}`;
 }
 export function decodeRange(text: string | null | undefined): RangeSpec | null {
   if (!text) return null;
-  const m = /^(7d|30d|90d|custom:(\d{4}-\d{2}-\d{2})~(\d{4}-\d{2}-\d{2}))(?:\.(prev|month|year))?$/.exec(text);
+  const m = /^(today|yday|7d|30d|90d|week|lweek|month|lmonth|custom:(\d{4}-\d{2}-\d{2})~(\d{4}-\d{2}-\d{2}))(?:\.(prev|month|year))?$/.exec(text);
   if (!m) return null;
   const compare: Compare = m[4] === "prev" ? "previous" : m[4] === "month" ? "month" : m[4] === "year" ? "year" : "none";
   if (m[1].startsWith("custom:")) return validDate(m[2]) && validDate(m[3]) ? { preset: "custom", from: m[2], to: m[3], compare } : null;
@@ -128,4 +143,5 @@ export function inWindow(startMs: number, spanDays: number, w: Pick<Window, "fro
   const mid = startMs + (spanDays * DAY) / 2;
   return mid >= toMs(w.from) && mid < toMs(w.to) + DAY;
 }
-export const todayOf = (ms: number) => toIso(ms);
+/** The day it is in the account time zone (NOT the UTC day: at 00:30 in Lagos it is already tomorrow). */
+export const todayOf = (ms: number) => localDay(ms);

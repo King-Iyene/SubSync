@@ -1,4 +1,5 @@
 import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
+import { utcDayAfterToday } from "../design/zone.ts";
 import { unansweredBusinessElapsedMs } from "./unanswered-advanced.ts";
 import type {
   Pp3AccountRisk, Pp3LoadState, Pp3Move, Pp3NameState, Pp3Reason, Pp3Role, Pp3TodayLine,
@@ -30,7 +31,7 @@ export function parseWindow(from: string | null | undefined, to: string | null |
   const iso = /^\d{4}-\d{2}-\d{2}$/;
   const f = from && iso.test(from) ? Date.parse(from) : NaN;
   const t = to && iso.test(to) ? Date.parse(to) : NaN;
-  const end = Number.isFinite(t) ? t + DAY : Math.floor(now / DAY) * DAY + DAY;
+  const end = Number.isFinite(t) ? t + DAY : utcDayAfterToday(now);
   const start = Number.isFinite(f) ? f : end - 28 * DAY;
   if (end <= start) return { from: new Date(end - 28 * DAY), to: new Date(end), days: 28, problem: "The start date was after the end date, so the last 28 days are shown." };
   const days = Math.round((end - start) / DAY);

@@ -1,4 +1,5 @@
 import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
+import { localDay } from "../design/zone.ts";
 // Appointment logic added in stage F3 (the status breakdown, the date window, the filters, the history lines, the targets). Pure: no database or
 // network imports, so it can be unit tested. Definitions are in docs/METRICS.md, "Appointments".
 import { needsOutcome, rates, type Appt } from "./appointment-intel.ts";
@@ -61,7 +62,7 @@ export type ParsedWindow = {
 export const MAX_WINDOW_DAYS = MAX_RANGE_DAYS;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const dayStart = (iso: string): number | null => (ISO.test(iso) && Number.isFinite(Date.parse(`${iso}T00:00:00Z`)) && new Date(`${iso}T00:00:00Z`).toISOString().slice(0, 10) === iso ? Date.parse(`${iso}T00:00:00Z`) : null);
-export const todayIso = (now: number) => new Date(now).toISOString().slice(0, 10);
+export const todayIso = (now: number) => localDay(now); // today in the account time zone
 
 /**
  * Dates sent by the browser (YYYY-MM-DD, whole UTC days, the end date included). Anything that does not parse, runs backwards, ends in the future or

@@ -1,14 +1,13 @@
 "use client";
 
 import { Banknote, BarChart3, CalendarCheck, Clock, Compass, Kanban, LayoutDashboard, Timer, TrendingUp, Users, Workflow, ArrowLeftRight } from "lucide-react";
-import { useCallback, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import type { AccessKind } from "@/lib/access";
 import { cardLink, goWith } from "@/lib/design/deep-link";
-import { FLOW_PRESETS, type FlowPreset } from "@/lib/analytics/lead-flow";
-import { writeReportState } from "@/lib/analytics/report-filter";
+import { zoneWord } from "@/lib/design/zone";
+import { usePageRange } from "../ds/page-range";
 import type { TodayData } from "@/lib/analytics/today-types";
 import type { GoFn } from "../nav";
-import { useReportFilter } from "./report-filter";
 import { OverviewView } from "./overview";
 import { PipelineView } from "./pipeline";
 import { InfoTip } from "../ds/info-tip";
@@ -20,35 +19,12 @@ import "./td3/td3.css";
 // do they show up, what is the money doing, where do they come from, who is carrying the work. Nothing is removed: each card holds the same working component the older page used (so every
 // mark still opens exactly its rows). ONE bar above sets the dates for all of them; the client choice is the bar at the top of the app (the same choice for every card).
 
-const PREFIXES = ["g", "l", "c", "p"] as const;
-
-/** One dates choice for every dated card. Each older tab keeps its own address key, so the same choice is written to all of them in one step. */
+/** The dates of every chart below, in words. There is NO second date control here: the date bar at the top of the app is the only one (docs/DATE_RULES.md). */
 export function DatesBar() {
-  const f = useReportFilter("g", "30d");
-  const apply = useCallback((p: { preset: FlowPreset; from?: string; to?: string }) => {
-    try {
-      let hash = window.location.hash || "#today";
-      for (const prefix of PREFIXES) hash = writeReportState(hash, prefix, p.preset === "custom" ? { preset: p.preset, from: p.from ?? "", to: p.to ?? "" } : { preset: p.preset });
-      window.history.replaceState(null, "", hash);
-      window.dispatchEvent(new Event("subsync-report-filter"));
-    } catch { /* each card keeps its own dates */ }
-  }, []);
-  const { range, today, preset, state } = f;
-  const field = "min-h-9 rounded-md border bg-background px-2 py-1 text-sm";
+  const bar = usePageRange();
   return (
     <div className="td-dates print:hidden" role="group" aria-label="Dates for every chart below" data-testid="td-dates">
-      <label className="sr-only" htmlFor="td-dates-preset">Dates for every chart below</label>
-      <select id="td-dates-preset" className={field} value={preset} onChange={(e) => apply({ preset: e.target.value as FlowPreset, from: state.from || range?.from, to: state.to || range?.to })} data-testid="td-dates-preset">
-        {FLOW_PRESETS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
-      </select>
-      {preset === "custom" && (
-        <>
-          <input type="date" className={field} aria-label="From" value={state.from} max={today ?? undefined} onChange={(e) => apply({ preset: "custom", from: e.target.value, to: state.to })} />
-          <input type="date" className={field} aria-label="To" value={state.to} max={today ?? undefined} onChange={(e) => apply({ preset: "custom", from: state.from, to: e.target.value })} />
-        </>
-      )}
-      {range && !range.problem && <span className="ap-fine" data-testid="td-dates-window">{range.from === range.to ? range.from : `${range.from} to ${range.to}`}</span>}
-      <span className="ap-fine">Sets the dates for every chart below. Choose the client accounts in the bar at the top of the page.</span>
+      <span className="ap-fine" data-testid="td-dates-window">{bar.ready ? `Every chart below shows ${bar.spec.preset === "custom" ? "from " : ""}${bar.label}, ${zoneWord()} time. ` : "Working out the dates... "}Change the dates in the bar at the top of the page; choose the client accounts there too.</span>
     </div>
   );
 }

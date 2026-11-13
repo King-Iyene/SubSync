@@ -1,0 +1,20 @@
+{
+ "app/app/views/clients/details.tsx": 1,
+ "app/app/views/fn/payouts.tsx": 1,
+ "app/app/views/pm/sections.tsx": 1,
+ "app/app/views/wg/data.ts": 2,
+ "lib/analytics/appointments-exec-intel.ts": 2,
+ "lib/analytics/appointments-exec-queries.ts": 1,
+ "lib/analytics/bf-queries.ts": 1,
+ "lib/analytics/cash-queries.ts": 1,
+ "lib/analytics/clients-actions-queries.ts": 1,
+ "lib/analytics/clients3-queries.ts": 2,
+ "lib/analytics/dq-queries.ts": 1,
+ "lib/analytics/people3-queries.ts": 1,
+ "lib/analytics/today3-queries.ts": 3,
+ "lib/api/client-routes.ts": 1,
+ "lib/api/dq-routes.ts": 2,
+ "lib/api/growth-api.ts": 1,
+ "lib/api/people-actions-routes.ts": 1,
+ "lib/api/pipeline3-routes.ts": 2
+}

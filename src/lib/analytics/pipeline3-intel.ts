@@ -1,4 +1,5 @@
 import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
+import { utcDayAfterToday } from "../design/zone.ts";
 // Pipeline round 3: the pure part (no database, no network), unit tested. Definitions: docs/METRICS.md "Pipeline 3".
 import { rateRange } from "./pipeline-intel.ts";
 import type { Estimate, FlowStage, Pl3Overview, Pl3Row, Rate } from "./pipeline3-types.ts";
@@ -21,8 +22,8 @@ export function parsePlWindow(from: string | null | undefined, to: string | null
   const t = (v: string | null | undefined) => (v && /^\d{4}-\d{2}-\d{2}/.test(v) && Number.isFinite(Date.parse(v)) ? Date.parse(v.slice(0, 10)) : null);
   let f = t(from), e = t(to), problem: string | null = null;
   if (e !== null) e += DAY;
-  if (f === null || e === null) { e = now + DAY - (now % DAY); f = e - 30 * DAY; if (from || to) problem = "That date range was not understood, so the last 30 days are shown."; }
-  if (e <= f) { e = now + DAY - (now % DAY); f = e - 30 * DAY; problem = "The end date was before the start date, so the last 30 days are shown."; }
+  if (f === null || e === null) { e = utcDayAfterToday(now); f = e - 30 * DAY; if (from || to) problem = "That date range was not understood, so the last 30 days are shown."; }
+  if (e <= f) { e = utcDayAfterToday(now); f = e - 30 * DAY; problem = "The end date was before the start date, so the last 30 days are shown."; }
   if (e - f > MAX_WINDOW_DAYS * DAY) { f = e - MAX_WINDOW_DAYS * DAY; problem = `The range is capped at ${MAX_RANGE_DAYS} days (about 3 years).`; }
   return { from: new Date(f), to: new Date(e), days: Math.round((e - f) / DAY), problem };
 }

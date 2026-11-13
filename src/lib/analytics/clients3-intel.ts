@@ -1,4 +1,5 @@
 import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
+import { utcDayAfterToday } from "../design/zone.ts";
 import type { Cl3Account, Cl3Level, Cl3Reason, Cl3ReasonCount, Cl3Today, Delta, Rate } from "./clients3-types";
 
 // Pure rules behind the Clients screens (no database, unit tested). Definitions: docs/METRICS.md "Clients 3".
@@ -26,7 +27,7 @@ export function parseWindow(from: string | null | undefined, to: string | null |
   const iso = /^\d{4}-\d{2}-\d{2}$/;
   const f = from && iso.test(from) ? Date.parse(from) : NaN;
   const t = to && iso.test(to) ? Date.parse(to) : NaN;
-  const end = Number.isFinite(t) ? t + DAY : Math.floor(now / DAY) * DAY + DAY;
+  const end = Number.isFinite(t) ? t + DAY : utcDayAfterToday(now);
   const start = Number.isFinite(f) ? f : end - 30 * DAY;
   if (end <= start) return { from: new Date(end - 30 * DAY), to: new Date(end), days: 30, problem: "The start date was after the end date, so the last 30 days are shown." };
   const days = Math.round((end - start) / DAY);
