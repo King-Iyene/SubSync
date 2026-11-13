@@ -21,7 +21,7 @@ export type PlMoneyFlow = {
   won: { count: number; valueCents: number; previousValueCents: number | null };
   leak: { fromStage: string; toStage: string; lostCents: number } | null; // biggest drop between stages
   people: PlPersonFlow[]; replay: PlReplayDay[] | null; minDeals: number;
-  excluded: { zeroValue: number; noOwner: number; test: number };
+  excluded: { zeroValue: number; noOwner: number; test: number; outlier?: number; outlierCents?: number; ownerCounted?: boolean; testsCounted?: boolean };
   outlier: { name: string; share: number } | null; // one deal over 40% of the total, shown separately
 };
 export type PlDeal = {

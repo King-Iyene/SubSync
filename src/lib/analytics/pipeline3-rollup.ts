@@ -66,7 +66,7 @@ export async function refreshRollup(inst: string, o: { locations?: string[] | nu
         big as (select percentile_cont(0.9) within group (order by d.value) p90, count(*) n from d where ${P_OPEN(T)}),
         med as (select d.pipeline_id, coalesce(d.stage_id, '') stage_id, percentile_cont(0.5) within group (order by d.days_in_stage) med, max(d.norm_days) norm, max(d.stays)::int stays from d where ${P_OPEN(T)} group by 1, 2),
         g as (
-          select d.pipeline_id, coalesce(d.stage_id, '') stage_id, coalesce(d.owner, '') owner_id, coalesce(d.source, '') source, d.status, d.is_test, d.out_of_scope oos, d.value > 0 has_value, d.owner is not null has_owner, d.outlier, d.stale,
+          select d.pipeline_id, coalesce(d.stage_id, '') stage_id, coalesce(d.owner, '') owner_id, coalesce(d.source, '') source, d.status, d.is_test, d.out_of_scope oos, d.value > 0 has_value, d.owner_ok has_owner, d.outlier, d.stale,
             (${P_OPEN(T)} and big.n >= 10 and d.value >= big.p90 and coalesce(greatest(d.last_activity_at, d.last_stage_change_at, d.last_status_change_at), d.created_at) < now() - interval '14 days') big_untouched,
             case when d.status <> 'open' and d.last_status_change_at is not null then (d.last_status_change_at at time zone ${tz})::date else date '1970-01-01' end closed_day,
             case when d.status = 'lost' then coalesce(d.lost_reason, case when d.lost_reason_id is not null then 'Reason ' || right(d.lost_reason_id, 4) end, '') else '' end lost_reason,
@@ -96,7 +96,7 @@ export async function rollupHeadline(s: Scope, f: { location?: string | null; pi
       coalesce(sum(r.n) filter (where ${R.closedIn(db, "won", f.d30, null)}), 0)::int won_n, coalesce(sum(r.value) filter (where ${R.closedIn(db, "won", f.d30, null)}), 0)::float8 won_v,
       coalesce(sum(r.n) filter (where ${R.closedIn(db, "lost", f.d30, null)}), 0)::int lost_n, coalesce(sum(r.value) filter (where ${R.closedIn(db, "lost", f.d30, null)}), 0)::float8 lost_v,
       coalesce(sum(r.n) filter (where ${R.noOwner(db)}), 0)::int no_owner, coalesce(sum(r.n) filter (where ${R.noValue(db)}), 0)::int no_value,
-      coalesce(sum(r.n) filter (where r.is_test and r.status = 'open'), 0)::int test, coalesce(sum(r.n) filter (where r.outlier), 0)::int outliers,
+      coalesce(sum(r.n) filter (where r.is_test and r.status = 'open' and not r.oos), 0)::int test, coalesce(sum(r.n) filter (where r.outlier), 0)::int outliers,
       coalesce(sum(r.n) filter (where r.status = 'lost' and not r.is_test and r.closed_day >= ${rollupFromDay(f.d30.getTime())}::date and r.lost_reason = ''), 0)::int no_reason,
       coalesce(sum(r.n) filter (where r.status = 'open' and not r.oos), 0)::int open_all, coalesce(sum(r.n) filter (where ${R.flag(db)}), 0)::int flagged,
       coalesce(sum(r.n) filter (where r.big_untouched), 0)::int big_n, coalesce(sum(r.value) filter (where r.big_untouched), 0)::float8 big_v

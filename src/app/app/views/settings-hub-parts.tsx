@@ -132,13 +132,14 @@ export function PermissionsSection() {
           <li key={s.scope} className="px-3 py-3 text-sm" data-granted={s.granted ? "yes" : "no"}>
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{g.title}</span>
-              <Badge tone={s.granted ? "good" : "warn"}>{s.granted ? "Granted" : "Not granted"}</Badge>
+              <Badge tone={s.granted ? "good" : s.comingSoon ? "neutral" : "warn"}>{s.granted ? "Granted" : "Not granted"}</Badge>
               <span className="text-xs text-muted-foreground">{s.required ? "Required" : "Optional"} · {s.kind === "read" ? "reads only" : "can change, after a preview"}</span>
             </div>
             <p className="mt-1 text-muted-foreground">{s.why}</p>
             <p className="mt-0.5 font-mono text-xs text-muted-foreground">{s.scope}</p>
             {unlocks(s.scope).length > 0 && <p className="mt-1 text-xs">Unlocks: {unlocks(s.scope).join("; ")}.</p>}
-            {!s.granted && <p className="mt-1 text-xs font-medium text-warning">{NEEDS_PERMISSION}</p>}
+            {s.comingSoon && !s.granted && <p className="mt-1 text-xs font-medium">For a coming feature. Not used yet, so nothing changes whether you grant it or not.</p>}
+            {!s.granted && !s.comingSoon && <p className="mt-1 text-xs font-medium text-warning">{NEEDS_PERMISSION}</p>}
           </li>
         ))}
       </ul>

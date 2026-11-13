@@ -61,6 +61,7 @@ export function deals(s: Scope, f: Filters): Frag {
         (case when ss.stays >= ${MIN_STAGE_STAYS} and ss.p75_days is not null then greatest(${STAGE_LIMIT_FLOOR_DAYS}::numeric, least(${STAGE_LIMIT_CAP_DAYS}::numeric, ss.p75_days)) end)::float8 limit_days, false limit_est, ss.median_days::float8 norm_days, coalesce(ss.stays, 0) stays,
         extract(epoch from (now() - coalesce(o.last_stage_change_at, o.created_remote_at, o.synced_at))) / 86400 days_in_stage,
         ((coalesce(o.name, '') ~* ${TEST_RE} or coalesce(o.contact_name, '') ~* ${TEST_RE}) and not coalesce(sc_cfg.count_test_deals, false)) is_test,
+        (o.assigned_to is not null or coalesce(sc_cfg.count_ownerless_deals, false)) owner_ok,
         ${outOfScope()} out_of_scope, ${valueSuspect(f.includeTest === true)} suspect
       from cached_opportunities o
       join (${locs(s, f.location)}) l on l.location_id = o.location_id
@@ -77,7 +78,7 @@ export function deals(s: Scope, f: Filters): Frag {
         ${like ? db`and (o.name ilike ${like} or o.contact_name ilike ${like} or c.full_name ilike ${like})` : db``}
     ),
     d1 as (
-      select d0.*, (d0.value > 0 and d0.owner is not null and not d0.out_of_scope ${f.includeTest ? db`` : db`and not d0.is_test`}) counted from d0
+      select d0.*, (d0.value > 0 and d0.owner_ok and not d0.out_of_scope ${f.includeTest ? db`` : db`and not d0.is_test`}) counted from d0
     ),
     /* MATERIALIZED: left inlined, the planner re-ran this total once per deal (92 s at 55,000 deals; 2.5 s now). docs/QA_SCALE.md */
     lo as materialized (select location_id, sum(value)::float8 total, count(*)::int n from d1 where status = 'open' and counted group by 1),
@@ -90,9 +91,9 @@ export function deals(s: Scope, f: Filters): Frag {
 
 export const P_OPEN = (db: Db) => db`d.status = 'open' and d.counted and not d.outlier`;
 export const P_STALE = (db: Db) => db`d.status = 'open' and d.counted and not d.outlier and d.stale`;
-export const P_NO_OWNER = (db: Db) => db`d.status = 'open' and not d.out_of_scope and not d.is_test and d.value > 0 and d.owner is null`;
+export const P_NO_OWNER = (db: Db) => db`d.status = 'open' and not d.out_of_scope and not d.is_test and d.value > 0 and not d.owner_ok`;
 export const P_NO_VALUE = (db: Db) => db`d.status = 'open' and not d.out_of_scope and not d.is_test and d.value <= 0`;
-const P_FLAG = (db: Db) => db`(d.status = 'open' and not d.out_of_scope and (d.is_test or d.stale or d.outlier or (d.value > 0 and d.owner is null) or d.value <= 0))`;
+const P_FLAG = (db: Db) => db`(d.status = 'open' and not d.out_of_scope and (d.is_test or d.stale or d.outlier or (d.value > 0 and not d.owner_ok) or d.value <= 0))`;
 
 function bucketCond(db: Db, s: Scope, f: Filters): Frag {
   const win = db`d.last_status_change_at >= ${f.from} and d.last_status_change_at < ${f.to} and not d.is_test`;
@@ -103,7 +104,7 @@ function bucketCond(db: Db, s: Scope, f: Filters): Frag {
     case "outlier": return db`and d.outlier`;
     case "no_owner": return db`and ${P_NO_OWNER(db)}`;
     case "no_value": return db`and ${P_NO_VALUE(db)}`;
-    case "test": return db`and d.is_test and d.status = 'open'`;
+    case "test": return db`and d.is_test and d.status = 'open' and not d.out_of_scope`;
     case "won": return db`and d.status = 'won' and ${win}`;
     case "lost": return db`and d.status = 'lost' and ${win}`;
     case "abandoned": return db`and d.status = 'abandoned' and ${win}`;
@@ -271,7 +272,7 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
         count(*) filter (where ${P_STALE(db)})::int stale_n, coalesce(sum(d.value) filter (where ${P_STALE(db)}), 0)::float8 stale_v,
         count(*) filter (where d.status = 'won' and not d.is_test and d.last_status_change_at >= ${d30})::int won_n, coalesce(sum(d.value) filter (where d.status = 'won' and not d.is_test and d.last_status_change_at >= ${d30}), 0)::float8 won_v,
         count(*) filter (where d.status = 'lost' and not d.is_test and d.last_status_change_at >= ${d30})::int lost_n, coalesce(sum(d.value) filter (where d.status = 'lost' and not d.is_test and d.last_status_change_at >= ${d30}), 0)::float8 lost_v,
-        count(*) filter (where ${P_NO_OWNER(db)})::int no_owner, count(*) filter (where ${P_NO_VALUE(db)})::int no_value, count(*) filter (where d.is_test and d.status = 'open')::int test,
+        count(*) filter (where ${P_NO_OWNER(db)})::int no_owner, count(*) filter (where ${P_NO_VALUE(db)})::int no_value, count(*) filter (where d.is_test and d.status = 'open' and not d.out_of_scope)::int test,
         count(*) filter (where d.outlier)::int outliers, count(*) filter (where d.status = 'lost' and not d.is_test and d.last_status_change_at >= ${d30} and d.lost_reason_id is null and d.lost_reason is null)::int no_reason,
         count(*) filter (where d.status = 'open' and not d.out_of_scope)::int open_all, count(*) filter (where ${P_FLAG(db)})::int flagged
       from d`,
@@ -516,7 +517,7 @@ export async function health(s: Scope, f: Filters, p: number, size: number): Pro
   const db = sql(), sz = clampSize(size), w = deals(s, { ...f, bucket: null });
   const [rows, [cnt], [all]] = await Promise.all([
     db`with ${w} select d.location_id, max(d.account_name) account_name, count(*) filter (where d.status = 'open' and not d.out_of_scope)::int open_n, count(*) filter (where ${P_FLAG(db)})::int flagged,
-        count(*) filter (where ${P_NO_OWNER(db)})::int no_owner, count(*) filter (where ${P_NO_VALUE(db)})::int no_value, count(*) filter (where d.is_test and d.status = 'open')::int test,
+        count(*) filter (where ${P_NO_OWNER(db)})::int no_owner, count(*) filter (where ${P_NO_VALUE(db)})::int no_value, count(*) filter (where d.is_test and d.status = 'open' and not d.out_of_scope)::int test,
         count(*) filter (where ${P_STALE(db)})::int stale, count(*) filter (where d.outlier)::int outliers,
         (select count(*)::int - count(distinct (x.contact_id, x.pipeline_id))::int from d x where x.location_id = d.location_id and x.status = 'open' and x.counted and x.contact_id is not null) dup
       from d group by d.location_id order by (count(*) filter (where ${P_FLAG(db)}))::float8 / greatest(1, count(*) filter (where d.status = 'open' and not d.out_of_scope)) desc, d.location_id limit ${sz} offset ${offsetOf(p, sz)}`,
@@ -628,7 +629,11 @@ export async function moneyFlow(s: Scope, f: Filters): Promise<Pl3MoneyFlow> {
     return { stageId: st.id, stageName: st.name, nextStageId: stages[i + 1]?.id ?? null, reachedValue: rc?.v ?? 0, reachedCount: rc?.n ?? 0, lostValue: lostHere.reduce((t, d) => t + d.value, 0), lostCount: lostHere.reduce((t, d) => t + d.count, 0) };
   });
 
-  const [pp, outl] = await Promise.all([people(s, { ...f, pipeline: chosen }, 0, 20, null), db`with ${deals(s, { ...f, bucket: null, pipeline: chosen })} select d.opportunity_id, d.name, d.value, d.stage_id, d.location_id, d.loc_total from d where d.outlier order by d.value desc limit 10`]);
+  const [pp, outl, [lo]] = await Promise.all([people(s, { ...f, pipeline: chosen }, 0, 20, null), db`with ${deals(s, { ...f, bucket: null, pipeline: chosen })} select d.opportunity_id, d.name, d.value, d.stage_id, d.location_id, d.loc_total from d where d.outlier order by d.value desc limit 10`,
+    // Every reason an open deal of this pipeline is left out of its money, with the SAME predicates the drill-down lists use (buckets no_value, no_owner, test, outlier), so the header, the rows and the clicked list agree.
+    db`with ${deals(s, { ...f, bucket: null, pipeline: chosen })} select count(*) filter (where ${P_NO_VALUE(db)})::int no_value, count(*) filter (where ${P_NO_OWNER(db)})::int no_owner,
+        count(*) filter (where d.is_test and d.status = 'open' and not d.out_of_scope and not ${f.includeTest === true}::boolean)::int test, count(*) filter (where d.outlier)::int outlier, coalesce(sum(d.value) filter (where d.outlier), 0)::float8 outlier_v,
+        (select coalesce(count_ownerless_deals, false) from settings where installation_id = ${s.inst}) owner_counted from d`]);
   const perStage = await db`with ${deals(s, { ...f, bucket: null, pipeline: chosen })} select d.owner, d.location_id, d.stage_id, count(*)::int n, sum(d.value)::float8 v from d where ${P_OPEN(db)} and d.owner = any(${pp.rows.map((r) => r.ownerId as string)}::text[]) group by 1, 2, 3`;
   const peopleFlow: FlowPerson[] = pp.rows.map((r) => ({
     ownerId: r.ownerId, name: r.name, open: r.open, won: r.won, lost: r.lost, staleCount: r.staleCount,
@@ -640,6 +645,7 @@ export async function moneyFlow(s: Scope, f: Filters): Promise<Pl3MoneyFlow> {
     vault: { won: { value: Math.round(num(parts.vault?.won_v)), n: num(parts.vault?.won_n) }, wonLast7: { value: Math.round(num(parts.vault?.w7v)), n: num(parts.vault?.w7n) }, target: null },
     people: peopleFlow, leak: findLeak(loss),
     outliers: outl.map((r) => ({ opportunityId: r.opportunity_id as string, name: (r.name as string | null) ?? null, value: num(r.value), sharePct: Math.round((num(r.value) / Math.max(1, num(r.loc_total))) * 100), stageId: keyOf(sm, r.location_id, r.stage_id)?.key ?? null })),
+    leftOut: { noValue: num(lo?.no_value), noOwner: num(lo?.no_owner), test: num(lo?.test), outlier: num(lo?.outlier), outlierValue: Math.round(num(lo?.outlier_v)), ownerCounted: lo?.owner_counted === true, testsCounted: f.includeTest === true },
     period: { from: f.from.toISOString(), to: f.to.toISOString() }, pipelineId: chosen, pipelines,
     historyDays: parts.hist?.since instanceof Date ? Math.floor((Date.now() - parts.hist.since.getTime()) / DAY) : 0, enoughHistory: histN >= 20,
   };

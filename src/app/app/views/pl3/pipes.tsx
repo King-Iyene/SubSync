@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
 import { usePageRange } from "../../ds/page-range";
 import { usePl, type PlFilters } from "./data";
 import { money, moneyShort } from "./format";
+import { OwnerlessNote } from "./ownerless-note";
 import { PIPE_PAGE, pageProgress, rowNotes, testNamesNote } from "./pipe-list";
 
 // PIPELINE LIST: when no single pipeline is picked, one calm row per (account, pipeline). Columns line up (name, open money with its stage shape, deals, stuck, won, lost) and a row opens that
@@ -25,12 +26,12 @@ export function MiniStack({ stages }: { stages: PipeCard["mini"] }) {
   );
 }
 
-function RowView({ c, onOpen }: { c: PipeCard; onOpen: (c: PipeCard) => void }) {
-  const notes = rowNotes(c);
+function RowView({ c, onOpen, counted }: { c: PipeCard; onOpen: (c: PipeCard) => void; counted: { ownerCounted?: boolean; testsCounted?: boolean } }) {
+  const notes = rowNotes(c, counted);
   return (
     <li className="pl-row-li">
-      <button type="button" className="pl-row" onClick={() => onOpen(c)} data-testid="pl-row" aria-label={`${c.accountName}, ${c.name}: ${d(c.openValue)} open, ${c.openCount} deals, ${c.staleCount} stuck, won ${d(c.wonValue)}, lost ${d(c.lostValue)}${notes.length ? `. ${notes.join(". ")}` : ""}. Open its river.`}>
-        <span className="pl-c-name"><b title={c.name}>{c.name}</b><span className="pl-c-acct" title={c.accountName}>{c.accountName}</span>{c.empty ? <span className="pl-c-note">Nothing in this pipeline yet.</span> : notes.length > 0 && <span className="pl-c-note">{notes.join(" · ")}</span>}</span>
+      <button type="button" className="pl-row" onClick={() => onOpen(c)} data-testid="pl-row" aria-label={`${c.accountName}, ${c.name}: ${d(c.openValue)} open, ${c.openCount} deals, ${c.staleCount} stuck, won ${d(c.wonValue)}, lost ${d(c.lostValue)}${notes.length ? `. Not counted in money: ${notes.join(", ")}` : ""}. Open its river.`}>
+        <span className="pl-c-name"><b title={c.name}>{c.name}</b><span className="pl-c-acct" title={c.accountName}>{c.accountName}</span>{c.empty ? <span className="pl-c-note">Nothing in this pipeline yet.</span> : notes.length > 0 && <span className="pl-c-note" data-testid="pl-row-notes">Not counted in money: {notes.join(" · ")}</span>}</span>
         {c.empty ? null : (<>
           <span className="pl-c pl-c-open tnum" data-label="Open money"><b>{d(c.openValue)}</b><MiniStack stages={c.mini} /></span>
           <span className="pl-c tnum" data-label="Deals">{n(c.openCount)}</span>
@@ -43,7 +44,7 @@ function RowView({ c, onOpen }: { c: PipeCard; onOpen: (c: PipeCard) => void }) 
   );
 }
 
-function Page({ filters, after, showEmpty, dir, onOpen, onLoaded, first }: { filters: PlFilters; after: string | null; showEmpty: boolean; dir: "asc" | "desc"; onOpen: (c: PipeCard) => void; onLoaded: (cursor: string, count: number, next: string | null) => void; first: boolean }) {
+function Page({ filters, after, showEmpty, dir, onOpen, onLoaded, first, counted }: { counted: { ownerCounted?: boolean; testsCounted?: boolean }; filters: PlFilters; after: string | null; showEmpty: boolean; dir: "asc" | "desc"; onOpen: (c: PipeCard) => void; onLoaded: (cursor: string, count: number, next: string | null) => void; first: boolean }) {
   const r = usePl<Pl3Cards>("pipelines", filters, { after: after ?? undefined, empty: showEmpty ? 1 : undefined, pageSize: PIPE_PAGE, dir: dir === "asc" ? "asc" : undefined });
   const data = r.data;
   // One account with one pipeline: no list is needed, open it.
@@ -52,7 +53,7 @@ function Page({ filters, after, showEmpty, dir, onOpen, onLoaded, first }: { fil
   useEffect(() => { if (data) onLoaded(after ?? "", data.cards.length, data.next); }, [data, after, onLoaded]);
   if (r.error) return <li className="pl-row-li"><ErrorState error={r.error} onRetry={r.reload} /></li>;
   if (!data) return <li className="pl-row-li"><SkeletonRows rows={3} label="Loading pipelines..." /></li>;
-  return <>{data.cards.map((c) => <RowView key={`${c.locationId}|${c.pipelineId}`} c={c} onOpen={onOpen} />)}</>;
+  return <>{data.cards.map((c) => <RowView key={`${c.locationId}|${c.pipelineId}`} c={c} onOpen={onOpen} counted={counted} />)}</>;
 }
 
 export function PipelineGrid({ filters, onOpen, onIncludeTest }: { filters: PlFilters; onOpen: (c: PipeCard) => void; onIncludeTest?: (v: boolean) => void }) {
@@ -72,7 +73,7 @@ export function PipelineGrid({ filters, onOpen, onIncludeTest }: { filters: PlFi
   if (!head.data) return <SkeletonRows rows={4} label="Loading pipelines..." />;
   if (!head.data.cards.length && !t?.emptyHidden && !q && !t?.testCount) return <EmptyState title="No pipelines with deals yet" body="When a pipeline has deals, it shows here as a row. Click a row to see the money in each of its stages." />;
   const total = t ? (showEmpty ? t.all ?? t.pipelines : t.pipelines) : 0, prog = pageProgress(loaded, rk, cursors, total), next = prog.next, loadingTail = prog.loading;
-  const note = testNamesNote(t);
+  const note = testNamesNote(t), counted = { ownerCounted: t?.countsOwnerless === true, testsCounted: t?.countsTests === "setting" || t?.countsTests === "toggle" };
   return (
     <div data-testid="pl-grid">
       <div className="pl-gridbar">
@@ -82,6 +83,7 @@ export function PipelineGrid({ filters, onOpen, onIncludeTest }: { filters: PlFi
       <p className="ap-fine mb-1" data-testid="pl-asof"><b>Open money is as of now.</b> The dates{range.label ? ` (${range.label})` : ""} apply to won and lost.</p>
       <p className="ap-fine mb-2">Each pipeline has its own stages, so they are not added together. Open money leaves out deals with no value, no owner, test deals, and any one deal over 40% of an account. It is the same rule as the river. Click a row to open it.</p>
       {note && <p className="ap-fine mb-2" data-testid="pl-testnames" role="status">{note.text}{note.action && onIncludeTest && <>{" "}<button type="button" className="ap-link" onClick={() => onIncludeTest(note.action === "count")} data-testid="pl-testnames-toggle">{note.action === "count" ? "Count them" : "Leave them out"}</button></>}</p>}
+      {t && <OwnerlessNote count={t.noOwnerCount} counted={t.countsOwnerless === true} />}
       {!head.data.cards.length ? <p className="ap-fine" role="status">{q ? `No pipeline matches "${q}".` : "Nothing to list here yet."}</p> : (
         <div className="pl-list" role="group" aria-label="Pipelines">
           <div className="pl-row pl-row-head">
@@ -90,8 +92,8 @@ export function PipelineGrid({ filters, onOpen, onIncludeTest }: { filters: PlFi
             <span className="pl-c">Deals</span><span className="pl-c">Stuck</span><span className="pl-c">Won</span><span className="pl-c">Lost</span>
           </div>
           <ul className="pl-rows">
-            <Page key={`p0${rk}`} filters={f} after={null} showEmpty={showEmpty} dir={dir} onOpen={onOpen} onLoaded={onLoaded} first />
-            {cursors.map((cur) => <Page key={`${rk}${cur}`} filters={f} after={cur} showEmpty={showEmpty} dir={dir} onOpen={onOpen} onLoaded={onLoaded} first={false} />)}
+            <Page key={`p0${rk}`} counted={counted} filters={f} after={null} showEmpty={showEmpty} dir={dir} onOpen={onOpen} onLoaded={onLoaded} first />
+            {cursors.map((cur) => <Page key={`${rk}${cur}`} counted={counted} filters={f} after={cur} showEmpty={showEmpty} dir={dir} onOpen={onOpen} onLoaded={onLoaded} first={false} />)}
           </ul>
           <div className="pl-more" data-testid="pl-more-bar">
             <span className="ap-fine tnum" data-testid="pl-showing" role="status">{prog.label}</span>

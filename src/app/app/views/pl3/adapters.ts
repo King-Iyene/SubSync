@@ -20,7 +20,7 @@ export function overviewOf(o: Pl3Overview | null): PlOverview {
   return {
     headline: { openCount: o?.openCount ?? 0, openValueCents: c(o?.openValue?.value), staleCount: o?.stale?.count ?? 0, staleValueCents: c(o?.stale?.value), wonCents: c(o?.wonLast30?.value), lostCents: c(o?.lostLast30?.value), winRate: o?.winRate?.value ?? null, winRateDeals: o?.winRate?.of ?? 0 },
     bigUntouched: o?.bigUntouched ? { count: o.bigUntouched.count, valueCents: c(o.bigUntouched.value), days: o.bigUntouched.days } : undefined,
-    sentence: typeof o?.headline === "string" ? o.headline : "", leak: null, minDeals: 15, excluded: { zeroValue: h?.noValue ?? 0, noOwner: h?.noOwner ?? 0, test: h?.test ?? 0 }, outlier: null, trust: o?.trust ?? null,
+    sentence: typeof o?.headline === "string" ? o.headline : "", leak: null, minDeals: 15, excluded: { zeroValue: h?.noValue ?? 0, noOwner: h?.noOwner ?? 0, test: h?.test ?? 0, outlier: h?.outliers ?? 0 }, outlier: null, trust: o?.trust ?? null,
   };
 }
 
@@ -38,7 +38,7 @@ export function flowOf(m: Pl3MoneyFlow | null, replay: Pl3Replay | null): PlMone
     reasons.set(d.reason, { count: x.count + d.count, value: x.value + d.value });
   }
   const names = new Map(stages.map((s) => [s.id, s.name]));
-  const big = m?.outliers?.[0];
+  const big = m?.outliers?.[0], lo = m?.leftOut;
   return {
     pipelineName: pipe?.name ?? "Pipeline", periodLabel: m?.period ? `${m.period.from.slice(0, 10)} to ${m.period.to.slice(0, 10)}` : "",
     stages: stages.map((s, i) => ({
@@ -57,7 +57,7 @@ export function flowOf(m: Pl3MoneyFlow | null, replay: Pl3Replay | null): PlMone
       stageValueCents: stages.map((s) => c(f.stages.find((x) => x.stageId === s.id)?.value)), stageCounts: stages.map((s) => f.stages.find((x) => x.stageId === s.id)?.count ?? 0),
     })) : null,
     minDeals: 15,
-    excluded: { zeroValue: 0, noOwner: 0, test: 0 },
+    excluded: { zeroValue: lo?.noValue ?? 0, noOwner: lo?.noOwner ?? 0, test: lo?.test ?? 0, outlier: lo?.outlier ?? 0, outlierCents: c(lo?.outlierValue), ownerCounted: lo?.ownerCounted === true, testsCounted: lo?.testsCounted === true },
     outlier: big ? { name: big.name ?? "One deal", share: big.sharePct / 100 } : null,
   };
 }
@@ -121,6 +121,7 @@ export function adapt(part: PlPart, raw: unknown, aux?: unknown): unknown {
 /** The dates always come from the date bar (usePageRange): there is no "days back from today" here, and no clock. `fromTime` / `toTime` (HH:MM, Lagos time) are set only when the bar has hours. */
 export type PlFiltersLike = { from?: string; to?: string; fromTime?: string; toTime?: string; locationId: string; pipeline: string; ownerId: string; q: string; includeTest?: boolean };
 const DEAL_STATUS = new Set(["open", "won", "lost", "abandoned"]);
+const LEFT_OUT_BUCKETS = new Set(["no_value", "no_owner", "test", "outlier"]);
 /** Drill-down words are translated to the server's own (status or stale become bucket, lostReason becomes reason, pageSize becomes size); the server re-checks every one of them. */
 export function queryOf(part: PlPart, f: PlFiltersLike, extra: Record<string, string | number | undefined> = {}): string {
   const p = new URLSearchParams({ part: API_PART[part] });
@@ -132,7 +133,9 @@ export function queryOf(part: PlPart, f: PlFiltersLike, extra: Record<string, st
   if (f.includeTest) p.set("test", "1");
   if (extra.dir === "asc") p.set("dir", "asc");
   const status = typeof extra.status === "string" && DEAL_STATUS.has(extra.status) ? extra.status : "";
-  if (part === "list") { const bucket = extra.stale ? "stale" : status; if (bucket) p.set("bucket", bucket); }
+  // A left-out reason (no value, no owner, test, big deal) opens exactly the deals that were counted under that name; otherwise stale, or the deal status.
+  const reasonBucket = typeof extra.bucket === "string" && LEFT_OUT_BUCKETS.has(extra.bucket) ? extra.bucket : "";
+  if (part === "list") { const bucket = reasonBucket || (extra.stale ? "stale" : status); if (bucket) p.set("bucket", bucket); }
   if (extra.stage) p.set("stage", String(extra.stage));
   if (extra.after) p.set("after", String(extra.after));
   if (extra.total) p.set("total", String(extra.total));

@@ -11,6 +11,8 @@ import { useReducedMotion } from "../speed6-base";
 import { usePl, type PlFilters } from "./data";
 import { money, moneyShort, pct } from "./format";
 import { FLOW_FIXTURE } from "./fixtures";
+import { LeftOutLine, LEFT_OUT_TITLE } from "./left-out-line";
+import { OwnerlessNote } from "./ownerless-note";
 import { River } from "./river-view";
 
 /** Fake numbers for looking at the shape of the river. Shown only when the user asks, always marked Example, never mixed with real data. */
@@ -21,7 +23,7 @@ export const hasNoValuedDeals = (f: PlMoneyFlow | null): boolean => !!f && f.sta
 // MONEY FLOW = the RIVER (river-view.tsx): ribbons between stages (conversion % on each), piles of cash where deals sit, stuck piles hatched ochre, lost money drains into a muted channel, won lands in the vault.
 // When no deal has a dollar value the same picture counts DEALS (cards instead of bills) so the screen is never blank. The old coin stacks are kept in the unused coin file, hidden at King's request.
 
-export type FlowPick = { title: string; count: number; params: { stageId?: string; bucket?: "no_value"; stale?: boolean; status?: "won" | "lost"; lostReason?: string; ownerId?: string } };
+export type FlowPick = { title: string; count: number; params: { stageId?: string; bucket?: "no_value" | "no_owner" | "test" | "outlier"; stale?: boolean; status?: "won" | "lost"; lostReason?: string; ownerId?: string } };
 
 function applyView(f: PlMoneyFlow, person: string, day: number | null): { stages: PlStage[]; drains: PlDrain[]; wonCents: number; wonCount: number } {
   let stages = f.stages, drains = f.drains, wonCents = f.won.valueCents, wonCount = f.won.count;
@@ -123,7 +125,8 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
         {!enough && <p className="ap-fine" role="status">Not enough closed deals yet ({closed} of {data.minDeals} needed) to name the biggest leak. The picture above is still true.</p>}
         {totalStale > 0 && <p className="ap-fine">{totalStale} stuck deals{counts ? "" : `, ${money(view.stages.reduce((a, s) => a + s.staleValueCents, 0))} in total`}.</p>}
         {data.outlier && <p className="ap-fine">{data.outlier.name} is {pct(data.outlier.share)} of the money, so it is left out of the averages.</p>}
-        <p className="ap-fine">Left out of the money: {data.excluded.zeroValue} deals with no value, {data.excluded.noOwner} with no owner, {data.excluded.test} test deals.</p>
+        {!person && <LeftOutLine x={data.excluded} onPick={(key, count) => onPick({ title: LEFT_OUT_TITLE[key], count, params: { bucket: key } })} />}
+        {!person && !showExample && <OwnerlessNote count={data.excluded.noOwner} counted={data.excluded.ownerCounted === true} testId="pl-flow-ownerless" />}
       </div>
     </div>
   );

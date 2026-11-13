@@ -82,6 +82,8 @@ export type Pl3MoneyFlow = {
   /** Single deals over 40% of a total, shown apart so one big deal never rules the picture. */
   outliers: Array<{ opportunityId: string; name: string | null; value: number; sharePct: number; stageId: string | null }>;
   period: { from: string; to: string }; pipelineId: string | null; pipelines: Array<{ id: string; name: string; locationId: string }>;
+  /** Every reason open deals of THIS pipeline are left out of its money, counted with the same rules as the drill-down lists (so the numbers add up to the rows a click opens). */
+  leftOut?: { noValue: number; noOwner: number; test: number; outlier: number; outlierValue: number; ownerCounted: boolean; testsCounted: boolean };
   historyDays: number; enoughHistory: boolean;
 };
 
@@ -175,5 +177,5 @@ export type Pl3Cards = {
   refreshing?: boolean;
   totals: { pipelines: number; emptyHidden: number; openValue: number; wonValue: number; lostValue: number; openCount: number; wonCount: number; lostCount: number; staleCount: number; noOwnerCount: number;
     /** Deals with a test-looking name, in money and count; how many pipelines in all (empty ones too); and whether they are counted now: by the company's setting, by this screen's toggle, or not. */
-    testCount?: number; testValue?: number; all?: number; countsTests?: "setting" | "toggle" | null };
+    testCount?: number; testValue?: number; all?: number; countsTests?: "setting" | "toggle" | null; /** "Count deals without an owner" is on (Settings, Targets): ownerless deals are inside the money. */ countsOwnerless?: boolean };
 };

@@ -24,6 +24,10 @@ export const GHL_SCOPES = [
   "opportunities.write",
   "locations/tags.write",
   "locations/tasks.write",
+  // Release 1.1.0, OPTIONAL, for coming features (AI data cleaning changes custom field values after a preview). Not used yet. Together with
+  // conversations/reports.readonly, locations/tasks.readonly, locations/tasks.write and locations/tags.write above, asked for now so no install has to approve again later.
+  // NEVER add conversations/message.write, invoices.write or conversations.write (delete): see NOT_REQUESTED in scope-groups.ts.
+  "locations/customFields.write",
   // Workflows module (optional): read the list and history, then change after a preview. Campaigns are read only.
   "workflows.readonly",
   "workflows.logs",
