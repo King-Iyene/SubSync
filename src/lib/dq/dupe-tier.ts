@@ -38,3 +38,22 @@ export const DIFFERENT_NAMES = "different names";
 /** "Same email, different names". Added to the badge only when the tier was lowered for this reason. */
 export const withNameNote = (badge: string): string => `${badge}, ${DIFFERENT_NAMES}`;
 export const DIFFERENT_NAMES_WHY = "The email or phone is shared, but the names are different people's names. This may be a shared mailbox or a household. Check before you merge.";
+
+export type TierTally = Record<SureTier, { groups: number; extra: number }>;
+/** The read-time key of a stored group (account + group key). */
+export const lowerKey = (loc: string, key: string): string => `${loc}\u0000${key}`;
+/** Of the stored-"certain" groups, the ones whose names differ (so they really belong to "likely"). Key -> group size. One rule for the tab counts, each tab's list and the bulk merge. */
+export function loweredGroups(certain: ReadonlyArray<{ loc: string; key: string; size: number; names: ReadonlyArray<string | null | undefined> }>): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const g of certain) if (effectiveTier("certain", g.names) !== "certain") out.set(lowerKey(g.loc, g.key), g.size);
+  return out;
+}
+/** Moves the lowered groups from the stored "certain" count to "likely", so the tab counts, the headline split and the rows always agree. */
+export function applyLowering(stored: TierTally, lowered: ReadonlyMap<string, number>): TierTally {
+  const out: TierTally = { certain: { ...stored.certain }, likely: { ...stored.likely }, possible: { ...stored.possible } };
+  for (const size of lowered.values()) {
+    out.certain.groups--; out.certain.extra -= size - 1;
+    out.likely.groups++; out.likely.extra += size - 1;
+  }
+  return out;
+}
