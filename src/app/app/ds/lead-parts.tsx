@@ -70,7 +70,7 @@ const BTN = "ds-press inline-flex min-h-11 cursor-pointer items-center rounded-m
 /** One tap to write down how a call went. It is saved on the contact in your CRM (a note, a tag, and for "follow up" a task) and on SubSync's own list, so the person leaves the call lists for 12 hours. */
 export function LogCall({ locationId, contactId, onLogged }: { locationId: string; contactId: string; onLogged: (label: string, message?: string, id?: string) => void }) {
   const api = useApiClient();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   // Starting a call (any Call button) opens this, so the result is one tap away and goes to the CRM.
   useEffect(() => { const on = () => setOpen(true); window.addEventListener(CALL_STARTED, on); return () => window.removeEventListener(CALL_STARTED, on); }, []);
   const [busy, setBusy] = useState(false);
@@ -113,7 +113,7 @@ export function LogCall({ locationId, contactId, onLogged }: { locationId: strin
 export function NoteToSelf({ locationId, contactId, name, account }: { locationId: string; contactId: string; name: string; account: string | null }) {
   const api = useApiClient();
   const [text, setText] = useState("");
-  const [noteOpen, setNoteOpen] = useState(false); // kept in state so a refresh of the panel never closes it
+  const [noteOpen, setNoteOpen] = useState(true); // kept in state so a refresh of the panel never closes it
   const [state, setState] = useState<{ kind: "idle" | "saving" | "saved" | "failed" | "copied"; text?: string; id?: string }>({ kind: "idle" });
   const save = async () => {
     if (!text.trim() || state.kind === "saving") return;

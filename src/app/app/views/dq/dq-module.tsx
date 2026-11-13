@@ -69,8 +69,8 @@ export function DqModule({ kind, start, duplicatesOn, intakeOn, fixOn, cleanupOn
       <div className="space-y-6">
         {sampleOn() && <p className="rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground" role="status">Sample data: these are not your real contacts.</p>}
         {fixOn ? <FixTab /> : <EmptyState title="Fix lists are switched off" body="They will appear here as soon as they are ready for your account." />}
-        {kind !== "client" && <details className="rounded-xl border bg-card p-3" data-testid="dq-tidy"><summary className="cursor-pointer text-sm font-semibold">Tidy phone numbers, names and email typos (preview first)</summary><div className="mt-3"><CleanupView embedded /></div></details>}
-        {legacyHealth && <details className="rounded-xl border bg-card p-3"><summary className="cursor-pointer text-sm font-medium">More data health tools (alerts, imports, safe fixes)</summary><div className="mt-3">{legacyHealth}</div></details>}
+        {kind !== "client" && <details open className="rounded-xl border bg-card p-3" data-testid="dq-tidy"><summary className="cursor-pointer text-sm font-semibold">Tidy phone numbers, names and email typos (preview first)</summary><div className="mt-3"><CleanupView embedded /></div></details>}
+        {legacyHealth && <details open className="rounded-xl border bg-card p-3"><summary className="cursor-pointer text-sm font-medium">More data health tools (alerts, imports, safe fixes)</summary><div className="mt-3">{legacyHealth}</div></details>}
       </div>
     ),
     intake: <IntakeTab opts={opts} account={account} setAccount={setAccount} pick={setSheet} />,

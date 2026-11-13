@@ -40,6 +40,7 @@ const TIPS: Record<TabKey, [string, string]> = {
   today: ["Today", "What to do first, in one sentence and one button."], recover: ["Recover", "People who wrote, called or booked and were missed, with what they may be worth."], proof: ["Proof", "A weekly receipt you can show a client: what we found and what was fixed."],
   numbers: ["Numbers", "The few numbers that matter, each one opens the people behind it."], settings: ["Settings", "Your daily email and what you put aside."],
 };
+const TAB_KEYS: TabKey[] = ["today", "recover", "proof", "numbers", "settings"];
 const MODULE_NAME: Record<Td3Module, string> = { speed: "Speed to lead", appointments: "Appointments", pipeline: "Pipeline and deals", clients: "Clients", team: "Team", "data-health": "Data health", settings: "Settings" };
 const num = (n: number) => n.toLocaleString("en-US");
 const ago = (iso: string | null): string => { if (!iso) return ""; const h = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 3_600_000)); return h < 1 ? "just now" : h < 48 ? `${h} h ago` : `${Math.round(h / 24)} d ago`; };
@@ -175,7 +176,7 @@ function Hero({ t, go, open, location }: { t: Td3Today; go: (m: Td3Module, loc?:
 
 /** The Today tab: the slim number strip, the money cards (Finance, Wallet) and the older Today (headline, accounts, lists) exactly as it was before the rebuild. The blocks the rebuild added (the brief card, accounts to save,
  *  What to do today, In this order, Done today) are NOT drawn here; their code is kept in TodayTabBlocks below. Where each one lives now: docs/DECISIONS.md "Today, 12 Nov". */
-function TodayTab({ location, level, go, open, nav, kind }: { kind: AccessKind; location: string; level: string; go: (m: Td3Module, loc?: string | null) => void; open: (d: NonNullable<Drill>) => void; nav: GoFn }) {
+function TodayTab({ location, level, go, open, nav, kind, saveOn, openRecover }: { saveOn: boolean; openRecover: (location: string) => void; kind: AccessKind; location: string; level: string; go: (m: Td3Module, loc?: string | null) => void; open: (d: NonNullable<Drill>) => void; nav: GoFn }) {
   const r = useTd<Td3Today>("today", { location: location || undefined });
   return (
     <div className="cl-stack td-compact" data-testid="td-today">
@@ -193,6 +194,7 @@ function TodayTab({ location, level, go, open, nav, kind }: { kind: AccessKind; 
           </>
         )}
       </Load>
+      {saveOn && level !== "self" && <SaveCard openList={openRecover} go={(v, loc) => nav(v, loc)} />}
       {level !== "self" && <FinanceTodayCard go={nav} />}
       {level === "all" && <WalletCard go={nav} />}
       <section className="td-more-below" aria-label="More about today" data-testid="td-below">
@@ -469,6 +471,7 @@ function SettingsTab({ level, cashOn, saveOn, nav }: { level: string; cashOn: bo
               {problem && <p className="ap-fine" role="alert">{problem}</p>}
             </form>
             <p className="ap-fine mt-2">Emails go out only once sending is switched on for your business. Until then this page shows exactly what would be sent. Every email has a link to stop it.</p>
+            {level !== "self" && <p className="ap-fine mt-2" data-testid="td-alert-links">More ways to be told: <button type="button" className="ap-link" onClick={() => nav("notifications")}>Choose who is told and when</button> or <button type="button" className="ap-link" onClick={() => nav("alerts")}>see the alerts list</button>.</p>}
           </section>
           {today.data && (
             <section className="td-card2" aria-label="Preview">
@@ -477,7 +480,7 @@ function SettingsTab({ level, cashOn, saveOn, nav }: { level: string; cashOn: bo
             </section>
           )}
           {level === "all" && <div className="td-card2"><BriefTools /></div>}
-          {saveOn && level !== "self" && <details className="td-card2" data-testid="td-settings-save"><summary className="td-h2">Accounts to save (the list and the paused ones)</summary><SaveCard openList={(loc) => nav("speed", loc || undefined)} go={(v, loc) => nav(v, loc)} /></details>}
+          {saveOn && level !== "self" && <details open className="td-card2" data-testid="td-settings-save"><summary className="td-h2">Accounts to save (the list and the paused ones)</summary><SaveCard openList={(loc) => nav("speed", loc || undefined)} go={(v, loc) => nav(v, loc)} /></details>}
           {cashOn && level !== "self" && <div className="td-card2"><CashSettings /></div>}
           {level !== "self" && today.data && (
             <section className="td-card2" aria-label="Put aside" data-testid="td-settings-aside">
@@ -502,14 +505,15 @@ export function TodayModule({ go, kind, initialTab = "today", fromOverview = fal
   const level = (opt.data?.level ?? "all") as "all" | "account" | "self";
   const cash = useCashFlags();
   const link = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.hash.split("?")[1] ?? "");
-  const [tab, setTab] = useState<TabKey>(() => initialTab), [location, setLocation] = useState(() => (/^[A-Za-z0-9_-]{3,64}$/.test(link.get("account") ?? "") ? (link.get("account") as string) : "")), [drill, setDrill] = useState<Drill>(null);
+  const [tab, setTab] = useState<TabKey>(() => { const t = link.get("tab"); return t && (TAB_KEYS as string[]).includes(t) ? (t as TabKey) : initialTab; }), [location, setLocation] = useState(() => (/^[A-Za-z0-9_-]{3,64}$/.test(link.get("account") ?? "") ? (link.get("account") as string) : "")), [drill, setDrill] = useState<Drill>(null);
   const ta = parseTodayAccounts(useSyncExternalStore(subscribeTa, () => window.location.hash, () => "")), taKey = ta.join(","), taSeen = useRef(false);
   // The account choice in the bar at the top and the one on this page are one choice: one account narrows every number here; several are counted as all, and the page says so.
   useEffect(() => { if (taKey || taSeen.current) setLocation(taKey && !taKey.includes(",") ? taKey : ""); taSeen.current = taKey !== ""; }, [taKey]);
   const flags = opt.data?.flags ?? null;
   const flagOf: Record<TabKey, string | null> = { today: "td_today", recover: null, proof: "td_proof", numbers: "td_numbers", settings: null };
   const saveOn = cash.flags?.cf_save === true, cashMail = saveOn || cash.flags?.cf_email === true;
-  const tabs = useMemo(() => (["today", "proof", "numbers", "settings"] as TabKey[]).filter((k) => (k !== "settings" || level !== "self") && (!flagOf[k] || flags === null || flags[flagOf[k] as string] !== false)), [flags, level]); // eslint-disable-line react-hooks/exhaustive-deps
+  const recoverOn = cash.flags?.cf_recover === true;
+  const tabs = useMemo(() => (["today", "recover", "proof", "numbers", "settings"] as TabKey[]).filter((k) => (k !== "settings" || level !== "self") && (k !== "recover" || (recoverOn && level !== "self")) && (!flagOf[k] || flags === null || flags[flagOf[k] as string] !== false)), [flags, level, recoverOn]); // eslint-disable-line react-hooks/exhaustive-deps
   const active = tabs.includes(tab) ? tab : tabs[0];
   const accounts = opt.data?.accounts ?? [];
   // A business or a client's staff have no Clients, Settings or Team-wide pages of the owner's kind: the closest page of their own is used instead.
@@ -520,10 +524,12 @@ export function TodayModule({ go, kind, initialTab = "today", fromOverview = fal
   // The list scrolls itself into view and takes focus when it appears (DrillList), so choosing a number always shows its rows.
   const open = (d: NonNullable<Drill>) => { setDrill(d); };
   const goTab = (t: TabKey) => { setTab(t); setDrill(null); };
+  // "Open the list" on a save card: the win-back list when it is on, otherwise Speed to lead.
+  const openRecover = (loc: string) => { if (recoverOn && level !== "self") { if (loc) setLocation(loc); goTab("recover"); } else go("speed", loc || undefined); };
   if (!sample && opt.data && opt.data.canSee === false) return <div data-testid="page" className="td-page"><header className="td-head"><h1>Today</h1></header></div>;
   const body = (() => {
     switch (active) {
-      case "today": return <TodayTab location={location} level={level} go={goModule} open={open} nav={go} kind={kind} />;
+      case "today": return <TodayTab location={location} level={level} go={goModule} open={open} nav={go} kind={kind} saveOn={saveOn} openRecover={openRecover} />;
       case "recover": return <RecoverTab location={location} level={level} accounts={accounts.length} />;
       case "proof": return <ProofTab location={location} accounts={level !== "self"} open={open} />;
       case "numbers": return <NumbersTab location={location} go={goModule} open={open} fromOverview={fromOverview} level={level} nav={go} kind={kind} />;

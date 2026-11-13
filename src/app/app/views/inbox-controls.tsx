@@ -83,7 +83,7 @@ export function SavedViews({ filter, views, max, onApply, onSave, onRemove, mess
     try { await onSave(name.trim()); setName(""); } finally { setBusy(false); }
   };
   return (
-    <details className="text-sm" data-testid="saved-views">
+    <details open className="text-sm" data-testid="saved-views">
       <summary className="cursor-pointer select-none text-muted-foreground">Saved views ({views.length})</summary>
       <div className="mt-2 space-y-2">
         {views.length === 0 ? <p className="text-xs text-muted-foreground">Choose your tab and filters, give them a name, and come back to them in one tap. Only you see your saved views.</p> : (

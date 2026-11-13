@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { shortWords, summaryText } from "@/lib/analytics/unanswered-v2";
 import { useApiClient, useData } from "../session";
 import type { GoFn } from "../nav";
-import { EmptyState, ErrorState, InlineAlert, PopMenu, SkeletonRows, type MenuItem } from "../ds";
+import { EmptyState, ErrorState, InlineAlert, ActionRow, SkeletonRows, type MenuItem } from "../ds";
 import "./today-theme.css";
 import { CountUp, Q } from "./speed6-base";
 import { TipHost } from "./speed-popup";
@@ -195,7 +195,7 @@ export function UnansweredRoom({ go, ui, embedded }: { go: GoFn; ui: UiPayload; 
               : <p className="s6-sub !mb-0" data-testid="page-subtitle">Customers who wrote and are still waiting. SubSync shows who; it never sends a reply.</p>}
           </div>
           {ui.flags.inbox_search === true && <FindBox multi={multi} />}
-          <PopMenu label="More" items={menu} testId="inbox-more" triggerClassName="s6-btn">More<ChevronDown aria-hidden className="size-3.5" /></PopMenu>
+          <ActionRow items={menu} testId="inbox-more" />
         </header>
         <RecoverLink go={go} />
 

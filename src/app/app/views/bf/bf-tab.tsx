@@ -130,7 +130,7 @@ export function BfTab({ scope, people, accounts, sources, flags, testId = "bf-ta
           {sum.data.timesNote && <p className="bf-fine">{sum.data.timesNote} <InfoTip text="A median is the middle value: half of the leads were faster, half slower. It is read from the latest 20,000 leads of the filters." label="What a median is" /></p>}
         </section>
         {cmp !== "none" && (cmp === "prev" || cmpVal) && <Compare a={sum.data} scope={scope} local={local} cmp={cmp} value={cmpVal} labelA={cmp === "prev" ? "This period" : "Now showing"} people={people} accounts={accounts} />}
-        <details className="bf-more" data-testid="bf-more"><summary className="bf-link">More: leak finder, split by account or person, weekly cohorts and forecast</summary>
+        <details open className="bf-more" data-testid="bf-more"><summary className="bf-link">More: leak finder, split by account or person, weekly cohorts and forecast</summary>
         <LeakFinder res={leaks} onOpen={(title, step, extra) => open({ title, step, mode: "dropped", extra, count: null })} />
         <Split scope={scope} local={local} by={by} setBy={setBy} dims={dims} onOpen={open} onSet={(d, id) => set(d === "dow" ? { dow: id } : d === "hour" ? { hour: id } : d === "age" ? { age: id } : d === "setter" ? { setter: idParam(id) } : d === "closer" ? { closer: idParam(id) } : d === "owner" ? { owner: idParam(id) } : d === "form" ? { form: idParam(id) } : {})} />
         {flags.cohorts && <Cohorts scope={scope} local={local} />}
