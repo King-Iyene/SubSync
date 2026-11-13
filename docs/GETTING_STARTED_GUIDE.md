@@ -35,6 +35,10 @@ In Settings, Alerts and connections, type one email address. You will get a shor
 
 Open **Team** and type names for the people shown by an id (the platform only gives SubSync an id). Replies and appointments are then shown by name.
 
+## 7. Optional: AI wording for your 7 am brief
+
+In **Settings, Integrations, AI** you can connect your own AI account: **Connect with OpenRouter** (one click; uses your OpenRouter credit), **Sign in with ChatGPT** (shown as "coming" until OpenAI approves our app), or **Paste an API key** from Anthropic, OpenAI, Google Gemini or any OpenAI-compatible service (billed by that provider to you). Set a monthly limit, press **Preview a sample** to see what it writes and exactly what was sent. A ChatGPT or Claude chat subscription cannot be used with a key. It only suggests; it never messages a lead or changes your CRM.
+
 ## What SubSync will never do
 
 - It never sends a message to your contacts.

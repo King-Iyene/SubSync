@@ -151,9 +151,9 @@ export async function briefFor(inst: string, prefs: Pick<BrPrefs, "sections" | "
 const appBase = () => (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
 
 /** The email of one brief to the person's own saved address, through the outward gate. Returns whether it was really sent or only rehearsed (dry run). */
-export async function emailBrief(inst: string, email: string, b: Brief): Promise<{ dryRun: boolean; subject: string; text: string }> {
+export async function emailBrief(inst: string, email: string, b: Brief, ai: string | null = null): Promise<{ dryRun: boolean; subject: string; text: string }> {
   const base = appBase(), stop = unsubscribeUrl(base, inst, email);
-  const m = briefEmail(b, { appUrl: base, stopUrl: stop, settingsUrl: `${base}/app#today?brief=settings` });
+  const m = briefEmail(b, { appUrl: base, stopUrl: stop, settingsUrl: `${base}/app#today?brief=settings`, ai });
   const r = await realTransports(inst, () => stop).email(email, { subject: m.subject, text: m.text, html: m.html }, []);
   const dry = r.ok ? r.dryRun === true : !isLive("SEND_EMAIL_LIVE");
   return { dryRun: dry, subject: m.subject, text: m.text };
@@ -172,7 +172,7 @@ export async function runBriefs(inst: string, f: BriefFlags, now = Date.now()): 
     const b = await briefFor(inst, { sections: [...sectionsOf(p.sections)], timezone: tz }, f, now);
     // Nothing needs the person: no email (one useful brief, not a ping that says nothing). The in-app brief still says so.
     if (!b.items.length) continue;
-    const r = await emailBrief(inst, p.email as string, b);
+    const r = await emailBrief(inst, p.email as string, b, await (await import("../ai/brief")).wordingForEmail(inst, b));
     await record(inst, p.user_key as string, key, "email", r.dryRun ? "dry_run" : "sent", b, false);
     sent++;
   }

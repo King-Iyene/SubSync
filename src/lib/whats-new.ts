@@ -9,6 +9,7 @@ export type NewsEntry = {
 export const NEW_WINDOW_DAYS = 14;
 
 export const NEWS: readonly NewsEntry[] = [
+  { id: "ai-byo", date: "2026-11-13", title: "AI wording for your brief (your own AI)", line: "Connect your own AI account (OpenRouter, an API key from Anthropic, OpenAI or Google) and get a short plain-English note on your 7 am brief. You set the monthly limit and see exactly what was sent. It only suggests.", view: "settings", feature: "ai_brief" },
   { id: "sy-power-dialer", date: "2026-11-13", title: "Start calling opens your power dialer", line: "In Speed to lead, Start calling sends up to 25 waiting leads to your CRM call queue after one preview and one confirm, then opens your CRM call queue in a new tab. Skips anyone who asked not to be contacted or who is outside calling hours, lists who was sent, and has Undo. SubSync never places a call.", view: "speed", feature: null },
   { id: "sy-auto", date: "2026-11-13", title: "Syncs by itself, in seconds", line: "SubSync now checks for new changes when you open it, when you come back to the tab and about once a minute, and shows Live and Updated seconds ago. Only what changed is read, so a big account no longer slows the rest. Sync now is still there, and so is a Full re-sync.", view: null, feature: null },
   { id: "st-sale-basis", date: "2026-11-12", title: "How a sale is counted", line: "Pick how your team counts a sale, including whether a sale with no dollar value counts. Every Sold figure follows your choice and says which one it used. It is in Settings.", view: "settings", feature: null },

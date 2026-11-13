@@ -62,7 +62,8 @@ const PROOFS: Record<string, Proof[]> = {
   isolation_tests: [has("scripts/check-tenancy.ts", "cross-reads")],
   owner_delete: [has("src/lib/access.ts", "mayDeleteData"), has("src/lib/api/router.ts", "data\\.purge_refused"), has("src/lib/api/router.ts", "data\\.purged"), has("src/lib/api/router.ts", "Type DELETE to confirm")],
   settings_audit: [has("src/lib/feedback-queries.ts", "settings\\.changed"), has("src/lib/api/router.ts", "logSettingsChange\\(ctx\\.installationId")],
-  no_ai: [sourceLacks("anthropic|openai|generativelanguage|api\\.cohere|mistral\\.ai")],
+  // AI is the customer's own connection, off by default, and names never leave without the account's opt-in (the gateway refuses it).
+  ai_own: [has("src/lib/ai/gateway.ts", "includesNames && !conn\\.shareNames"), has("src/lib/ai/gateway.ts", "AI_KILL_ALL"), has("src/lib/flags-core.ts", "\"ai_byo\"")],
   no_sending_permission: [() => { assert.ok(!(GHL_SCOPES as readonly string[]).includes("conversations/message.write")); assert.ok(!SCOPE_GROUPS.some((g) => g.scopes.some((s) => (s.scope as string) === "conversations/message.write"))); }],
   never_stored: [() => {
     const schema = schemaFromMigrations();
@@ -140,7 +141,7 @@ test("the outside services on the page are the ones in the code and config, and 
   // No service is used by the code without being listed: the hosts the source talks to, other than the CRM's own and the listed ones, are none.
   const hosts = new Set<string>();
   for (const f of walk("src")) for (const m of read(f).matchAll(/https:\/\/([a-z0-9.-]+\.[a-z]{2,})/gi)) hosts.add(m[1].toLowerCase());
-  const known = /(^|\.)(resend\.com|slack\.com|fathom\.(video|ai)|leadconnectorhq\.com|gohighlevel\.com|zoom\.us|googleapis\.com|google\.com|kdsquares\.com|vercel\.app|vercel\.com|supabase\.(co|com)|w3\.org|openapi\.vercel\.sh|example\.com|youragency\.com|fonts\.g(oogleapis|static)\.com|github\.com|nextjs\.org|ui\.shadcn\.com|developer\.mozilla\.org)$/;
+  const known = /(^|\.)(resend\.com|slack\.com|fathom\.(video|ai)|leadconnectorhq\.com|gohighlevel\.com|zoom\.us|googleapis\.com|google\.com|kdsquares\.com|vercel\.app|vercel\.com|supabase\.(co|com)|w3\.org|openapi\.vercel\.sh|example\.com|youragency\.com|fonts\.g(oogleapis|static)\.com|github\.com|nextjs\.org|ui\.shadcn\.com|developer\.mozilla\.org|openrouter.ai|api.openai.com|auth.openai.com|api.anthropic.com)$/;
   const unknown = [...hosts].filter((h) => !known.test(h));
   assert.deepEqual(unknown, [], "a web host the code talks to that the Trust page does not account for");
 });

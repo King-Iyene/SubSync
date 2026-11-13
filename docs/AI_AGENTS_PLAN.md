@@ -1,9 +1,11 @@
-# AI agents plan (a plan only: nothing here is built)
+# AI agents plan (status: BRING YOUR OWN AI platform and job 1 built, behind flags, default off)
 
-Status: PLAN. No AI call exists in the product today. Meeting-note matching, Slack routing, dedupe and every number are plain, tested code (`src/lib/connections/auto-note.ts`, `slack-auto.ts`, `meeting-plan.ts`). AI is added only where it is clearly better than rules, and never where a rule is exact.
+Status (13 Nov 2026): the platform (provider gateway, safety layer, per-account connection, usage panel) and job 1, the 7 am brief writer, are built behind the flags `ai_byo`, `ai_brief` and `ai_chatgpt`, all default off. Meeting-note matching, Slack routing, dedupe and every number remain plain, tested code. AI is added only where it is clearly better than rules, and never where a rule is exact. What is built and what is next: section 8.
 
-## 0. The answer to "can our Claude subscription tokens power the product?"
-No. A Claude or Anthropic SUBSCRIPTION (the one Claude Code uses) is for one person using Anthropic's apps. It cannot legally or technically power a hosted multi-tenant product. The product needs an Anthropic API key with per-tenant metering, billed per token. Claude Code subagents like the ones building SubSync are a development tool only and never run inside the product.
+## 0. DECISION (King, final): bring your own AI. SubSync never pays for AI
+Each customer connects THEIR OWN AI account with their own key, so there is no AI bill for SubSync and no key for King to hold. A consumer ChatGPT or Claude chat subscription has no API and cannot be used with a pasted key (the UI says so). The three ways to connect: OpenRouter sign-in (OAuth PKCE, live), Sign in with ChatGPT (OpenAI plan-usage OAuth, built but OFF until OpenAI approves our app), and a pasted API key (Anthropic, OpenAI, Google Gemini, any OpenAI-compatible service). Anthropic is API key only: Anthropic prohibits subscription login in other products, so none is built.
+
+Background: a Claude or Anthropic SUBSCRIPTION (the one Claude Code uses) is for one person using Anthropic's apps. It cannot legally or technically power a hosted multi-tenant product. The product needs an Anthropic API key with per-tenant metering, billed per token. Claude Code subagents like the ones building SubSync are a development tool only and never run inside the product.
 
 ## 1. Where plain code stays (do NOT use AI)
 Email matching of a meeting to a contact (exact email, one match, else wait), Slack routing and quiet hours, dedupe by meeting id, every count, rate, dollar and date, permission checks, undo. These are exact, free and testable. AI would only add cost and risk.
@@ -48,7 +50,11 @@ Usage-based add-on through the marketplace billing meter (Create Wallet Charge A
 3. Autonomous low-risk (opt-in only), then "ask your data".
 
 ## 6. What King must provide
-The Anthropic API key and a monthly spend limit set in the Anthropic console; the decision on the price per run; confirmation that the billing meter is created in the marketplace portal.
+Nothing for AI keys (customers bring their own). King only switches the flags on (docs/KING_TODO_AI.md) and, for ChatGPT sign-in, applies for OpenAI partner access (docs/AI_JOBS_SPEC.md). The older plan to resell AI through a billing meter is dropped.
 
 ## 7. Slack: what is automatic now and what needs King
 Built (default off, dry run): routing rules, pause all, per-account mutes, quiet hours, send-a-test, meeting notices. Not built because it needs a different Slack permission set: one-click channel creation and direct messages need a Slack app with bot scopes (`chat:write`, `channels:manage`, `im:write`, `users:read.email`). King must add those to the Slack app and approve the install; until then the product keeps using incoming webhooks, and the meeting notice is in-app only.
+
+## 8. What is built (BYO-AI, 13 Nov 2026) and what is next
+Built, all default off: `src/lib/ai/` (providers: Anthropic Messages API, OpenAI, Google Gemini, OpenAI-compatible and OpenRouter; gateway with kill switches, per-customer monthly cap, rate limit, retry with backoff, idempotency per tenant, job and input hash, tool-call loop over a read-only whitelist; safety layer with the number check, banned claims, length limit and JSON schema validation; job registry; encrypted store). Tables `ai_connections`, `ai_runs`, `ai_oauth_pending`. Screens: Settings, Integrations, AI (connect three ways, model picker from the provider's own list, monthly limit, pause, names opt-in, per-job switch, Preview with "What was sent to your AI", thumbs, usage panel, typed disconnect). Job 1: the 7 am brief wording, in the app and in the brief email, only when the account has a connection, the job is on and the number check passes.
+Next (specified in docs/AI_JOBS_SPEC.md, not built): data review, data cleaning proposals, Ask your data, duplicate adjudication, setup auditor, then the monthly proof narrator and breach root-cause notes. A scheduled per-account note (today it runs on demand through Preview) is also next.
