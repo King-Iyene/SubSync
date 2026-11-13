@@ -65,9 +65,9 @@ export const FlowCanvas = forwardRef<CanvasHandle, Props>(function FlowCanvas({ 
     const el = box.current; if (!el) return;
     const onWheel = (e: WheelEvent) => {
       if (!wheelZoom && !(e.ctrlKey || e.metaKey)) return;
-      e.preventDefault();
+      e.preventDefault(); e.stopPropagation(); // also inside the CRM's frame: nothing above us sees this wheel
       const r = el.getBoundingClientRect();
-      setView(zoomAt(viewRef.current, viewRef.current.z * wheelFactor(e.deltaY, e.deltaMode), e.clientX - r.left, e.clientY - r.top), false);
+      setView(zoomAt(viewRef.current, viewRef.current.z * wheelFactor(e.deltaY || e.deltaX, e.deltaMode), e.clientX - r.left, e.clientY - r.top), false);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);

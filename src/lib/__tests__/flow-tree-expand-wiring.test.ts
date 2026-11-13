@@ -42,6 +42,12 @@ test("plain wheel resizes in the card and in full screen, with a non-passive lis
 test("the card keeps a strip where the wheel scrolls the page", () => {
   assert.match(read("../../app/app/views/ap3/ap3.css"), /\.ap-canvas-inline \.ap-canvas-view \{ right: 12px; \}/);
 });
+test("works inside the CRM frame: wheel stops at the canvas, overscroll contained, touch handled by us", () => {
+  assert.match(canvas, /e\.stopPropagation\(\)/);
+  const css = read("../../app/app/views/ap3/ap3.css");
+  assert.match(css, /\.ap-canvas-view \{[^}]*touch-action: none; overscroll-behavior: contain;/);
+  assert.doesNotMatch(canvas, /onWheel=\{/, "no passive React wheel handler");
+});
 test("the tree is fitted on load and whenever the drawing changes", () => {
   assert.match(canvas, /fitKey/);
   assert.match(tree, /fitKey=\{fitKey\}/);
