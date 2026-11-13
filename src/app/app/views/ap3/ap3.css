@@ -262,3 +262,32 @@ details.ap-sec > summary.ap-sec-h::-webkit-details-marker { display: none; }
 .ap-status[data-on="1"] i { background: color-mix(in srgb, var(--s6-cyan) 70%, var(--s6-line)); } .ap-status[data-on="1"] { color: var(--foreground); }
 .ap-calpop { display: inline-block; } .ap-calpop summary { font-size: 0.75rem; }
 @media (max-width: 700px) { .ap-sumrow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---- Flow Tree canvas (pan + zoom) and the full screen view ---- */
+.ap-canvas { position: relative; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--s6-line) 80%, transparent); background: color-mix(in srgb, var(--s6-sunk) 55%, transparent); overflow: hidden; }
+.ap-canvas-inline { height: clamp(560px, calc(100vh - 150px), 1000px); }
+.ap-canvas-ph { display: grid; place-items: center; color: var(--muted-foreground); font-size: 0.875rem; }
+.ap-canvas-view { position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab; outline: none; }
+.ap-canvas[data-dragging] .ap-canvas-view { cursor: grabbing; }
+.ap-canvas-view:focus-visible { box-shadow: inset 0 0 0 2px var(--ring); }
+.ap-canvas-content { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.ap-canvas .ap-node-main, .ap-canvas .ap-cmp { cursor: pointer; }
+.ap-canvas-ctl { position: absolute; right: 10px; bottom: 10px; z-index: 3; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; padding: 4px; max-width: calc(100% - 20px); border-radius: 12px; border: 1px solid color-mix(in srgb, var(--s6-edgec) 28%, transparent); background: color-mix(in srgb, var(--s6-surf) 94%, transparent); box-shadow: 0 4px 14px -6px color-mix(in srgb, var(--foreground) 35%, transparent); }
+.ap-canvas-ctl button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 36px; min-height: 36px; padding: 0 10px; border-radius: 8px; border: 0; background: transparent; color: var(--s6-btn-ink); font: inherit; font-size: 0.8125rem; font-weight: 600; cursor: pointer; }
+.ap-canvas-ctl button:hover { background: color-mix(in srgb, var(--s6-cyan) 14%, transparent); }
+.ap-canvas-ctl button:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.ap-canvas-pct { min-width: 52px !important; font-variant-numeric: tabular-nums; color: var(--foreground) !important; }
+.ap-canvas-hint { position: absolute; left: 12px; bottom: 12px; z-index: 2; font-size: 0.6875rem; color: var(--muted-foreground); pointer-events: none; }
+.ap-full { position: fixed; inset: 0; z-index: 1000; background: var(--background, #fff); color: var(--foreground); }
+.ap-full-box { display: flex; flex-direction: column; height: 100dvh; width: 100vw; padding: 10px 12px 8px; gap: 8px; box-sizing: border-box; }
+.ap-full-head { flex: none; }
+.ap-full-title { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.ap-full-title b { font-size: 1.0625rem; }
+.ap-full-close { margin-left: auto; min-height: 40px; }
+.ap-full-close .ap-x { display: none; }
+.ap-full .ap-tree-bar { margin-bottom: 6px; } .ap-full .ap-preview { margin-bottom: 0; min-height: 36px; }
+.ap-canvas-full { flex: 1 1 auto; min-height: 0; }
+.ap-full-foot { flex: none; max-height: 34vh; overflow: auto; }
+.ap-full-foot p { margin: 4px 0; }
+@media (max-width: 640px) { .ap-full-head .ap-legend { display: none; } .ap-canvas-hint { display: none; } .ap-full-foot { max-height: 40vh; } }
+@media (prefers-reduced-motion: reduce) { .ap-canvas-content { transition: none !important; } }
