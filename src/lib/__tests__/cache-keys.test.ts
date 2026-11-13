@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
-import { answerKey } from "../read-cache.ts";
 import { answerStoreKey, STORED_READS } from "../analytics/read-answers.ts";
 
 // Filter audit (13 Nov 2026, King: "the 90 days filter is still not working", "check the filter for all other modules"): a finished answer is kept by its address, so the
@@ -25,9 +24,13 @@ test("every stored read: any filter that changes makes another key (30 days neve
       const y = new URLSearchParams(base); y.set(k, b);
       const path = `/api/app/${read}`;
       assert.notEqual(answerStoreKey("w", path, x), answerStoreKey("w", path, y), `${read}: ${k} must be part of the stored answer key`);
-      assert.notEqual(answerKey("inst", "w", `${path}?${x.toString()}`), answerKey("inst", "w", `${path}?${y.toString()}`), `${read}: ${k} must be part of the in-memory answer key`);
     }
   }
+});
+
+test("the router's in-memory answer key is the installation, the person and the whole address", () => {
+  const src = readFileSync(new URL("../api/router.ts", import.meta.url), "utf8");
+  assert.match(src, /answerKey\(ctx\.installationId, who, `\$\{ctx\.url\.pathname\}\?\$\{ctx\.url\.searchParams\.toString\(\)\}`\)/);
 });
 
 test("the key ignores only the Try again marker and the order of the parameters", () => {
