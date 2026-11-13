@@ -53,6 +53,7 @@ export function EmailTool({ email, check, onCheck, reload }: { email: EmailData;
         <Btn disabled={!email.hasAddress || changed || busy !== null} onClick={() => void run("verify")} testId="email-verify">{busy === "verify" ? "Checking..." : check ? "Check again" : "Check records"}</Btn>
         <Btn disabled={!email.hasAddress || changed || busy !== null} onClick={() => void run("test")} testId="email-test">{busy === "test" ? "Preparing..." : "Send me a test"}</Btn>
       </div>
+      <p className="text-sm"><a className="font-medium underline underline-offset-4 max-sm:inline-block max-sm:py-3" href="#email">Open email sender health for every client</a></p>
       {msg && <InlineAlert tone={msg.ok ? "success" : "danger"}>{msg.text}</InlineAlert>}
       {check && (
         <div className="rounded-lg border p-3" data-testid="email-records">

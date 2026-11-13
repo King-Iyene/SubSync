@@ -26,7 +26,6 @@ export function ConnectionsSection() {
   const api = useApiClient();
   const { data, error, loading, reload } = useData<Conn>("st/connections");
   const ai = useData<AiStatus>("ai?part=status");
-  const [open, setOpen] = useState(true);
   const [check, setCheck] = useState<EmailCheck | null | undefined>(undefined);
   const [waiting, setWaiting] = useState<"slack" | "fathom" | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -49,7 +48,7 @@ export function ConnectionsSection() {
   if (!data) return null;
   const f = data.fathom;
   const fOk = f.status === "connected";
-  const manage = () => { setOpen(true); setTimeout(() => document.getElementById("connection-details")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); };
+  const manage = () => { setTimeout(() => document.getElementById("connection-details")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); };
   // The Connect buttons start the sign-in straight away (no second click inside a folded section).
   const connect = async (which: "slack" | "fathom") => {
     setMsg(null);
@@ -99,12 +98,10 @@ export function ConnectionsSection() {
           </ToolRow>
         </ul>
       </Card>
-      <div id="connection-details" className="scroll-mt-4">
-        <details open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)} className="rounded-lg border">
-          <summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-medium">Who connected what, rules, test and disconnect</summary>
-          <div className="p-3"><ConnectionsSlot /></div>
-        </details>
-      </div>
+      <section id="connection-details" className="scroll-mt-4" aria-labelledby="connection-details-h">
+        <h2 id="connection-details-h" className="mb-2 text-sm font-semibold">Who connected what, rules, test and disconnect</h2>
+        <ConnectionsSlot />
+      </section>
     </div>
   );
 }
