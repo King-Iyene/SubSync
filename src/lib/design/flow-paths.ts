@@ -20,7 +20,15 @@ export type FlowPaths = {
   minDeals: number;
   /** When SubSync started recording step moves, and whether that is on or before the first chosen day. When it is not, the funnel says so and shows where deals are now, with no flow claims. */
   history?: { since: string | null; covers: boolean };
+  /** True when no deal was created, moved, won or lost in the dates, so the numbers are the open deals where they sit NOW (grouped by their current step), not a flow in the dates. */
+  nowOnly?: boolean;
 };
+
+/** Open deals drawn in deal counts (valued or not), over every step. */
+export const openDealsDrawn = (p: Pick<FlowPaths, "stages">): number => p.stages.reduce((t, s) => t + Math.max(0, s.open) + Math.max(0, s.noValue), 0);
+/** Deals exist but none of them carries money (open, lost or won): the funnel can only count deals. */
+export const pathsAllNoValue = (p: Pick<FlowPaths, "stages" | "won">): boolean =>
+  p.won.cents <= 0 && p.stages.every((s) => s.openCents <= 0 && s.lostCents <= 0) && p.stages.some((s) => s.noValue > 0);
 
 export type Reach = { n: number[]; cents: number[] };
 /** Deals (and money) that got to each step, then one more entry for Won. Length stages + 1. `dealsMode` also counts open deals with no value. */

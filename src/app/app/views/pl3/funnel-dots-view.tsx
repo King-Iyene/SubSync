@@ -2,7 +2,7 @@
 
 import { CalendarCheck, ClipboardCheck, FileText, Handshake, Layers, PhoneCall, Trophy, UserPlus } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { closedDeals, dealsText, lostTotal, pathSteps, type FlowPaths, type PathSeg } from "@/lib/design/flow-paths";
+import { closedDeals, dealsText, lostTotal, openDealsDrawn, pathSteps, pathsAllNoValue, type FlowPaths, type PathSeg } from "@/lib/design/flow-paths";
 import { LEAK_LINE, LEAK_NEEDS } from "@/lib/design/funnel-fx";
 import { dotLegend, funnelModel, halfWidthAt, particleBudget, placeDots, type FunnelRow, type IconKey } from "@/lib/design/funnel-dots";
 import type { Measure } from "@/lib/design/funnel-flow-layout";
@@ -23,6 +23,7 @@ export type FunnelProps = {
   /** Set while a replay day is shown ("Replaying 12 Nov"): the numbers are that day's, the breakdown of who won is hidden. */ replayLabel?: string | null;
   /** Deals that got to step `index` or further (index = number of steps means Won). */ onReach: (index: number) => void;
   onWaiting: (index: number, stuck: boolean) => void; onLost: (index: number) => void; onLostAll: () => void;
+  /** Open deals of a step that have no dollar value (the hatched count). */ onNoValue?: (index: number) => void;
   onWon: () => void; onWonBy: (kind: "owner" | "source", seg: PathSeg) => void;
 };
 
@@ -57,7 +58,9 @@ export function DotFunnel(p: FunnelProps) {
   const steps = useMemo(() => pathSteps(paths, dealsMode), [paths, dealsMode]);
   const closed = closedDeals(paths), enough = closed >= paths.minDeals, lostAll = lostTotal(paths);
   // History that does not reach back to the first day means no claim about flow between steps (the sample has no history field and is complete).
-  const flowOk = paths.history ? paths.history.covers : true;
+  // When nothing moved in the dates the numbers are where the open deals are NOW, so no claim about flow between steps is made.
+  const nowOnly = paths.nowOnly === true, flowOk = nowOnly ? false : paths.history ? paths.history.covers : true;
+  const allNoValue = dealsMode && pathsAllNoValue(paths);
   const model = useMemo(() => funnelModel(paths, measure, { enough: enough && flowOk }), [paths, measure, enough, flowOk]);
   const budget = useMemo(() => (reduced ? model.rows.map(() => 0) : particleBudget(model.rows.map((r) => (r.kind === "stage" ? r.moved : 0)))), [model, reduced]);
   const fmtShort = (v: number) => (dealsMode ? nf(v) : moneyShort(v));
@@ -83,15 +86,20 @@ export function DotFunnel(p: FunnelProps) {
     return () => { io?.disconnect(); document.removeEventListener("visibilitychange", apply); };
   }, []);
 
-  if (model.empty) return <p className="ap-fine" data-testid="ff-empty">Nothing reached this pipeline in these dates, so there is no funnel to draw.</p>;
+  if (model.empty) return <p className="ap-fine" data-testid="ff-empty">This pipeline has no deals to draw. When deals are added, the funnel appears here.</p>;
   const leak = model.leakIndex, leakStage = leak !== null ? paths.stages[leak] : null;
   const since = sinceText(paths.history?.since);
 
+  const nv = (r: FunnelRow) => (r.kind === "stage" && r.noValue > 0 && !allNoValue ? (!p.sample && p.onNoValue
+    ? <button type="button" className="fv-nvchip tnum" onClick={() => p.onNoValue?.(r.index)} aria-label={`${dealsText(r.noValue)} in ${r.name} have no value${dealsMode ? "" : " and are not counted in the money"}. Open the deals.`} title={dealsMode ? "Open deals with no dollar value (counted as deals)" : "Open deals with no dollar value: not counted in the money"} data-testid={`fv-nv-${r.index}`}>{nf(r.noValue)} no value</button>
+    : <span className="fv-nvchip tnum" data-testid={`fv-nv-${r.index}`}>{nf(r.noValue)} no value</span>) : null);
   const num = (n: number, fn: () => void, id: string, label: string, cls = "fv-n") => (n > 0 && !p.sample
     ? <button type="button" className={`${cls} tnum`} onClick={fn} aria-label={`${label}. Open the deals.`} data-testid={id}>{nf(n)}</button> : <span className={`${cls} tnum`}>{nf(n)}</span>);
 
   return (
     <div className="fv-wrap" ref={wrap} onPointerMove={onMove} onPointerLeave={onLeave} data-hover="0" data-replay={p.replayLabel ? "1" : "0"} data-testid="pl-funnel" data-measure={measure} data-paused={active ? "0" : "1"} data-motion={reduced ? "0" : "1"} data-unit={model.unit} data-dots={model.totalDots} data-flow={flowOk ? "1" : "0"}>
+      {allNoValue && <p className="fv-nvlabel" role="note" data-testid="fv-novalue-label">These deals have no value, so this shows deal counts, not money.</p>}
+      {nowOnly && <p className="fv-note" role="note" data-testid="fv-nowonly">No deal moved in these dates; this shows where the {nf(openDealsDrawn(paths))} open {openDealsDrawn(paths) === 1 ? "deal is" : "deals are"} now.</p>}
       <div className="fv-replayslot">{p.replayLabel && <p className="fv-replaychip" role="status" data-testid="fv-replaying"><i aria-hidden />Replaying <b>{p.replayLabel}</b>: the numbers are the end of that day.</p>}</div>
       <ol className="fv-list" data-narrow={narrow ? "1" : "0"} aria-label={dealsMode ? "Funnel of deals by step" : "Funnel of money by step"}>
         {model.rows.map((r, i) => {
@@ -105,7 +113,7 @@ export function DotFunnel(p: FunnelProps) {
                 <span className="fv-name">{r.name}{isLeak && <span className="ap-chip ml-2" data-tone="red" data-testid="fv-leakchip">Biggest leak</span>}</span>
               </div>
               <div className="fv-band" style={{ height: rowH }}>
-                <BandSvg row={r} i={i} uid={uid} w={bandW} h={rowH} wTop={r.width * bandW} wBot={nextW * bandW} leak={isLeak} particles={budget[i] ?? 0} paused={!active}
+                <BandSvg row={r} i={i} uid={uid} w={bandW} h={rowH} wTop={r.width * bandW} wBot={nextW * bandW} leak={isLeak} particles={budget[i] ?? 0} paused={!active} hatch={allNoValue}
                   can={{ moved: r.dots.moved > 0 && !p.sample, waiting: r.dots.waiting > 0 && !p.sample, stuck: r.dots.stuck > 0 && !p.sample, lost: r.dots.lost > 0 && !p.sample, band: !p.sample }}
                   on={{ band: () => (won ? p.onWon() : p.onReach(i)), moved: () => (won ? p.onWon() : p.onReach(i + 1)), waiting: () => p.onWaiting(i, false), stuck: () => p.onWaiting(i, true), lost: () => p.onLost(i) }} flowOk={flowOk} />
               </div>
@@ -121,6 +129,7 @@ export function DotFunnel(p: FunnelProps) {
                     <div className="fv-pills">
                       {enough && r.pctFirst && <span className="fv-pill" data-testid={`fv-pct-${i}`}>{r.pctFirst} of the first step</span>}
                       {enough && r.conv && <span className="fv-pill fv-conv" data-testid={`fv-conv-${i}`}>{r.conv} moved on</span>}
+                      {nv(r)}
                     </div>
                     <div className="fv-drop" data-testid={`fv-drop-${i}`}>
                       <span className="fv-droplabel">Drop-off {nf(Math.max(0, st!.fromN - st!.toN))}:</span>{" "}
@@ -131,6 +140,7 @@ export function DotFunnel(p: FunnelProps) {
                 ) : (
                   <>
                     <div className="fv-big">{num(st!.stillHere, () => p.onWaiting(i, false), `fv-wait-${i}`, `${dealsText(st!.stillHere)} in ${r.name} now`, "fv-count")}<span className="fv-unit">{st!.stillHere === 1 ? "deal here now" : "deals here now"}</span></div>
+                    {nv(r) && <div className="fv-pills">{nv(r)}</div>}
                     <div className="fv-drop" data-testid={`fv-drop-${i}`}>
                       {num(s!.lost, () => p.onLost(i), `fv-lost-${i}`, `${dealsText(s!.lost)} lost in ${r.name}`, "fv-n fv-n-lost")} lost here
                       {s!.stuck > 0 && <> · {num(s!.stuck, () => p.onWaiting(i, true), `fv-stuck-${i}`, `${dealsText(s!.stuck)} stuck too long in ${r.name}`, "fv-n fv-n-stuck")} stuck</>}
@@ -150,7 +160,9 @@ export function DotFunnel(p: FunnelProps) {
         </span>
       </p>
       <p className="fv-note" data-testid="fv-window-note" role="note">
-        {flowOk
+        {nowOnly
+          ? <>Open deals are grouped by the step they are in now. Won and lost are the deals closed in the dates, and there are none.</>
+          : flowOk
           ? <>Counts are deals created or moved to a step in <b>{p.windowLabel || "the dates above"}</b>, grouped by the step they are in now. Won and lost are the deals closed in these dates.</>
           : <>Step history only started {since ?? "recently"}, so this shows where deals from <b>{p.windowLabel || "the dates above"}</b> are now. Moves between steps are not shown until the history covers these dates.</>}
       </p>
@@ -163,14 +175,14 @@ export function DotFunnel(p: FunnelProps) {
 }
 
 type BandProps = {
-  row: FunnelRow; i: number; uid: string; w: number; h: number; wTop: number; wBot: number; leak: boolean; particles: number; paused: boolean; flowOk: boolean;
+  row: FunnelRow; i: number; uid: string; w: number; h: number; wTop: number; wBot: number; leak: boolean; particles: number; paused: boolean; flowOk: boolean; hatch: boolean;
   can: Record<Cat | "band", boolean>; on: Record<Cat | "band", () => void>;
 };
 const ORDER: Cat[] = ["moved", "waiting", "stuck", "lost"];
 const GROUP_LABEL: Record<Cat, string> = { moved: "moved on", waiting: "waiting", stuck: "stuck too long", lost: "lost" };
 
 /** One band, layered for depth: a soft shadow on the floor, the thickness of the slab under it, the glass top with a lit edge and a sheen, then spherical dots and a few falling lights, each layer sliding a little differently with the pointer. One small SVG per row; the dots are circles, never one per deal. */
-function BandSvg({ row, i, uid, w, h, wTop, wBot, leak, particles, can, on, flowOk }: BandProps) {
+function BandSvg({ row, i, uid, w, h, wTop, wBot, leak, particles, can, on, flowOk, hatch }: BandProps) {
   const won = row.kind === "won", cx = w / 2, top = 2, depth = 5, bot = h - 2 - depth - 3, bh = bot - top;
   const t = Math.max(8, wTop), b = Math.max(8, wBot);
   const shape = (dy: number) => `M${cx - t / 2} ${top + dy} C${cx - t / 2} ${top + dy + bh / 2} ${cx - b / 2} ${top + dy + bh / 2} ${cx - b / 2} ${bot + dy} L${cx + b / 2} ${bot + dy} C${cx + b / 2} ${top + dy + bh / 2} ${cx + t / 2} ${top + dy + bh / 2} ${cx + t / 2} ${top + dy} Z`;
@@ -193,6 +205,7 @@ function BandSvg({ row, i, uid, w, h, wTop, wBot, leak, particles, can, on, flow
         <linearGradient id={id("g")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" className={won ? "fv-s-won0" : "fv-s-b0"} /><stop offset="1" className={won ? "fv-s-won1" : "fv-s-b1"} /></linearGradient>
         <linearGradient id={id("cyl")} x1="0" y1="0" x2="1" y2="0"><stop offset="0" className="fv-s-edge" /><stop offset="0.22" className="fv-s-clear" /><stop offset="0.78" className="fv-s-clear" /><stop offset="1" className="fv-s-edge" /></linearGradient>
         <linearGradient id={id("sheen")} x1="0" y1="0" x2="0" y2="1"><stop offset="0" className="fv-s-sheen0" /><stop offset="1" className="fv-s-sheen1" /></linearGradient>
+        <pattern id={id("hat")} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" className="fv-hatch-line" /></pattern>
         <clipPath id={id("top")}><rect x="0" y="0" width={w} height={top + bh * 0.46} /></clipPath>
         {kinds.map((c) => <radialGradient key={c} id={id(`r${c}`)} cx="0.35" cy="0.3" r="0.8"><stop offset="0" className="fv-s-spec" /><stop offset="0.45" className={`fv-s-dot fv-s-${won ? "won" : c}`} /><stop offset="1" className={`fv-s-dotedge fv-s-${won ? "won" : c}`} /></radialGradient>)}
       </defs>
@@ -201,6 +214,7 @@ function BandSvg({ row, i, uid, w, h, wTop, wBot, leak, particles, can, on, flow
       <g className="fv-layer-top">
         <path className={`fv-glow${won ? " fv-glow-won" : ""}`} d={d} />
         <path className={`fv-bandpath${won ? " fv-bandpath-won" : ""}${leak ? " fv-leakring" : ""}`} d={d} fill={`url(#${id("g")})`} {...(can.band ? { onClick: (e: React.MouseEvent) => { e.stopPropagation(); on.band(); }, "data-open": "1" } : {})} />
+        {hatch && <><path d={d} fill={`url(#${id("hat")})`} pointerEvents="none" data-testid={`fv-hatch-${i}`} /><path className="fv-hatch" d={d} fill="none" /></>}
         <path className="fv-cyl" d={d} fill={`url(#${id("cyl")})`} pointerEvents="none" />
         <path className="fv-sheen" d={d} fill={`url(#${id("sheen")})`} clipPath={`url(#${id("top")})`} pointerEvents="none" />
       </g>
