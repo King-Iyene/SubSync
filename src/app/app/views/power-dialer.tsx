@@ -3,7 +3,7 @@
 import { ExternalLink, PhoneCall } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CLICK_MAX } from "@/lib/dial/callqueue";
-import { capNote, confirmText, finishTab, gate, requeueNote, reserveTab, shouldOpenQueue, stepsText, handSteps, summaryLine, UNDO_NOTE, type Opener, type SentLead, type SetupState } from "@/lib/dial/powerdialer";
+import { ACCOUNTS_ERROR_TEXT, CALL_MODE_BUTTON, CHECKING_TEXT, NO_ACCOUNTS_TEXT, capNote, confirmText, emptyBatchText, finishTab, gate, requeueNote, reserveTab, shouldOpenQueue, stepsText, handSteps, summaryLine, UNDO_NOTE, type Opener, type SentLead, type SetupState } from "@/lib/dial/powerdialer";
 import { useApiClient } from "../session";
 
 // "Send to power dialer" (docs/features/DIALQUEUE.md). Tags the chosen leads with the call tag through the safe gateway; the customer's own CRM workflow turns each tag into a call task;
@@ -15,7 +15,7 @@ type Sent = { ok: boolean; message: string; live: boolean; added: number; failed
 type Batch = { loc: string; name: string; res: Sent };
 type Review = { loc: string; name: string; p: Prev; keys: string[]; held: number }[];
 
-export function usePowerDialer(o: { list: string; locs: string[]; nameOf: (loc: string) => string; keysFor?: (loc: string) => string[] | undefined; onSent?: () => void; showStatus?: boolean }) {
+export function usePowerDialer(o: { list: string; locs: string[]; nameOf: (loc: string) => string; keysFor?: (loc: string) => string[] | undefined; onSent?: () => void; showStatus?: boolean; /** Where "Pick a list in Call mode" goes. Absent when the person is already in Call mode. */ onCallMode?: () => void }) {
   const api = useApiClient();
   const { list, locs, nameOf, keysFor, onSent } = o;
   const [ready, setReady] = useState<Record<string, Ready>>({});
@@ -26,6 +26,8 @@ export function usePowerDialer(o: { list: string; locs: string[]; nameOf: (loc: 
   const [batches, setBatches] = useState<Batch[] | null>(null);
   const [opened, setOpened] = useState<boolean | null>(null);
   const [undoMsg, setUndoMsg] = useState<string | null>(null);
+  // Everyone is set up but nobody can be sent: say so in words (with the reason each account gave) instead of ending the click in silence.
+  const [empty, setEmpty] = useState<string[] | null>(null);
   const locKey = locs.join(",");
 
   const fetchReady = useCallback(async (loc: string): Promise<Ready> => {
@@ -41,8 +43,9 @@ export function usePowerDialer(o: { list: string; locs: string[]; nameOf: (loc: 
   }, [locKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function start() {
-    setBusy(true); setMsg(null); setBatches(null); setOpened(null); setUndoMsg(null); setGateLoc(null);
+    setBusy(true); setMsg(null); setBatches(null); setOpened(null); setUndoMsg(null); setGateLoc(null); setEmpty(null);
     try {
+      if (locs.length === 0) { setReview(null); setMsg(NO_ACCOUNTS_TEXT); return; }
       const rows = await Promise.all(locs.slice(0, 20).map(async (l) => [l, await fetchReady(l)] as const));
       const map = Object.fromEntries(rows);
       setReady((r) => ({ ...r, ...map }));
@@ -62,7 +65,9 @@ export function usePowerDialer(o: { list: string; locs: string[]; nameOf: (loc: 
       }
       const blocked = rows.filter(([, r]) => gate(r.state) === "setup_card").map(([l]) => l);
       setGateLoc(blocked[0] ?? null);
-      setReview(out);
+      const nobody = usable.length > 0 && out.every((x) => x.p.names.length === 0);
+      setEmpty(nobody ? out.map((x) => (x.p.message && !/^s*$/.test(x.p.message) ? `${x.name}: ${x.p.message}` : "")).filter(Boolean).slice(0, 3) : null);
+      setReview(nobody ? null : out);
     } catch { setMsg("Could not check the call queue right now. Nothing was sent."); } finally { setBusy(false); }
   }
 
@@ -118,7 +123,15 @@ export function usePowerDialer(o: { list: string; locs: string[]; nameOf: (loc: 
   const panel: ReactNode = (
     <div data-testid="pd-panel" className="basis-full">
       {status && <p className="s6-label mt-2" data-testid="pd-status">{status}</p>}
+      {busy && !review && !batches && <p className="mt-2 text-sm" role="status" data-testid="pd-checking">{CHECKING_TEXT}</p>}
       {msg && <p className="mt-2 text-sm" role="status" data-testid="pd-msg">{msg}</p>}
+      {empty && (
+        <div className="cm-panel mt-2" role="status" data-testid="pd-empty">
+          <p className="font-medium" data-testid="pd-empty-text">{emptyBatchText(!!o.onCallMode)}</p>
+          {empty.map((l) => <p key={l} className="s6-label mt-1">{l}</p>)}
+          <div className="mt-2 flex flex-wrap gap-2">{o.onCallMode && <button type="button" className="s6-btn" data-kind="primary" onClick={o.onCallMode} data-testid="pd-empty-callmode">{CALL_MODE_BUTTON}</button>}<button type="button" className="s6-btn" onClick={() => setEmpty(null)}>Close</button></div>
+        </div>
+      )}
       {gateLoc && (
         <div className="cm-panel mt-2" role="dialog" aria-label="Set up your call queue" data-testid="pd-setup">
           <p className="font-medium">{locs.length > 1 ? `${nameOf(gateLoc)}: ` : ""}Set up your call queue first (once, in your CRM, about 2 minutes).</p>
@@ -184,11 +197,19 @@ function CopyButton({ text }: { text: string }) {
 export function StartCallingButton({ list = "new_unanswered", className, testId = "start-calling", onCallMode }: { list?: string; className?: string; testId?: string; onCallMode?: () => void }) {
   const api = useApiClient();
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
-  useEffect(() => { let live = true; void api.get<{ accounts: Array<{ id: string; name: string }> }>("dial/cq-status").then((r) => { if (live) setAccounts(r.accounts ?? []); }).catch(() => undefined); return () => { live = false; }; }, [api]);
-  const pd = usePowerDialer({ list, locs: accounts.map((a) => a.id), nameOf: (id) => accounts.find((a) => a.id === id)?.name ?? "Account" });
+  const [loaded, setLoaded] = useState<"loading" | "ready" | "error">("loading"), [again, setAgain] = useState(0);
+  useEffect(() => {
+    let live = true;
+    void api.get<{ accounts: Array<{ id: string; name: string }> }>("dial/cq-status", { fresh: true }).then((r) => { if (live) { setAccounts(r.accounts ?? []); setLoaded("ready"); } }).catch(() => { if (live) setLoaded("error"); });
+    return () => { live = false; };
+  }, [api, again]);
+  const pd = usePowerDialer({ list, locs: accounts.map((a) => a.id), nameOf: (id) => accounts.find((a) => a.id === id)?.name ?? "Account", onCallMode });
+  // The click always ends in words: while the accounts load the button waits; if they failed to load the note under it says so, and having no accounts at all is said after the click.
+  const note = loaded === "error" ? ACCOUNTS_ERROR_TEXT : null;
   return (
     <>
-      <button type="button" onClick={() => void pd.start()} disabled={pd.busy || accounts.length === 0} data-testid={testId} className={className}><PhoneCall aria-hidden className="size-4" />Start calling</button>
+      <button type="button" onClick={() => { if (loaded === "error") { setLoaded("loading"); setAgain((x) => x + 1); return; } void pd.start(); }} disabled={pd.busy || loaded === "loading"} data-testid={testId} className={className}><PhoneCall aria-hidden className="size-4" />Start calling</button>
+      {note && <p className="s6-label basis-full" role="status" data-testid="start-calling-note">{note}</p>}
       {onCallMode && <button type="button" className="s6-link text-sm" onClick={onCallMode} data-testid="start-calling-mode">Or pick a list in Call mode</button>}
       {pd.panel}
     </>

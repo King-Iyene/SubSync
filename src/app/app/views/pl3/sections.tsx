@@ -8,6 +8,7 @@ import { zoneWord } from "@/lib/design/zone";
 import { CountUp } from "../speed6-base";
 import { usePl, type PlFilters } from "./data";
 import { days, money, moneyShort, pct } from "./format";
+import { leftOutSentence } from "./pipe-list";
 import { Chip, DealList } from "./parts";
 import { TrustBasis } from "../td3/trust-basis";
 import type { PlDeal } from "@/lib/analytics/pipeline3-types-interim";
@@ -52,7 +53,7 @@ export function Overview({ filters, go, onDrill }: SectionProps) {
               <div className="ap-act"><button type="button" className="s6-btn" data-kind="primary" onClick={() => go("flow")}>See the money flow</button><button type="button" className="s6-btn" onClick={() => go("needs")}>Unclog stuck deals</button></div>
             </section>
             {d.outlier && <p className="ap-fine">{d.outlier.name} is {pct(d.outlier.share)} of the money, so it is left out of the averages and shown on its own.</p>}
-            <p className="ap-fine">Left out of the money: {d.excluded.zeroValue} deals with no value, {d.excluded.noOwner} with no owner, {d.excluded.test} test deals. A deal is stuck when it has sat in a step longer than that step normally takes in your own account.</p>
+            <p className="ap-fine">{leftOutSentence(d.excluded) ?? "Nothing is left out of the money here."} A deal is stuck when it has sat in a step longer than that step normally takes in your own account.</p>
           </div>
         );
       }}

@@ -78,3 +78,11 @@ export function finishTab(tab: TabWin | null, url: string | null): boolean {
 }
 
 export type SentLead = { contactId: string; name: string; url: string | null };
+
+// --- Words for the states a click can end in. Every outcome of "Start calling" renders text: nothing is ever a silent click (source guard in powerdialer.test.ts).
+/** The batch is empty: nobody can be sent. With a Call mode to go to, the sentence points there. */
+export const emptyBatchText = (hasCallMode: boolean) => (hasCallMode ? "Nobody to call right now: no lead is waiting. Pick a list in Call mode." : "Nobody to call right now: nobody is waiting on this list.");
+export const CHECKING_TEXT = "Checking who is ready to call...";
+export const NO_ACCOUNTS_TEXT = "No client account is connected yet, so there is nobody to call.";
+export const ACCOUNTS_ERROR_TEXT = "Could not load your accounts, so nothing was checked. Try again.";
+export const CALL_MODE_BUTTON = "Open Call mode";

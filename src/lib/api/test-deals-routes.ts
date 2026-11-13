@@ -1,5 +1,5 @@
 import { sql } from "../db";
-import { loadCountTestDeals, saveCountTestDeals } from "../analytics/test-deals-setting";
+import { loadCountOwnerlessDeals, loadCountTestDeals, ownerlessPreview, saveCountOwnerlessDeals, saveCountTestDeals } from "../analytics/test-deals-setting";
 import { plCache } from "../analytics/pipeline3-queries";
 import { forgetFresh } from "../analytics/pipeline3-rollup";
 import { json, type AuthContext } from "./auth";
@@ -19,4 +19,21 @@ export async function handleTestDeals(ctx: Ctx): Promise<Response> {
   plCache.clear(`["${ctx.installationId}"`); forgetFresh();
   await sql()`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${ctx.session.userId ?? ctx.kind}, 'deal_rules.count_test_deals_changed', ${sql().json({ countTestDeals: body.countTestDeals } as never)})`;
   return json({ ok: true, countTestDeals: body.countTestDeals });
+}
+
+// GET and PUT /api/app/deal-rules/ownerless: "Count deals without an owner". Same permissions and audit as the test-names switch. GET also carries the preview (how many deals and how much money the switch would add).
+export async function handleOwnerlessDeals(ctx: Ctx): Promise<Response> {
+  if (ctx.request.method === "GET") {
+    const [on, preview] = await Promise.all([loadCountOwnerlessDeals(ctx.installationId), ownerlessPreview(ctx.installationId, ctx.limitTo ? [ctx.limitTo] : null)]);
+    return json({ countOwnerless: on, canChange: ctx.kind !== "client", preview });
+  }
+  if (ctx.request.method !== "PUT") return json({ error: "Not found" }, 404);
+  if (ctx.kind === "client") return json({ error: "Not available in this view" }, 403);
+  const body = (await ctx.request.json().catch(() => null)) as { countOwnerless?: unknown } | null;
+  if (!body || typeof body.countOwnerless !== "boolean") return json({ error: "Choose on or off" }, 400);
+  if (ctx.demo) return json({ error: "This cannot be changed in the demo" }, 400);
+  if (!(await saveCountOwnerlessDeals(ctx.installationId, body.countOwnerless))) return json({ error: "This setting is not ready yet. Try again later." }, 503);
+  plCache.clear(`["${ctx.installationId}"`); forgetFresh();
+  await sql()`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${ctx.session.userId ?? ctx.kind}, 'deal_rules.count_ownerless_deals_changed', ${sql().json({ countOwnerless: body.countOwnerless } as never)})`;
+  return json({ ok: true, countOwnerless: body.countOwnerless });
 }

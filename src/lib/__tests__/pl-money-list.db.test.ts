@@ -49,5 +49,18 @@ test("pipeline list: dates move won and lost, not open; test names follow the to
   assert.equal(bySetting.cards[0].openValue, w.openValue + 4800);
   assert.equal(bySetting.totals.countsTests, "setting");
   assert.equal(bySetting.cards[0].testCount, 0);
+  // deals without an owner: left out and named with their count; the company switch counts them (and the note says so)
+  const ownerless = Array.from({ length: 4 }, (_, i) => deal(`n${i}`, { assigned_to: null, monetary_value: 2000 + i * 50 }));
+  await db`insert into cached_opportunities ${db(ownerless as never)}`;
+  const base = await pipelineCards(scope, { from: new Date(to.getTime() - 45 * day), to, size: 24 });
+  assert.equal(base.cards[0].noOwnerCount, 4, "the row names them");
+  assert.equal(base.totals.noOwnerCount, 4, "the header total is the sum of the rows");
+  assert.equal(base.cards[0].openValue, bySetting.cards[0].openValue, "ownerless money is not counted by default");
+  assert.equal(base.totals.countsOwnerless, false);
+  await db`update settings set count_ownerless_deals = true where installation_id = ${inst}`;
+  const counted = await pipelineCards(scope, { from: new Date(to.getTime() - 45 * day), to, size: 24 });
+  assert.equal(counted.cards[0].openValue, base.cards[0].openValue + 8300, "the four ownerless deals count once the switch is on");
+  assert.equal(counted.cards[0].noOwnerCount, 0, "nothing is left out for lack of an owner any more");
+  assert.equal(counted.totals.countsOwnerless, true);
   await db.end();
 });
