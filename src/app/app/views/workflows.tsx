@@ -224,7 +224,7 @@ export function WorkflowsView({ go, kind }: { go: GoFn; kind: AccessKind }) {
 
       {tab === "health" ? (
         <div data-testid="wf-health">
-          {!data.can.health ? <InlineAlert tone="info" title="Part of the paid plan">The checks and alerts below are part of the paid plan. The free plan shows the list.</InlineAlert> : (
+          {!data.can.health ? <InlineAlert tone="info" title="Part of the Growth plan">The checks and alerts below are part of the Growth plan. Without it you can still see the list.</InlineAlert> : (
             <>
               <Section title="Things to check" hint="Each one says why and what to do. Items marked estimate are found by name or from quiet history, so treat them as a prompt, not a fact.">
                 {data.findings.filter((f) => show === "both" || (f.workflowId ? entityOf(f.workflowId) === show : show === "workflow")).length === 0 ? <EmptyState compact title="Nothing to check" body="No failing, idle or stuck items were found." /> : (

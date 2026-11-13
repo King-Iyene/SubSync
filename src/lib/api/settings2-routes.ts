@@ -48,7 +48,7 @@ export async function handleSettings2(ctx: Ctx): Promise<Response> {
 async function home(ctx: Ctx) {
   const { level } = viewerOf(ctx);
   const [inst] = await sql()`select created_at from installations where id = ${ctx.installationId}`;
-  return json({ kind: ctx.kind, plan: ctx.plan, canManage: level !== "self", level, enforced: ctx.entitlements.enforced === true, since: inst?.created_at ?? null, demo: ctx.demo });
+  return json({ kind: ctx.kind, plan: ctx.plan, canManage: level !== "self", level, enforced: ctx.entitlements.enforced === true, trialEnded: ctx.entitlements.trialEnded === true, since: inst?.created_at ?? null, demo: ctx.demo });
 }
 
 async function state(ctx: Ctx) {
