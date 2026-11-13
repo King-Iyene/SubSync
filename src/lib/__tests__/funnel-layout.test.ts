@@ -35,10 +35,12 @@ test("width at height interpolates between top and bottom", () => {
 });
 
 import { readFileSync } from "node:fs";
-test("money view keeps every old click target, the Coins toggle and reduced motion", () => {
-  const src = readFileSync(new URL("../../app/app/views/pl3/money-flow.tsx", import.meta.url), "utf8");
-  const css = readFileSync(new URL("../../app/app/views/pl3/pl3.css", import.meta.url), "utf8");
-  for (const id of ["pl-seg-", "pl-stuck-", "pl-vault", "pl-play", "pl-scrub", "pl-person", "pl-leak", "pl-view-coins", "pl-view-funnel"]) assert.ok(src.includes(id), id);
-  assert.ok(/prefers-reduced-motion[^}]*\.fn-drop/.test(css));
-  assert.ok(!/gohighlevel|highlevel|\bghl\b/i.test(src));
+test("money view is the river only: every click target, replay, no coin toggle, reduced motion", () => {
+  const dir = "../../app/app/views/pl3/";
+  const src = readFileSync(new URL(dir + "money-flow.tsx", import.meta.url), "utf8") + readFileSync(new URL(dir + "river-view.tsx", import.meta.url), "utf8");
+  const css = readFileSync(new URL(dir + "pl3.css", import.meta.url), "utf8");
+  for (const id of ["pl-seg-", "pl-stuck-", "pl-vault", "pl-play", "pl-scrub", "pl-person", "pl-leak", "pl-tail-", "pl-link-", "pl-counts-note"]) assert.ok(src.includes(id), id);
+  assert.ok(!src.includes("pl-view-coins") && !src.includes("coins-view"));
+  assert.ok(/prefers-reduced-motion[^}]*.rv-flow/.test(css));
+  assert.ok(!/gohighlevel|highlevel|ghl/i.test(src));
 });

@@ -30,7 +30,7 @@ import { DealMoves } from "../people";
 
 type TabKey = "overview" | "flow" | "needs" | "wonlost" | "people" | "sources" | "history" | "health" | "proof" | "slipping" | "classic" | "stale" | "funnel" | "stuck";
 const TABS: Array<{ key: TabKey; label: string; tip: string }> = [
-  { key: "overview", label: "Overview", tip: "The one sentence, the numbers and where the money leaks." }, { key: "flow", label: "Money flow", tip: "The money in each stage as stacks of coins." },
+  { key: "overview", label: "Overview", tip: "The one sentence, the numbers and where the money leaks." }, { key: "flow", label: "Money flow", tip: "Deals and money flowing through each stage, where they pile up, get stuck or leak." },
   { key: "needs", label: "Needs attention", tip: "Deals stuck longer than that step normally takes." }, { key: "wonlost", label: "Won and lost", tip: "What closed, and the lost reason when your CRM has one." },
   { key: "people", label: "People", tip: "Who closes and who lets deals go cold." },
   { key: "sources", label: "Sources", tip: "Which lead sources turn into money." }, { key: "history", label: "Stage history", tip: "How long deals really stay in each step." },

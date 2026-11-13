@@ -101,3 +101,43 @@
 .fn-lostrow .fn-band { height: 32px; }
 @media (max-width: 700px) { .fn-row { grid-template-columns: minmax(0, 1fr); gap: 4px; } .fn-label { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; } .fn-conv { margin-left: 0; } .fn-band { height: 48px; } }
 @media (prefers-reduced-motion: reduce) { [data-settle="1"] .fn-drop, [data-settle="1"] .fn-open { animation: none; } .fn-drop { display: none; } }
+
+/* THE RIVER (river-view.tsx). Forest = flow and cash, ochre = stuck, muted grey = lost, destructive red only for the biggest leak. No glow. */
+.rv-host { width: 100%; max-width: 100%; overflow: hidden; }
+.rv-wrap { position: relative; width: 100%; }
+.rv-svg { display: block; max-width: 100%; overflow: visible; font-family: inherit; }
+.rv-ribbon { fill: color-mix(in srgb, var(--primary) 20%, transparent); stroke: none; transition: fill 160ms; }
+.rv-link:hover .rv-ribbon, .rv-link:focus-visible .rv-ribbon { fill: color-mix(in srgb, var(--primary) 36%, transparent); }
+.rv-flow { fill: none; stroke: color-mix(in srgb, var(--primary) 55%, transparent); stroke-linecap: round; stroke-dasharray: 1 11; opacity: .75; }
+[data-settle="1"] .rv-flow { animation: rv-dash 1.2s linear 4; }
+@keyframes rv-dash { to { stroke-dashoffset: -36; } }
+[data-settle="1"] .rv-ribbon { animation: rv-fade 700ms ease-out both; }
+@keyframes rv-fade { from { opacity: 0; } to { opacity: 1; } }
+.rv-link, .rv-node, .rv-tail, .rv-leaktag { cursor: pointer; outline: none; }
+.rv-link:focus-visible, .rv-node:focus-visible, .rv-tail:focus-visible, .rv-leaktag:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.rv-conv rect { fill: var(--background); stroke: color-mix(in srgb, var(--primary) 50%, transparent); }
+.rv-conv text { fill: var(--foreground); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rv-drain { fill: color-mix(in srgb, var(--foreground) 16%, transparent); stroke: none; }
+.rv-tail:hover .rv-drain, .rv-tail:focus-visible .rv-drain { fill: color-mix(in srgb, var(--foreground) 28%, transparent); }
+.rv-leak .rv-drain { fill: color-mix(in srgb, var(--destructive) 26%, transparent); stroke: var(--destructive); stroke-width: 1.5; }
+.rv-leaktag rect { fill: color-mix(in srgb, var(--destructive) 10%, var(--background)); stroke: var(--destructive); }
+.rv-leaktag text { fill: var(--destructive); font-size: 11px; font-weight: 600; }
+.rv-slot { fill: color-mix(in srgb, var(--foreground) 5%, transparent); }
+.rv-bill rect:first-child { fill: color-mix(in srgb, var(--primary) 30%, var(--background)); stroke: var(--primary); stroke-width: .8; }
+.rv-bill .rv-bill-in { fill: none; stroke: color-mix(in srgb, var(--primary) 60%, transparent); stroke-width: .6; }
+.rv-card rect:first-child { fill: var(--background); stroke: color-mix(in srgb, var(--primary) 70%, transparent); }
+.rv-card .rv-bill-in { fill: color-mix(in srgb, var(--primary) 45%, transparent); stroke: none; }
+.rv-bill-stuck rect:first-child { fill: color-mix(in srgb, var(--pl-stuck) 22%, var(--background)); stroke: var(--pl-stuck); }
+.rv-bill-stuck .rv-bill-in { stroke: color-mix(in srgb, var(--pl-stuck) 70%, transparent); }
+[data-settle="1"] .rv-bill { animation: rv-land 420ms ease-out both; }
+@keyframes rv-land { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
+.rv-won .rv-bill rect:first-child { fill: color-mix(in srgb, var(--primary) 55%, var(--background)); }
+.rv-vault { stroke: var(--primary); stroke-width: 2; }
+.rv-node:hover .rv-slot, .rv-node:focus-visible .rv-slot { fill: color-mix(in srgb, var(--primary) 14%, transparent); }
+.rv-stop rect { fill: var(--background); stroke: var(--pl-stuck); } .rv-stop path { stroke: var(--pl-stuck); stroke-width: 1.6; fill: none; stroke-linecap: round; }
+.rv-fly { fill: var(--primary); stroke: var(--background); stroke-width: .6; }
+.rv-text { fill: var(--foreground); font-size: 12px; paint-order: stroke; stroke: var(--background); stroke-width: 3px; stroke-linejoin: round; }
+.rv-name { font-weight: 600; } .rv-val { font-weight: 600; font-variant-numeric: tabular-nums; fill: var(--primary); } .rv-stucktxt { fill: var(--pl-stuck); font-size: 11px; font-weight: 600; }
+.rv-tip { position: absolute; z-index: 5; transform: translate(-50%, calc(-100% - 12px)); pointer-events: none; display: flex; flex-direction: column; gap: 2px; max-width: min(260px, 80vw); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--card, var(--background)); color: var(--foreground); box-shadow: 0 2px 8px color-mix(in srgb, var(--foreground) 14%, transparent); font-size: 0.75rem; line-height: 1.35; }
+.rv-tip b { font-size: 0.8125rem; }
+@media (prefers-reduced-motion: reduce) { [data-settle="1"] .rv-flow, [data-settle="1"] .rv-ribbon, [data-settle="1"] .rv-bill { animation: none; } .rv-flow { stroke-dasharray: none; opacity: .4; } }
