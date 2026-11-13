@@ -86,3 +86,8 @@ export function testSendDeps(installationId: string, stopUrl: StopUrl, switchOn:
     },
   };
 }
+
+/** "Send me a test" on Settings, Connections: one email to the company's saved address, through the same switch as every other email (a dry run while SEND_EMAIL_LIVE is off). */
+export async function sendConnectionsTest(installationId: string, to: string, mail: Mail): Promise<SendResult> {
+  return sendMail(installationId, to, mail, () => null, "connections.test_email", {});
+}
