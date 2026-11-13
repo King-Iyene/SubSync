@@ -85,6 +85,9 @@ export async function rebuildSpeedDaily(installationId: string, targetMinutes: n
     const events = await loadTouchEvents(installationId, null, now - days * DAY);
     const tz = new Map<string, string | null>((await db`select location_id, timezone from locations where installation_id = ${installationId}`).map((l) => [l.location_id as string, (l.timezone as string | null) ?? null]));
     const daily = dailyRollup(rows, events, (l) => tz.get(l) ?? null, targetMinutes, now);
+    // A day with no leads any more (or one keyed by the old UTC day for an account without a zone) must not survive: the window is replaced whole.
+    const cut = new Date(now - days * DAY - DAY);
+    await db`delete from speed_daily where installation_id = ${installationId} and day >= ${cut.toISOString().slice(0, 10)}::date`;
     for (const d of daily) await writeDay(installationId, d);
     await db`delete from touch_events where installation_id = ${installationId} and at < ${new Date(now - RETENTION_DAYS * DAY)}`;
     return daily.length;

@@ -1,3 +1,5 @@
+import { dayStartMs, isRealDay, localDay, mondayOfDay, nextMidnightMs } from "../design/zone";
+import { atOf } from "../analytics/window-time";
 import { pipelineCards } from "../analytics/pipeline3-cards";
 import { attention, cleanId, dealList, detail, forecast, health, moneyFlow, overview, people, plCache, receipt, replay, sources, stageHistory, wonLost, type Filters, type Scope } from "../analytics/pipeline3-queries";
 import { funnel, funnelDeals, historySettings, pipelineNames, saveHistorySettings, stuck } from "../analytics/pipeline3-funnel";
@@ -39,9 +41,9 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
   if (sp.get("location") && (!one || (await ownedAccount(ctx.installationId, allowedAll, one)) === null)) return json(emptyFor(part, flags, ctx.limitTo === null));
   const scope: Scope = { inst: ctx.installationId, allowed: allowedAll };
   const now = Date.now();
-  const w = parsePlWindow(sp.get("from"), sp.get("to"), now);
+  const w = parsePlWindow(sp.get("from"), sp.get("to"), now, atOf(sp));
   // Sources and the track record need a longer look by default than the 30 days of the other screens.
-  const wide = part === "sources" && !sp.get("from") && !sp.get("to") ? { from: new Date(now + DAY - (now % DAY) - 180 * DAY), to: new Date(now + DAY - (now % DAY)), days: 180, problem: null as string | null } : w;
+  const wide = part === "sources" && !sp.get("from") && !sp.get("to") ? { from: new Date(nextMidnightMs(now) - 180 * DAY), to: new Date(nextMidnightMs(now)), days: 180, problem: null as string | null } : w;
   const bucketP = sp.get("bucket");
   const f: Filters = {
     from: wide.from, to: wide.to, location: one, pipeline: text(sp.get("pipeline"), 120), stage: cleanId(sp.get("stage")), stageKey: (sp.get("stage") ?? "").includes("|") ? text(sp.get("stage"), 200) : null, owner: seePeople ? personParam(sp.get("owner")) : null,
@@ -81,12 +83,12 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
     case "stuck": return done(await stuck(scope, f, await historySettings(ctx.installationId), p, size, link));
     case "funnel-settings": return wrap({ ...(await historySettings(ctx.installationId)), canEdit: ctx.kind === "agency", pipelines: (await pipelineNames(scope, { from: f.from, to: f.to, location: null })).map((x) => x.name).slice(0, 100) });
     case "pipelines": return done(await pipelineCards(scope, { from: f.from, to: f.to, location: one, q: f.q, showEmpty: sp.get("empty") === "1", after: sp.get("after"), size: int(sp.get("size"), 24), includeTest: f.includeTest, asc: sp.get("dir") === "asc" }));
-    case "replay": return done(await replay(scope, f, int(sp.get("days"), 30)));
+    case "replay": return done(await replay(scope, f, (f.to.getTime() - f.from.getTime()) / DAY));
     case "receipt": {
       const wk = sp.get("week") ?? "";
-      const t = now - 7 * DAY;
-      const monday = Math.floor(t / DAY) * DAY - ((new Date(t).getUTCDay() + 6) % 7) * DAY;
-      return done(await receipt(scope, one, /^\d{4}-\d{2}-\d{2}$/.test(wk) && Number.isFinite(Date.parse(wk)) ? new Date(Date.parse(wk)) : new Date(monday)));
+      // A receipt is for a Monday-to-Sunday week in the app zone (a Lagos week starts at Lagos midnight).
+      const monday = dayStartMs(mondayOfDay(localDay(now - 7 * DAY))) as number;
+      return done(await receipt(scope, one, isRealDay(wk) ? new Date(dayStartMs(wk) as number) : new Date(monday)));
     }
     case "detail": {
       const dl = await ownedAccount(ctx.installationId, allowedAll, sp.get("location"));

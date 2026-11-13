@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { riverLayout } from "@/lib/design/river-layout";
 import type { PlDrain, PlMoneyFlow, PlStage } from "@/lib/analytics/pipeline3-types-interim";
 import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
+import { usePageRange } from "../../ds/page-range";
+import { zoneWord } from "@/lib/design/zone";
 import { useReducedMotion } from "../speed6-base";
 import { usePl, type PlFilters } from "./data";
 import { money, moneyShort, pct } from "./format";
@@ -37,6 +39,7 @@ function applyView(f: PlMoneyFlow, person: string, day: number | null): { stages
 
 export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; onPick: (p: FlowPick) => void }) {
   const real = usePl<PlMoneyFlow>("money-flow", filters), { error, loading, reload } = real;
+  const bar = usePageRange();
   const [example, setExample] = useState(false);
   const noValued = hasNoValuedDeals(real.data);
   // The example is only ever offered when the pipeline has no valued deals. It never replaces real data otherwise.
@@ -81,7 +84,7 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
       {showExample && <p className="ap-fine mb-2" role="status" data-testid="pl-example-banner"><b>Example.</b> These are made-up numbers so you can see the shape. They are not your deals. <button type="button" className="ap-link" onClick={() => setExample(false)} data-testid="pl-example-off">Back to my deals</button></p>}
       {counts && <p className="ap-fine mb-2" role="status" data-testid="pl-counts-note">Showing deal counts: no deal here has a dollar value yet. Add a value to a deal and the money appears. <button type="button" className="ap-link" onClick={() => setExample(true)} data-testid="pl-example-on">See an example with money</button></p>}
       <div className="pl-flow-bar">
-        <h3 className="pl-flow-title">{data.pipelineName}<span className="ap-sub"> · {data.periodLabel}</span></h3>
+        <h3 className="pl-flow-title">{data.pipelineName}<span className="ap-sub"> · {showExample ? data.periodLabel : `${bar.label}, ${zoneWord()} time`}</span></h3>
         <label className="sr-only" htmlFor="pl-person">Whose deals</label>
         <select id="pl-person" className="ap-field" value={person} onChange={(e) => { setPerson(e.target.value); setDay(null); }} data-testid="pl-person">
           <option value="">Everyone&apos;s deals</option>{data.people.map((p) => <option key={p.id} value={p.id}>{p.name}&apos;s deals</option>)}
@@ -95,6 +98,7 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
           </>}
         </div>
       </div>
+      <p className="ap-fine mb-2" data-testid="pl-flow-asof"><b>As of now:</b> the piles (open money and stuck deals). <b>Between {bar.label || "the dates above"}, {zoneWord()} time:</b> won, lost and what moved on.{view.wonCount === 0 && lostTotal === 0 && !showExample ? " Nothing was won or lost in these dates, so the vault and the lost channel are empty. The open money above is still true." : ""}</p>
       <p className="ap-fine mb-2">{counts ? "Each pile of cards is the deals sitting in that stage." : "Each pile of cash is the money sitting in that stage."} The ribbons show what moved on, with the share that did. Hatched ochre piles are stuck longer than that stage&apos;s own normal. The channel that drains away is lost. Won lands in the vault. Click any pile or ribbon to open exactly those deals.</p>
 
       <div ref={wrap} className="rv-host">

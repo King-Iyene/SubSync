@@ -1,5 +1,6 @@
 import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
-import { utcDayAfterToday } from "../design/zone.ts";
+import { nextMidnightMs } from "../design/zone.ts";
+import { endBound, startBound, type At } from "./window-time.ts";
 // Appointments round 3: the pure part (no database, no network), unit tested. Definitions: docs/METRICS.md "Appointments 3".
 import type { Appt3Bucket, Appt3FlowTree, Appt3Overview, Estimate, FlowNode, Rate } from "./appointments3-types.ts";
 
@@ -16,15 +17,14 @@ export const rate = (n: number, of: number, min = MIN_SHOW): Rate => ({ value: o
 export const trueShowRate = (showed: number, noshow: number, unmarked: number) => rate(showed, showed + noshow + unmarked);
 export const reportedShowRate = (showed: number, noshow: number) => rate(showed, showed + noshow);
 
-export function parseApptWindow(from: string | null | undefined, to: string | null | undefined, now: number): { from: Date; to: Date; days: number; problem: string | null } {
-  const t = (v: string | null | undefined) => (v && /^\d{4}-\d{2}-\d{2}/.test(v) && Number.isFinite(Date.parse(v)) ? Date.parse(v.slice(0, 10)) : null);
-  let f = t(from), e = t(to);
+/** The dates the bar sent (days in the app zone, `to` a whole day included unless `at.toTime` ends it earlier): the window [from, to) in real instants. */
+export function parseApptWindow(from: string | null | undefined, to: string | null | undefined, now: number, at?: At): { from: Date; to: Date; days: number; problem: string | null } {
+  let f = startBound(from, at), e = endBound(to, at);
   let problem: string | null = null;
-  if (e !== null) e += DAY; // "to" is a whole day, inclusive
-  if (f === null || e === null) { e = utcDayAfterToday(now); f = e - 30 * DAY; if (from || to) problem = "That date range was not understood, so the last 30 days are shown."; }
-  if (e <= f) { e = utcDayAfterToday(now); f = e - 30 * DAY; problem = "The end date was before the start date, so the last 30 days are shown."; }
+  if (f === null || e === null) { e = nextMidnightMs(now); f = e - 30 * DAY; if (from || to) problem = "That date range was not understood, so the last 30 days are shown."; }
+  if (e <= f) { e = nextMidnightMs(now); f = e - 30 * DAY; problem = "The end date was before the start date, so the last 30 days are shown."; }
   if (e - f > MAX_WINDOW_DAYS * DAY) { f = e - MAX_WINDOW_DAYS * DAY; problem = `The range is capped at ${MAX_RANGE_DAYS} days (about 3 years).`; }
-  return { from: new Date(f), to: new Date(e), days: Math.round((e - f) / DAY), problem };
+  return { from: new Date(f), to: new Date(e), days: Math.max(1, Math.round((e - f) / DAY)), problem };
 }
 
 export const clampSize = (n: number): 20 | 50 | 100 => (n >= 100 ? 100 : n >= 50 ? 50 : 20);

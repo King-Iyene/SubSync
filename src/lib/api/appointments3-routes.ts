@@ -1,3 +1,4 @@
+import { atOf } from "../analytics/window-time";
 import { apptCache, appointmentList, bookingShare, calendars, cleanId, detail, flowTree, health, needsOutcome, comparePeople, exportCsv, trends, noshowRecovery, options, overview, receipt, sources, type Filters, type Scope } from "../analytics/appointments3-queries";
 import { clampSize, DAY, parseApptWindow } from "../analytics/appointments3-intel";
 import { APPT3_FLAGS, APPT3_PARTS, type Appt3Bucket, type Appt3Part } from "../analytics/appointments3-types";
@@ -39,7 +40,7 @@ export async function handleAppointments3(ctx: Ctx, h: Appt3Helpers): Promise<Re
   const one = asked ? await ownedLocation(ctx.installationId, allowedAll, asked) : null;
   if (asked && !one) return part === "detail" ? json({ error: "Appointment not found" }, 404) : json(emptyFor(part, flags, ctx.limitTo === null));
   const scope: Scope = { inst: ctx.installationId, allowed: allowedAll };
-  const w = parseApptWindow(sp.get("from"), sp.get("to"), Date.now());
+  const w = parseApptWindow(sp.get("from"), sp.get("to"), Date.now(), atOf(sp));
   const bucketP = sp.get("bucket");
   const f: Filters = {
     from: w.from, to: w.to, location: one, calendar: cleanId(sp.get("calendar")), group: cleanId(sp.get("group")), active: sp.get("active") === "active" || sp.get("active") === "inactive" ? (sp.get("active") as "active" | "inactive") : null,

@@ -1,3 +1,4 @@
+import { atOf } from "../analytics/window-time";
 import { boards, decisions, execCache, exportCsv, pace, rows, setTarget, slots, summary, type ExecFilters } from "../analytics/appointments-exec-queries";
 import { cleanId, type Scope } from "../analytics/appointments3-queries";
 import { parseApptWindow } from "../analytics/appointments3-intel";
@@ -36,7 +37,7 @@ export async function handleApptExec(ctx: Ctx, h: ExecHelpers): Promise<Response
   const one = asked ? await ownedLocation(ctx.installationId, allowedAll, asked) : null;
   if (asked && !one) return json({ generatedAt: new Date().toISOString(), canSeeAccounts, canSeePeople: seePeople, empty: true });
   const scope: Scope = { inst: ctx.installationId, allowed: allowedAll };
-  const w = parseApptWindow(sp.get("from"), sp.get("to"), Date.now());
+  const w = parseApptWindow(sp.get("from"), sp.get("to"), Date.now(), atOf(sp));
   const f: ExecFilters = {
     from: w.from, to: w.to, basis: sp.get("basis") === "booked" ? "booked" : "appt", location: one, calendar: cleanId(sp.get("calendar")), user: seePeople ? cleanId(sp.get("user")) : null,
     setter: seePeople ? personParam(sp.get("setter")) : null, closer: seePeople ? personParam(sp.get("closer")) : null, source: text(sp.get("source"), 120),

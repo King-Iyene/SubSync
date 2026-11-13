@@ -17,7 +17,7 @@ const int = (v: string | null, d: number) => { const n = Number(v); return v !==
 const idOr = (v: string | null) => (v && ID.test(v) ? v : null);
 
 function windowOf(sp: URLSearchParams) {
-  return parseWindow({ from: sp.get("from"), to: sp.get("to"), cmpFrom: sp.get("cmpFrom"), cmpTo: sp.get("cmpTo") }, Date.now());
+  return parseWindow({ from: sp.get("from"), to: sp.get("to"), cmpFrom: sp.get("cmpFrom"), cmpTo: sp.get("cmpTo"), fromTime: sp.get("fromTime"), toTime: sp.get("toTime") }, Date.now());
 }
 
 /** A row with its white-label link to the contact (never a phone or mail link). A booking with no contact has no link. */

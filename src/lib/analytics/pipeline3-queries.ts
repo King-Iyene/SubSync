@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { sql } from "../db";
+import { APP_TZ, localDay } from "../design/zone";
 import { rollupCloses, rollupFlow, rollupFresh, rollupHeadline, rollupOpenByStage } from "./pipeline3-rollup";
 import { ttlCache } from "../ttl-cache";
 import { dealScopeJoins, outOfScope, valueSuspect } from "./stage-rules-sql";
@@ -31,6 +32,7 @@ export const cleanId = (v: unknown): string | null => (typeof v === "string" && 
 const num = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
 const numOrNull = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v ? new Date(v as string).toISOString() : null);
+// A `date` column comes back as midnight UTC of its own label, so reading it by its UTC label is right (it is already a local day: see the rollups and `at time zone ${APP_TZ}` below).
 const day = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
 export const plCache = ttlCache<unknown>(30_000, 300);
 
@@ -278,7 +280,7 @@ export async function overview(s: Scope, f: Filters, windowDays: number): Promis
     db`select count(*)::int n from (${locs(s, f.location)}) x`,
     db`select min(h.at) since from deal_history h join (${locs(s, f.location)}) l on l.location_id = h.location_id where h.installation_id = ${s.inst}`,
     basis(s, base, sm), openByStage(s, base, sm, fresh.fresh),
-    fresh.fresh ? rollupCloses(s, { location: f.location, pipeline: f.pipeline }, Math.min(windowDays, 120)) : db`with ${w} select (d.last_status_change_at at time zone 'UTC')::date dy, count(*) filter (where d.status = 'won')::int won, count(*) filter (where d.status = 'lost')::int lost from d
+    fresh.fresh ? rollupCloses(s, { location: f.location, pipeline: f.pipeline }, Math.min(windowDays, 120)) : db`with ${w} select (d.last_status_change_at at time zone ${APP_TZ})::date dy, count(*) filter (where d.status = 'won')::int won, count(*) filter (where d.status = 'lost')::int lost from d
       where d.status in ('won', 'lost') and not d.is_test and d.last_status_change_at >= now() - ${Math.min(windowDays, 120)}::int * interval '1 day' group by 1`,
     // Big open deals nobody has touched: the top tenth by value (needs 10 open deals), with no stage move, status change or update for 14 days.
     fresh.fresh ? Promise.resolve([undefined]) : db`with ${w}, big as (select percentile_cont(0.9) within group (order by d.value) p90, count(*) n from d where ${P_OPEN(db)})
@@ -646,13 +648,14 @@ export async function moneyFlow(s: Scope, f: Filters): Promise<Pl3MoneyFlow> {
 // ---------- replay ----------
 
 export async function replay(s: Scope, f: Filters, days: number): Promise<Pl3Replay> {
-  const db = sql(), sm = await stageMap(s, f.location), n = Math.min(90, Math.max(30, Math.floor(days) || 30));
-  const from = new Date(Date.now() - n * DAY), w = deals(s, { ...f, bucket: null });
+  const db = sql(), sm = await stageMap(s, f.location), n = Math.min(90, Math.max(2, Math.ceil(days) || 2));
+  // The replay plays the bar's dates (its last 90 days at most), ending at the end of the window, never "the last N days from today".
+  const end = f.to, from = new Date(end.getTime() - n * DAY), w = deals(s, { ...f, bucket: null });
   const [cur, moves, [since]] = await Promise.all([
     db`with ${w} select d.location_id, d.stage_id, count(*)::int n, sum(d.value)::float8 v from d where ${P_OPEN(db)} group by 1, 2`,
-    db`with ${w} select (h.at at time zone 'UTC')::date dy, h.kind, h.location_id, h.from_value, h.to_value, d.stage_id cur_stage, count(*)::int n, coalesce(sum(h.value), 0)::float8 v
+    db`with ${w} select (h.at at time zone ${APP_TZ})::date dy, h.kind, h.location_id, h.from_value, h.to_value, d.stage_id cur_stage, count(*)::int n, coalesce(sum(h.value), 0)::float8 v
       from deal_history h join d on d.location_id = h.location_id and d.opportunity_id = h.opportunity_id
-      where h.installation_id = ${s.inst} and h.actor_kind <> 'subsync' and d.counted and h.at >= ${from} and ((h.kind in ('stage', 'created') and h.to_value is not null) or (h.kind = 'status' and h.to_value in ('won', 'lost')))
+      where h.installation_id = ${s.inst} and h.actor_kind <> 'subsync' and d.counted and h.at >= ${from} and h.at < ${end} and ((h.kind in ('stage', 'created') and h.to_value is not null) or (h.kind = 'status' and h.to_value in ('won', 'lost')))
       group by 1, 2, 3, 4, 5, 6`,
     db`select min(h.at) since, count(*)::int n from deal_history h join (${locs(s, f.location)}) l on l.location_id = h.location_id where h.installation_id = ${s.inst} and h.kind = 'stage'`,
   ]);
@@ -667,7 +670,7 @@ export async function replay(s: Scope, f: Filters, days: number): Promise<Pl3Rep
     dm.push({ day: day(r.dy), from: from2, to: to2, status: isStatus ? (r.to_value as "won" | "lost") : null, count: num(r.n), value: num(r.v) });
   }
   const dayList: string[] = [];
-  for (let i = n - 1; i >= 0; i--) dayList.push(new Date(Date.now() - i * DAY).toISOString().slice(0, 10));
+  for (let i = n - 1; i >= 0; i--) dayList.push(localDay(end.getTime() - 1 - i * DAY));
   const frames = buildReplay(dayList, [...stock.values()], dm);
   return { days: n, frames, enough: num(since?.n) >= 20, historySince: iso(since?.since) };
 }
@@ -684,21 +687,21 @@ export async function receipt(s: Scope, location: string | null, weekStart: Date
     db`with ${w} select count(distinct h.opportunity_id)::int moved, count(distinct h.opportunity_id) filter (where h.dwell_seconds is not null and ss.limit_days is not null and h.dwell_seconds / 86400.0 > ss.limit_days)::int unclogged
       from deal_history h join d on d.location_id = h.location_id and d.opportunity_id = h.opportunity_id left join deal_stage_stats ss on ss.installation_id = h.installation_id and ss.location_id = h.location_id and ss.stage_id = h.from_value
       where h.installation_id = ${s.inst} and h.kind = 'stage' and h.actor_kind <> 'subsync' and h.at >= ${from} and h.at < ${to} and not d.is_test`,
-    db`select (select sum(m.open_value)::float8 from account_metrics_daily m join (${locs(s, location)}) l on l.location_id = m.location_id where m.installation_id = ${s.inst} and m.day = ${from.toISOString().slice(0, 10)}::date) a,
-        (select sum(m.open_value)::float8 from account_metrics_daily m join (${locs(s, location)}) l on l.location_id = m.location_id where m.installation_id = ${s.inst} and m.day = ${new Date(to.getTime() - DAY).toISOString().slice(0, 10)}::date) b`,
+    db`select (select sum(m.open_value)::float8 from account_metrics_daily m join (${locs(s, location)}) l on l.location_id = m.location_id where m.installation_id = ${s.inst} and m.day = ${localDay(from.getTime())}::date) a,
+        (select sum(m.open_value)::float8 from account_metrics_daily m join (${locs(s, location)}) l on l.location_id = m.location_id where m.installation_id = ${s.inst} and m.day = ${localDay(to.getTime() - 1)}::date) b`,
     location ? db`select name from locations where installation_id = ${s.inst} and location_id = ${location}` : db`select null::text name where false`,
   ]);
   const flow = await moneyFlow(s, { from, to, location: location ?? undefined }).catch(() => null);
   const pipelineChange = ac?.a !== null && ac?.a !== undefined && ac?.b !== null && ac?.b !== undefined ? Math.round(num(ac.b) - num(ac.a)) : null;
   const won = { value: num(t?.won_v), n: num(t?.won_n) }, lost = { value: num(t?.lost_v), n: num(t?.lost_n) };
-  const body = { weekStart: from.toISOString().slice(0, 10), loc: location, moved: num(mv?.moved), won, lost, newDeals: num(t?.new_n), unclogged: num(mv?.unclogged) };
+  const body = { weekStart: localDay(from.getTime()), loc: location, moved: num(mv?.moved), won, lost, newDeals: num(t?.new_n), unclogged: num(mv?.unclogged) };
   const parts: string[] = [];
   if (won.n) parts.push(`${won.n} won (${money(won.value)})`);
   if (num(mv?.moved)) parts.push(`${num(mv?.moved)} deals moved forward`);
   if (num(mv?.unclogged)) parts.push(`${num(mv?.unclogged)} stuck deals got moving`);
   if (lost.n) parts.push(`${lost.n} lost (${money(lost.value)})`);
   return {
-    weekStart: body.weekStart, weekEnd: new Date(to.getTime() - DAY).toISOString().slice(0, 10), locationId: location, accountName: (one?.name as string | null) ?? null,
+    weekStart: body.weekStart, weekEnd: localDay(to.getTime() - 1), locationId: location, accountName: (one?.name as string | null) ?? null,
     moved: body.moved, won, lost, newDeals: body.newDeals, unclogged: body.unclogged, stillStale: num(t?.stale_n), leakText: flow?.leak?.text ?? null, pipelineChange,
     headline: parts.length ? parts.join(", ") + "." : "A quiet week: no deals moved or closed.",
     verifyHash: createHash("sha256").update(JSON.stringify(body)).digest("hex").slice(0, 16),

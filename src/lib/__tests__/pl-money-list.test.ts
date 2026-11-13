@@ -10,7 +10,7 @@ import { routeAllowed } from "../access.ts";
 // Pipeline > Money flow list: paging that stays at the bottom, date meaning (open money is as of now), and the "count deals that look like tests" switch.
 const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), "utf8");
 const card = (o: Partial<PipeCard> = {}): PipeCard => ({ locationId: "L", pipelineId: "P", accountName: "A", name: "Sales", openCount: 3, openValue: 1000, wonCount: 0, wonValue: 0, lostCount: 0, lostValue: 0, staleCount: 0, noOwnerCount: 0, zeroValueCount: 0, outlierCount: 0, outlierValue: 0, empty: false, mini: [], ...o });
-const F = { days: 45, from: "2026-11-12", to: "2026-11-12", locationId: "", pipeline: "", ownerId: "", q: "" };
+const F = { from: "2026-11-12", to: "2026-11-12", locationId: "", pipeline: "", ownerId: "", q: "" };
 
 test("test names: only whole test words trigger it, never real names", () => {
   for (const yes of ["Test deal 101", "demo", "Dummy contract", "Sample - roof", "lorem ipsum", "Deal (test)", "xtest-abc", "TEST"]) assert.equal(looksLikeTestName(yes), true, yes);
@@ -60,8 +60,7 @@ test("dates: open money has no date in it; won and lost follow the chosen dates 
   assert.match(cards, /R\.closedIn\(db, "lost", o\.from, o\.to\)/);
   assert.match(cards, /d\.last_status_change_at >= \$\{o\.from\} and d\.last_status_change_at < \$\{o\.to\}/);
   // the date bar's dates are what the request carries, and the screen says so in words
-  const now = new Date("2026-11-12T10:00:00Z");
-  const a = queryOf("pipelines", F, {}, now), b = queryOf("pipelines", { ...F, from: "2026-10-01" }, {}, now);
+  const a = queryOf("pipelines", F, {}), b = queryOf("pipelines", { ...F, from: "2026-10-01" }, {});
   assert.match(a, /from=2026-11-12/); assert.match(a, /to=2026-11-12/);
   assert.notEqual(a, b, "narrowing the dates changes the request (so won and lost), and nothing about open money");
   assert.match(read("app/app/views/pl3/pipes.tsx"), /Open money is as of now\.<\/b> The dates/);

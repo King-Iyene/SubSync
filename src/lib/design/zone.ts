@@ -54,3 +54,39 @@ export const todayStartMs = (now: number, tz: string = APP_TZ): number => daySta
 export const dayEndMs = (day: string, tz: string = APP_TZ): number | null => dayStartMs(addDays(day, 1), tz);
 /** The UTC midnight that ends the UTC-day window of today's LOCAL date: the open end of "up to and including today" for readers that still count whole UTC days (see docs/DATE_RULES.md, known gaps). */
 export const utcDayAfterToday = (now: number, tz: string = APP_TZ): number => Date.parse(`${localDay(now, tz)}T00:00:00Z`) + DAY;
+
+// ---- time of day (optional part of the bar's range) and the day keys of the daily rollups ----
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+/** "09:30": a time of day in the zone, 24 hours. */
+export const isTime = (s: unknown): s is string => typeof s === "string" && TIME_RE.test(s);
+const pad2 = (n: number) => String(n).padStart(2, "0");
+/** "HH:MM" on the zone's clock at this instant. */
+export function localHM(ms: number, tz: string = APP_TZ): string { const d = new Date(ms + offsetMs(ms, tz)); return `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`; }
+/** The instant the zone's clock reads `day` `time` (HH:MM). null when either is not real. */
+export function localToMs(day: string, time: string, tz: string = APP_TZ): number | null {
+  if (!isRealDay(day) || !isTime(time)) return null;
+  const guess = Date.parse(`${day}T${time}:00Z`);
+  let t = guess - offsetMs(guess, tz);
+  t = guess - offsetMs(t, tz);
+  return t;
+}
+/**
+ * The window [fromMs, toMs) for two local days with an optional time of day on each end. No times: whole days (same as windowMs). `toTime` is inclusive to the
+ * minute (17:30 includes 17:30:59). The ONE place a server turns the bar's dates (and times) into instants for a timestamp column.
+ */
+export function windowAtMs(from: string, to: string, fromTime?: string | null, toTime?: string | null, tz: string = APP_TZ): { fromMs: number; toMs: number } | null {
+  const a = fromTime ? localToMs(from, fromTime, tz) : dayStartMs(from, tz);
+  const e = toTime ? localToMs(to, toTime, tz) : null;
+  const b = toTime ? (e === null ? null : e + 60_000) : dayStartMs(addDays(to, 1), tz);
+  return a === null || b === null || b <= a ? null : { fromMs: a, toMs: b };
+}
+/** The local day a daily rollup row for this instant is keyed by (rows are keyed by the ACCOUNT's local day, default the app zone). */
+export const rollupDay = (ms: number, tz: string = APP_TZ): string => localDay(ms, tz);
+/** Rollups have day precision: the first day a window [fromMs, toMs) touches... */
+export const rollupFromDay = (ms: number, tz: string = APP_TZ): string => localDay(ms, tz);
+/** ...and the day AFTER the last day it touches (use with `day < ...`). A window ending exactly at local midnight does not touch the next day. */
+export const rollupUntilDay = (ms: number, tz: string = APP_TZ): string => addDays(localDay(ms - 1, tz), 1);
+/** True when the zone name is a real IANA zone this runtime knows. */
+export function isZone(tz: unknown): tz is string { if (typeof tz !== "string" || !tz) return false; try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return true; } catch { return false; } }
+/** The zone of an account: its own when it is a real one, else the app zone. */
+export const zoneOf = (tz: unknown): string => (isZone(tz) ? tz : APP_TZ);

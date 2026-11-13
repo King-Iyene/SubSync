@@ -1,3 +1,4 @@
+import { atOf } from "../analytics/window-time";
 import { validLogoUrl } from "@/lib/brand-logo";
 import { sql } from "../db";
 import { safeError } from "../safe-log";
@@ -515,7 +516,7 @@ async function speedViewData(ctx: Ctx) {
   if (part !== null) {
     if (!isPart(part)) return json({ error: "Unknown part of this screen" }, 400);
     const now = Date.now();
-    const win = parseWindow(ctx.url.searchParams.get("from"), ctx.url.searchParams.get("to"), now);
+    const win = parseWindow(ctx.url.searchParams.get("from"), ctx.url.searchParams.get("to"), now, atOf(ctx.url.searchParams));
     if (!win.ok) return json({ error: win.error }, 400);
     const cmpFrom = ctx.url.searchParams.get("cmpFrom"), cmpTo = ctx.url.searchParams.get("cmpTo");
     const cmp = cmpFrom || cmpTo ? parseWindow(cmpFrom, cmpTo, now) : null;
@@ -566,7 +567,7 @@ async function roadmapVote(ctx: Ctx) {
 function apptParams(ctx: Ctx) {
   const q = ctx.url.searchParams;
   return {
-    window: parseApptWindow({ from: q.get("from"), to: q.get("to"), cmpFrom: q.get("cmpFrom"), cmpTo: q.get("cmpTo") }, Date.now()),
+    window: parseApptWindow({ from: q.get("from"), to: q.get("to"), cmpFrom: q.get("cmpFrom"), cmpTo: q.get("cmpTo"), fromTime: q.get("fromTime"), toTime: q.get("toTime") }, Date.now()),
     filters: parseApptFilters({ calendar: q.get("calendar"), user: q.get("user"), source: q.get("source") }),
   };
 }

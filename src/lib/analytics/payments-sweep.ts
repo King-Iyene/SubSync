@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { APP_TZ } from "../design/zone";
 import { GHL_API } from "../ghl/client";
 import { ghlFetch } from "../ghl/http";
 import { getCompanyAccessToken } from "../ghl/installations";
@@ -196,16 +197,24 @@ export async function finishPayments(inst: string): Promise<void> {
   await db`update pm_items set rank_score = round((case when amount > 0 then amount else 1 end * case
       when problem_since is null or now() - problem_since <= interval '3 days' then 1 when now() - problem_since <= interval '7 days' then 1.5 when now() - problem_since <= interval '14 days' then 2 when now() - problem_since <= interval '30 days' then 3 else 4 end)::numeric, 2)
     where installation_id = ${inst} and problem_kind is not null and resolved_at is null`;
-  await db`insert into pm_rollup_daily (installation_id, location_id, day, currency, failed_count, failed_amount, late_count, late_amount, recovered_count, recovered_amount, refund_count, refund_amount)
-    select ${inst}, location_id, d, cur,
+  // Rows are keyed by the account's LOCAL day (its own zone when Postgres knows it, else Africa/Lagos). The 90-day window is replaced whole in one transaction, so no
+  // row keyed by an old UTC day survives next to the same events counted under their local day. A due date is already a calendar day and is kept as it is.
+  const zones = db`select l.location_id, case when l.timezone is not null and exists (select 1 from pg_timezone_names n where n.name = l.timezone) then l.timezone else ${APP_TZ} end tz from locations l where l.installation_id = ${inst}`;
+  await db.begin(async (tx) => {
+    const T = tx as unknown as typeof db;
+    await T`delete from pm_rollup_daily where installation_id = ${inst} and day >= (now() at time zone ${APP_TZ})::date - 91`;
+    await T`insert into pm_rollup_daily (installation_id, location_id, day, currency, tz, failed_count, failed_amount, late_count, late_amount, recovered_count, recovered_amount, refund_count, refund_amount)
+    with z as (${zones})
+    select ${inst}, t.location_id, t.d, t.cur, max(t.tz),
       sum(f_c)::int, sum(f_a), sum(l_c)::int, sum(l_a), sum(r_c)::int, sum(r_a), sum(x_c)::int, sum(x_a)
     from (
-      select location_id, (occurred_at at time zone 'UTC')::date d, coalesce(currency, '') cur, 1 f_c, coalesce(amount, 0) f_a, 0 l_c, 0 l_a, 0 r_c, 0 r_a, 0 x_c, 0 x_a from pm_items where installation_id = ${inst} and kind = 'transaction' and problem_kind = 'failed_payment' and live_mode and occurred_at >= now() - interval '90 days'
-      union all select location_id, due_date, coalesce(currency, ''), 0, 0, 1, coalesce(amount, 0), 0, 0, 0, 0 from pm_items where installation_id = ${inst} and kind = 'invoice' and problem_kind = 'late_invoice' and live_mode and due_date >= (now() - interval '90 days')::date
-      union all select location_id, (resolved_at at time zone 'UTC')::date, coalesce(currency, ''), 0, 0, 0, 0, 1, coalesce(amount, 0), 0, 0 from pm_items where installation_id = ${inst} and resolved_at is not null and problem_kind is not null and live_mode and resolved_at >= now() - interval '90 days'
-      union all select location_id, (occurred_at at time zone 'UTC')::date, coalesce(currency, ''), 0, 0, 0, 0, 0, 0, 1, coalesce(amount_refunded, 0) from pm_items where installation_id = ${inst} and kind = 'transaction' and amount_refunded > 0 and live_mode and occurred_at >= now() - interval '90 days'
-    ) t where d is not null group by location_id, d, cur
-    on conflict (installation_id, location_id, day, currency) do update set failed_count = excluded.failed_count, failed_amount = excluded.failed_amount, late_count = excluded.late_count, late_amount = excluded.late_amount, recovered_count = excluded.recovered_count, recovered_amount = excluded.recovered_amount, refund_count = excluded.refund_count, refund_amount = excluded.refund_amount`;
+      select p.location_id, z.tz, (p.occurred_at at time zone z.tz)::date d, coalesce(p.currency, '') cur, 1 f_c, coalesce(p.amount, 0) f_a, 0 l_c, 0 l_a, 0 r_c, 0 r_a, 0 x_c, 0 x_a from pm_items p join z on z.location_id = p.location_id where p.installation_id = ${inst} and p.kind = 'transaction' and p.problem_kind = 'failed_payment' and p.live_mode and p.occurred_at >= now() - interval '90 days'
+      union all select p.location_id, z.tz, p.due_date, coalesce(p.currency, ''), 0, 0, 1, coalesce(p.amount, 0), 0, 0, 0, 0 from pm_items p join z on z.location_id = p.location_id where p.installation_id = ${inst} and p.kind = 'invoice' and p.problem_kind = 'late_invoice' and p.live_mode and p.due_date >= (now() - interval '90 days')::date
+      union all select p.location_id, z.tz, (p.resolved_at at time zone z.tz)::date, coalesce(p.currency, ''), 0, 0, 0, 0, 1, coalesce(p.amount, 0), 0, 0 from pm_items p join z on z.location_id = p.location_id where p.installation_id = ${inst} and p.resolved_at is not null and p.problem_kind is not null and p.live_mode and p.resolved_at >= now() - interval '90 days'
+      union all select p.location_id, z.tz, (p.occurred_at at time zone z.tz)::date, coalesce(p.currency, ''), 0, 0, 0, 0, 0, 0, 1, coalesce(p.amount_refunded, 0) from pm_items p join z on z.location_id = p.location_id where p.installation_id = ${inst} and p.kind = 'transaction' and p.amount_refunded > 0 and p.live_mode and p.occurred_at >= now() - interval '90 days'
+    ) t where t.d is not null group by t.location_id, t.d, t.cur
+    on conflict (installation_id, location_id, day, currency) do update set tz = excluded.tz, failed_count = excluded.failed_count, failed_amount = excluded.failed_amount, late_count = excluded.late_count, late_amount = excluded.late_amount, recovered_count = excluded.recovered_count, recovered_amount = excluded.recovered_amount, refund_count = excluded.refund_count, refund_amount = excluded.refund_amount`;
+  });
 }
 
 /** One company's hourly Payments read. Every account is read on its own key; one account failing never stops the others. */

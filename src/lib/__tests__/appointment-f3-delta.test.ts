@@ -56,12 +56,12 @@ test("no dates means the old window: the last 30 days against the 30 before", ()
   assert.deepEqual(w.compare, { from: NOW - 60 * DAY, to: NOW - 30 * DAY });
 });
 
-test("chosen dates are whole UTC days with the end date included; the comparison is optional", () => {
+test("chosen dates are whole Lagos days with the end date included; the comparison is optional", () => {
   const w = parseWindow({ from: "2026-10-03", to: "2026-11-01", cmpFrom: "2026-09-03", cmpTo: "2026-10-02" }, NOW);
   assert.equal(w.defaulted, false);
-  assert.equal(w.current.from, Date.parse("2026-10-03T00:00:00Z"));
-  assert.equal(w.current.to, Date.parse("2026-11-02T00:00:00Z"), "the end is the start of the next day, so the last day is in");
-  assert.equal(w.compare?.from, Date.parse("2026-09-03T00:00:00Z"));
+  assert.equal(w.current.from, Date.parse("2026-10-02T23:00:00Z"));
+  assert.equal(w.current.to, Date.parse("2026-11-01T23:00:00Z"), "the end is the start of the next day, so the last day is in");
+  assert.equal(w.compare?.from, Date.parse("2026-09-02T23:00:00Z"));
   assert.equal(parseWindow({ from: "2026-10-03", to: "2026-10-05" }, NOW).compare, null);
 });
 

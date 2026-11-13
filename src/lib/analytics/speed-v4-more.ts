@@ -1,4 +1,5 @@
 // Speed to lead, fourth pass, part two (stage SPEED4): response buckets, advanced filters, the lead journey, the daily rollup and the month-on-month proof. Pure: no database, no React.
+import { APP_TZ } from "../design/zone.ts";
 import { judge, responseSeconds, sourceLabel } from "./speed-intel.ts";
 import type { LoadedRow } from "./speed-parts.ts";
 import { localParts, type Outcomes } from "./speed-v3.ts";
@@ -102,7 +103,7 @@ export function journeyMembers(rows: readonly LoadedRow[], oc: Outcomes, replied
 
 // ---------- the daily rollup row for one account and one day ----------
 export type DailyRow = { locationId: string; day: string; leads: number; answered: number; within: number; medianSeconds: number | null; buckets: Record<string, number>; byChannel: Record<string, number>; bySource: Record<string, number>; byOwner: Record<string, number>; byHour: number[]; missedCalls: number; missedFollowed: number; textedBack60: number; failedSends: number };
-const dayOf = (ms: number, tz: string | null) => { try { return new Intl.DateTimeFormat("en-CA", { timeZone: tz || "UTC", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(ms)); } catch { return new Date(ms).toISOString().slice(0, 10); } };
+const dayOf = (ms: number, tz: string | null) => { try { return new Intl.DateTimeFormat("en-CA", { timeZone: tz || APP_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(ms)); } catch { return new Date(ms).toISOString().slice(0, 10); } };
 export function dailyRollup(rows: readonly LoadedRow[], events: readonly TouchEvent[], tzOf: (l: string) => string | null, targetMinutes: number, now: number): DailyRow[] {
   const days = new Map<string, DailyRow>();
   const get = (loc: string, day: string) => {

@@ -1,5 +1,6 @@
 import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
-import { utcDayAfterToday } from "../design/zone.ts";
+import { nextMidnightMs } from "../design/zone.ts";
+import { endBound, startBound, type At } from "./window-time.ts";
 import type { Cl3Account, Cl3Level, Cl3Reason, Cl3ReasonCount, Cl3Today, Delta, Rate } from "./clients3-types";
 
 // Pure rules behind the Clients screens (no database, unit tested). Definitions: docs/METRICS.md "Clients 3".
@@ -23,14 +24,12 @@ export const NOSHOW_FLAG = 3;
 export const rate = (n: number, of: number, min = MIN_SHARE): Rate => ({ value: of >= min && of > 0 ? n / of : null, n, of, enough: of >= min });
 export const delta = (current: number, previous: number, min = MIN_TREND_BASE): Delta => ({ current, previous, enough: previous >= min, change: previous >= min ? (current - previous) / previous : null });
 
-export function parseWindow(from: string | null | undefined, to: string | null | undefined, now: number): { from: Date; to: Date; days: number; problem: string | null } {
-  const iso = /^\d{4}-\d{2}-\d{2}$/;
-  const f = from && iso.test(from) ? Date.parse(from) : NaN;
-  const t = to && iso.test(to) ? Date.parse(to) : NaN;
-  const end = Number.isFinite(t) ? t + DAY : utcDayAfterToday(now);
-  const start = Number.isFinite(f) ? f : end - 30 * DAY;
+/** The dates the bar sent: days in the app zone, `to` included (optional `at` hours). The window is [from, to) in real instants, so "today" starts at local midnight. */
+export function parseWindow(from: string | null | undefined, to: string | null | undefined, now: number, at?: At): { from: Date; to: Date; days: number; problem: string | null } {
+  const end = endBound(to, at) ?? nextMidnightMs(now);
+  const start = startBound(from, at) ?? end - 30 * DAY;
   if (end <= start) return { from: new Date(end - 30 * DAY), to: new Date(end), days: 30, problem: "The start date was after the end date, so the last 30 days are shown." };
-  const days = Math.round((end - start) / DAY);
+  const days = Math.max(1, Math.round((end - start) / DAY));
   if (days > MAX_RANGE_DAYS) return { from: new Date(end - MAX_RANGE_DAYS * DAY), to: new Date(end), days: MAX_RANGE_DAYS, problem: `Periods are limited to ${MAX_RANGE_DAYS} days.` };
   return { from: new Date(start), to: new Date(end), days, problem: null };
 }

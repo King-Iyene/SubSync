@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { APP_TZ, rollupFromDay, rollupUntilDay, zoneOf } from "../design/zone";
 import { deals, P_OPEN, type Scope } from "./pipeline3-queries";
 
 // PIPELINE ROLLUP: every deal of an account is counted once, by the same rules as the live scan (deals(): value, owner, test, outlier, stuck, out of scope), and summed into
@@ -15,7 +16,8 @@ export const R = {
   noOwner: (db: Db) => db`(r.status = 'open' and not r.oos and not r.is_test and r.has_value and not r.has_owner)`,
   noValue: (db: Db) => db`(r.status = 'open' and not r.oos and not r.is_test and not r.has_value)`,
   flag: (db: Db) => db`(r.status = 'open' and not r.oos and (r.is_test or r.stale or r.outlier or (r.has_value and not r.has_owner) or not r.has_value))`,
-  closedIn: (db: Db, status: "won" | "lost", from: Date, to: Date | null) => db`(r.status = ${status} and not r.is_test and r.closed_day >= ${from.toISOString().slice(0, 10)}::date ${to ? db`and r.closed_day < ${to.toISOString().slice(0, 10)}::date` : db``})`,
+  // closed_day is the account's LOCAL day (docs/DATE_RULES.md): a window [from, to) in real instants touches the days from localDay(from) up to the one before rollupUntilDay(to).
+  closedIn: (db: Db, status: "won" | "lost", from: Date, to: Date | null) => db`(r.status = ${status} and not r.is_test and r.closed_day >= ${rollupFromDay(from.getTime())}::date ${to ? db`and r.closed_day < ${rollupUntilDay(to.getTime())}::date` : db``})`,
 };
 
 function accountScope(db: Db, s: Scope, location?: string | null) {
@@ -45,7 +47,9 @@ async function rollupFreshNow(s: Scope, location?: string | null): Promise<{ fre
 
 /** Rebuild the totals of one installation (every account, or the ones named). An account is rebuilt when a deal was saved since its last refresh, when it has never been built, or after FULL_EVERY_HOURS (the full fallback, which also catches deals removed in the CRM). `force` rebuilds all. Safe to run twice. */
 export async function refreshRollup(inst: string, o: { locations?: string[] | null; force?: boolean } = {}, db: Db = sql()): Promise<{ accounts: number; rebuilt: number; rows: number }> {
-  const accounts = (await db`select l.location_id from locations l where l.installation_id = ${inst} and not l.ignored ${o.locations ? db`and l.location_id = any(${o.locations}::text[])` : db``}`).map((r) => r.location_id as string);
+  const acct = await db`select l.location_id, l.timezone from locations l where l.installation_id = ${inst} and not l.ignored ${o.locations ? db`and l.location_id = any(${o.locations}::text[])` : db``}`;
+  const accounts = acct.map((r) => r.location_id as string);
+  const zones = new Map(acct.map((r) => [r.location_id as string, zoneOf(r.timezone)]));
   let rebuilt = 0, rows = 0;
   for (const loc of accounts) {
     const st = (await db`select refreshed_at, (select max(o.synced_at) from cached_opportunities o where o.installation_id = ${inst} and o.location_id = ${loc}) last_saved from pipeline_rollup_state where installation_id = ${inst} and location_id = ${loc}`)[0];
@@ -53,7 +57,7 @@ export async function refreshRollup(inst: string, o: { locations?: string[] | nu
     const noState = !st; let needs = o.force === true || noState || saved > refreshed || Date.now() - refreshed > FULL_EVERY_HOURS * 3_600_000;
     if (!needs && !noState) { const [x] = await db`select count(*)::int n from cached_opportunities where installation_id = ${inst} and location_id = ${loc}`; needs = Number(x.n) !== Number(st.deals ?? -1); }
     if (!needs) continue;
-    const scope: Scope = { inst, allowed: [loc] }, now = new Date();
+    const scope: Scope = { inst, allowed: [loc] }, now = new Date(), tz = zones.get(loc) ?? APP_TZ;
     await db.begin(async (tx) => {
       const T = tx as unknown as Db;
       await T`delete from pipeline_rollup where installation_id = ${inst} and location_id = ${loc}`;
@@ -64,7 +68,7 @@ export async function refreshRollup(inst: string, o: { locations?: string[] | nu
         g as (
           select d.pipeline_id, coalesce(d.stage_id, '') stage_id, coalesce(d.owner, '') owner_id, coalesce(d.source, '') source, d.status, d.is_test, d.out_of_scope oos, d.value > 0 has_value, d.owner is not null has_owner, d.outlier, d.stale,
             (${P_OPEN(T)} and big.n >= 10 and d.value >= big.p90 and coalesce(greatest(d.last_activity_at, d.last_stage_change_at, d.last_status_change_at), d.created_at) < now() - interval '14 days') big_untouched,
-            case when d.status <> 'open' and d.last_status_change_at is not null then (d.last_status_change_at at time zone 'UTC')::date else date '1970-01-01' end closed_day,
+            case when d.status <> 'open' and d.last_status_change_at is not null then (d.last_status_change_at at time zone ${tz})::date else date '1970-01-01' end closed_day,
             case when d.status = 'lost' then coalesce(d.lost_reason, case when d.lost_reason_id is not null then 'Reason ' || right(d.lost_reason_id, 4) end, '') else '' end lost_reason,
             count(*)::int n, sum(d.value)::float8 value
           from d, big where d.pipeline_id is not null group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
@@ -93,7 +97,7 @@ export async function rollupHeadline(s: Scope, f: { location?: string | null; pi
       coalesce(sum(r.n) filter (where ${R.closedIn(db, "lost", f.d30, null)}), 0)::int lost_n, coalesce(sum(r.value) filter (where ${R.closedIn(db, "lost", f.d30, null)}), 0)::float8 lost_v,
       coalesce(sum(r.n) filter (where ${R.noOwner(db)}), 0)::int no_owner, coalesce(sum(r.n) filter (where ${R.noValue(db)}), 0)::int no_value,
       coalesce(sum(r.n) filter (where r.is_test and r.status = 'open'), 0)::int test, coalesce(sum(r.n) filter (where r.outlier), 0)::int outliers,
-      coalesce(sum(r.n) filter (where r.status = 'lost' and not r.is_test and r.closed_day >= ${f.d30.toISOString().slice(0, 10)}::date and r.lost_reason = ''), 0)::int no_reason,
+      coalesce(sum(r.n) filter (where r.status = 'lost' and not r.is_test and r.closed_day >= ${rollupFromDay(f.d30.getTime())}::date and r.lost_reason = ''), 0)::int no_reason,
       coalesce(sum(r.n) filter (where r.status = 'open' and not r.oos), 0)::int open_all, coalesce(sum(r.n) filter (where ${R.flag(db)}), 0)::int flagged,
       coalesce(sum(r.n) filter (where r.big_untouched), 0)::int big_n, coalesce(sum(r.value) filter (where r.big_untouched), 0)::float8 big_v
     from pipeline_rollup r where r.installation_id = ${s.inst} and r.location_id in (${accountScope(db, s, f.location)}) ${pipeFilter(db, s, f.pipeline)}`;
@@ -119,7 +123,7 @@ export async function rollupCloses(s: Scope, f: { location?: string | null; pipe
   const db = sql();
   return db`select r.closed_day dy, coalesce(sum(r.n) filter (where r.status = 'won'), 0)::int won, coalesce(sum(r.n) filter (where r.status = 'lost'), 0)::int lost
     from pipeline_rollup r where r.installation_id = ${s.inst} and r.location_id in (${accountScope(db, s, f.location)}) and r.status in ('won', 'lost') and not r.is_test
-      and r.closed_day >= (now() - ${days}::int * interval '1 day')::date ${pipeFilter(db, s, f.pipeline)} group by 1`;
+      and r.closed_day >= ${rollupFromDay(Date.now() - days * 86_400_000)}::date ${pipeFilter(db, s, f.pipeline)} group by 1`;
 }
 
 /** The stage rows, lost rows (with their reason) and won totals of the stacks, from the rollup. Same shapes as the live parts. */

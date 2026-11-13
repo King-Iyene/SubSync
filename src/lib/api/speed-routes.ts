@@ -1,3 +1,5 @@
+import { addDays, localDay } from "../design/zone";
+import { atOf } from "../analytics/window-time";
 import { setAccountTarget, speedCompare, speedHome, speedList } from "../analytics/speed-v2-queries";
 import { SORTS, STATUS_FILTERS, type LeadSort, type LeadStatusFilter } from "../analytics/speed-v2";
 import { speedInsightList, speedInsights } from "../analytics/speed-v3-queries";
@@ -65,10 +67,10 @@ export function parseSel(sp: URLSearchParams, seePeople: boolean): Sel | null {
 function windowOf(url: URL, now: number): { ok: true; win: Win } | { ok: false; error: string } {
   const f = url.searchParams.get("from"), t = url.searchParams.get("to");
   if (f === null && t === null) {
-    const to = new Date(now).toISOString().slice(0, 10), from = new Date(now - 29 * DAY).toISOString().slice(0, 10);
+    const to = localDay(now), from = addDays(localDay(now), -29);
     return parseWindow(from, to, now);
   }
-  return parseWindow(f, t, now);
+  return parseWindow(f, t, now, atOf(url.searchParams));
 }
 
 /** Only an account id that is well formed narrows a request, and the query still binds it to the caller's own accounts. */
@@ -132,7 +134,7 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
 
   // Stage SPEED4: the race, coverage, the lead journey, the proof report and one lead story. The accounts come from the session; a filter only narrows inside them.
   // The bar's dates narrow every part that is about a period; the race is "right now" and ignores them. A bad pair of dates is ignored here (the home read already refuses it).
-  const wp = sp.get("from") !== null && sp.get("to") !== null ? parseWindow(sp.get("from"), sp.get("to"), now) : null;
+  const wp = sp.get("from") !== null && sp.get("to") !== null ? parseWindow(sp.get("from"), sp.get("to"), now, atOf(sp)) : null;
   const win = wp && wp.ok ? { winFrom: wp.win.fromMs, winTo: wp.win.toMs } : {};
   if (part === "zones") {
     const allowed = narrowed(allowedAll, sp.get("account"));

@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import type { PlForecast, PlHealthRow, PlOverview, PlPerson, PlProof, PlSource, PlStageHistory, PlWonLost } from "@/lib/analytics/pipeline3-types-interim";
 import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
+import { usePageRange } from "../../ds/page-range";
+import { zoneWord } from "@/lib/design/zone";
 import { CountUp } from "../speed6-base";
 import { usePl, type PlFilters } from "./data";
 import { days, money, moneyShort, pct } from "./format";
@@ -18,11 +20,17 @@ function Gate<T>({ r, label, children, empty }: { r: { data: T | null; error: un
   const e = empty?.(r.data); if (e) return <EmptyState title={e.title} body={e.body} />;
   return <>{children(r.data)}</>;
 }
+/** What the dates above do to these numbers, in words next to them: open money, stuck and open counts are as of now; won, lost and moved are between the bar's dates (Lagos time). */
+function Dates() {
+  const r = usePageRange();
+  return <p className="ap-fine mb-2" data-testid="pl-dates-note"><b>As of now:</b> open money, stuck deals and open counts. <b>Between {r.label || "the dates above"}, {zoneWord()} time:</b> won, lost and moved.</p>;
+}
 const Formula = ({ text }: { text: string }) => <details className="ap-formula"><summary>How is this worked out?</summary><p className="ap-fine">{text}</p></details>;
 const Rows = ({ head, children, testId }: { head: string[]; children: ReactNode; testId: string }) => <div className="ap-tablewrap" data-testid={testId}><div className="ap-scroll"><table className="ap-t"><thead><tr>{head.map((h, i) => <th key={h} data-num={i > 0 || undefined}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div></div>;
 
 export function Overview({ filters, go, onDrill }: SectionProps) {
   const r = usePl<PlOverview>("overview", filters);
+  const bar = usePageRange();
   return (
     <Gate r={r} label="Loading the pipeline..." empty={(d) => (d.headline.openCount === 0 && d.headline.wonCents === 0 ? { title: "No deals to show yet", body: "When deals are in your pipeline, the money, the stuck deals and the biggest leak show up here." } : null)}>
       {(d) => {
@@ -34,11 +42,12 @@ export function Overview({ filters, go, onDrill }: SectionProps) {
               {d.sentence && <p className="ap-sentence" data-testid="pl-sentence">{d.sentence}</p>}
               {(h.staleCount > 0 || d.excluded.noOwner > 0 || (d.bigUntouched?.count ?? 0) > 0) && <p className="ap-fine" data-testid="pl-today">What to do today: {[h.staleCount > 0 ? `move ${h.staleCount} stuck deal${h.staleCount === 1 ? "" : "s"} (${moneyShort(h.staleValueCents)})` : "", d.excluded.noOwner > 0 ? `give ${d.excluded.noOwner} deal${d.excluded.noOwner === 1 ? "" : "s"} an owner` : "", d.bigUntouched && d.bigUntouched.count > 0 ? `check ${d.bigUntouched.count} big open deal${d.bigUntouched.count === 1 ? "" : "s"} (${moneyShort(d.bigUntouched.valueCents)}) nobody has touched in ${d.bigUntouched.days} days` : ""].filter(Boolean).join(", then ")}. {h.staleCount > 0 && <button type="button" className="s6-btn" onClick={() => go("needs")}>Open stuck deals</button>}</p>}
               <div className="ap-kpis">
-                <button type="button" className="ap-kpi" data-tone="cyan" onClick={() => go("flow")}><span className="ap-kpi-n">$<CountUp value={Math.round(h.openValueCents / 100)} /></span><span className="ap-kpi-l">Open money, {h.openCount} deals</span></button>
-                <button type="button" className="ap-kpi" data-tone={h.staleCount ? "amber" : "green"} onClick={() => go("needs")}><span className="ap-kpi-n"><CountUp value={h.staleCount} /></span><span className="ap-kpi-l">Stuck deals, {moneyShort(h.staleValueCents)}</span></button>
-                <button type="button" className="ap-kpi" data-tone="green" onClick={() => onDrill({ title: "Won deals", count: 0, extra: { status: "won" } })}><span className="ap-kpi-n">{moneyShort(h.wonCents)}</span><span className="ap-kpi-l">Won in these dates</span></button>
+                <button type="button" className="ap-kpi" data-tone="cyan" onClick={() => go("flow")}><span className="ap-kpi-n">$<CountUp value={Math.round(h.openValueCents / 100)} /></span><span className="ap-kpi-l">Open money, {h.openCount} deals, as of now</span></button>
+                <button type="button" className="ap-kpi" data-tone={h.staleCount ? "amber" : "green"} onClick={() => go("needs")}><span className="ap-kpi-n"><CountUp value={h.staleCount} /></span><span className="ap-kpi-l">Stuck deals, {moneyShort(h.staleValueCents)}, as of now</span></button>
+                <button type="button" className="ap-kpi" data-tone="green" onClick={() => onDrill({ title: "Won deals", count: 0, extra: { status: "won" } })}><span className="ap-kpi-n">{h.wonCents === 0 ? "None" : moneyShort(h.wonCents)}</span><span className="ap-kpi-l">{h.wonCents === 0 ? (h.lostCents === 0 ? "Nothing won or lost in these dates" : `Nothing won in these dates (lost ${moneyShort(h.lostCents)})`) : `Won between ${bar.label || "these dates"}, ${zoneWord()} time`}</span></button>
                 <button type="button" className="ap-kpi" data-tone={h.winRate === null ? "violet" : "cyan"} onClick={() => go("wonlost")}><span className="ap-kpi-n">{h.winRate === null ? "Not enough data" : pct(h.winRate)}</span><span className="ap-kpi-l">{h.winRate === null ? `Needs ${d.minDeals} closed deals, you have ${h.winRateDeals}` : `Win rate, ${h.winRateDeals} closed deals`}</span></button>
               </div>
+              <Dates />
               {d.trust && <TrustBasis t={d.trust} />}
               <div className="ap-act"><button type="button" className="s6-btn" data-kind="primary" onClick={() => go("flow")}>See the money flow</button><button type="button" className="s6-btn" onClick={() => go("needs")}>Unclog stuck deals</button></div>
             </section>
@@ -66,6 +75,7 @@ export function WonLost(p: SectionProps) {
     <Gate r={r} label="Loading won and lost..." empty={(d) => (d.won + d.lost === 0 ? { title: "Nothing closed in these dates", body: "Won and lost deals show up here, with the lost reason when your CRM has one." } : null)}>
       {(d) => (
         <div data-testid="pl-wonlost">
+          <Dates />
           <div className="ap-kpis">
             <button type="button" className="ap-kpi" data-tone="green" onClick={() => p.onDrill({ title: "Won deals", count: d.won, extra: { status: "won", expect: d.won } })}><span className="ap-kpi-n">{d.won}</span><span className="ap-kpi-l">Won, {moneyShort(d.wonCents)}</span></button>
             <button type="button" className="ap-kpi" data-tone="red" onClick={() => p.onDrill({ title: "Lost deals", count: d.lost, extra: { status: "lost", expect: d.lost } })}><span className="ap-kpi-n">{d.lost}</span><span className="ap-kpi-l">Lost, {moneyShort(d.lostCents)}</span></button>

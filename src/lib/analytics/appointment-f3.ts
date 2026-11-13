@@ -1,5 +1,5 @@
 import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
-import { localDay } from "../design/zone.ts";
+import { dayEndMs, dayStartMs, isTime, localDay, windowAtMs } from "../design/zone.ts";
 // Appointment logic added in stage F3 (the status breakdown, the date window, the filters, the history lines, the targets). Pure: no database or
 // network imports, so it can be unit tested. Definitions are in docs/METRICS.md, "Appointments".
 import { needsOutcome, rates, type Appt } from "./appointment-intel.ts";
@@ -68,7 +68,7 @@ export const todayIso = (now: number) => localDay(now); // today in the account 
  * Dates sent by the browser (YYYY-MM-DD, whole UTC days, the end date included). Anything that does not parse, runs backwards, ends in the future or
  * is longer than a year is refused and the default window is used instead; the reason comes back as `problem` and is never silent.
  */
-export function parseWindow(q: { from?: string | null; to?: string | null; cmpFrom?: string | null; cmpTo?: string | null }, now: number): ParsedWindow {
+export function parseWindow(q: { from?: string | null; to?: string | null; cmpFrom?: string | null; cmpTo?: string | null; fromTime?: string | null; toTime?: string | null }, now: number): ParsedWindow {
   const fallback = (problem: string | null): ParsedWindow => ({ current: { from: now - 30 * DAY, to: now }, compare: { from: now - 60 * DAY, to: now - 30 * DAY }, defaulted: true, problem });
   if (!q.from && !q.to) return fallback(null);
   const f = q.from ? dayStart(q.from) : null;
@@ -77,14 +77,16 @@ export function parseWindow(q: { from?: string | null; to?: string | null; cmpFr
   if (f > t) return fallback("The end date was before the start date, so the last 30 days are shown.");
   if (t > dayStart(todayIso(now))!) return fallback("The end date was in the future, so the last 30 days are shown.");
   if ((t - f) / DAY + 1 > MAX_WINDOW_DAYS) return fallback(`A range can be at most ${MAX_WINDOW_DAYS} days, so the last 30 days are shown.`);
-  const current = { from: f, to: t + DAY };
+  const bar = windowAtMs(q.from as string, q.to as string, isTime(q.fromTime) ? q.fromTime : null, isTime(q.toTime) ? q.toTime : null);
+  if (bar === null) return fallback("The end time is before the start time, so the last 30 days are shown.");
+  const current = { from: bar.fromMs, to: bar.toMs }; // real instants: local midnight to local midnight (or the hours asked for)
   let compare: Window | null = null;
   let problem: string | null = null;
   if (q.cmpFrom || q.cmpTo) {
     const cf = q.cmpFrom ? dayStart(q.cmpFrom) : null;
     const ct = q.cmpTo ? dayStart(q.cmpTo) : null;
     if (cf === null || ct === null || cf > ct || (ct - cf) / DAY + 1 > MAX_WINDOW_DAYS) problem = "The dates to compare with were not understood, so there is no comparison.";
-    else compare = { from: cf, to: ct + DAY };
+    else compare = { from: dayStartMs(q.cmpFrom as string) ?? cf, to: dayEndMs(q.cmpTo as string) ?? ct + DAY };
   }
   return { current, compare, defaulted: false, problem };
 }
