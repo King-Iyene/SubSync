@@ -1,0 +1,12 @@
+[
+  { "id": "L01", "shot": "hook",    "text": "Know what is happening in every client account, before your client does." },
+  { "id": "L02", "shot": "speed",   "text": "Thirteen new leads are past your reply target right now." },
+  { "id": "L03", "shot": "speed",   "text": "SubSync shows who has waited longest, with the deal money behind each one, so you know who to call first." },
+  { "id": "L04", "shot": "appts",   "text": "Appointments tell the truth too. Four have no outcome marked, so your real show rate is fifty-seven percent." },
+  { "id": "L05", "shot": "appts",   "text": "Eight no-shows are waiting to be won back. Mark the four now." },
+  { "id": "L06", "shot": "funnel",  "text": "Eighty-seven deals have gone quiet, with about seven hundred and fifty-one thousand dollars at risk." },
+  { "id": "L07", "shot": "funnel",  "text": "Watch your pipeline as a funnel. Replay how deals moved, day by day, then click any step to open the deals waiting there." },
+  { "id": "L08", "shot": "clients", "text": "Every client account sits on one screen. Five need you now, and two paid plans are past due." },
+  { "id": "L09", "shot": "alerts",  "text": "And you don't have to go looking. SubSync sends the alert to Slack or email, with a link that opens the right account in your CRM." },
+  { "id": "L10", "shot": "close",   "text": "Install it once. Free for fourteen days." }
+]

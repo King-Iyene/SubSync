@@ -56,3 +56,6 @@ backups/
 .next-int
 .next-*/
 .claude/worktrees/
+
+# Preview video output (large, not committed). See docs/VIDEO_SCRIPT.md.
+assets/video-out/
