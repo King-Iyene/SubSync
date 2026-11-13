@@ -9,7 +9,7 @@ const outcomes = [
 ];
 
 const trust = [
-  "Read-only by default. The one thing SubSync writes on its own is a meeting note on a matched contact, and you can switch that off. Every other change needs a preview, a typed confirmation and an undo.",
+  "SubSync can change things in your CRM (book appointments, add tags, update deals, fix contact data) and send texts and emails, always through a preview and a confirm, with an audit log, only when a person presses the button (or a schedule they set), and never to contacts who asked not to be contacted. The only thing it writes on its own is a meeting note on a matched contact, and you can switch that off.",
   "A client account can only ever see its own data. Another agency's data is never reachable, and this is tested on every release.",
   "A small, clearly listed set of permissions, not hundreds.",
   "Your data is deleted when you uninstall.",
@@ -18,7 +18,7 @@ const trust = [
 const faq = [
   ["How much does it cost?", "Try it free for 14 days, then $11.50 per client account per month. You can resell it to your clients at your own price."],
   ["Does it work under my own brand?", "Yes. Add your agency name and colour in Settings and SubSync shows as yours."],
-  ["Will it message my clients' customers?", "No. SubSync never sends messages to contacts. It reads, alerts you, and tells you what to do."],
+  ["Will it message my clients' customers?", "Only when a person on your team presses Send, after a preview. SubSync never sends on its own and never to a contact who asked not to be contacted. It also reads your CRM, alerts you and tells you what to do."],
   ["How fast do I see something useful?", "The audit runs as soon as your accounts finish their first read, usually within minutes."],
 ];
 

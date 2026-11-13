@@ -25,7 +25,7 @@ export const CALL_QUEUE: Template = {
   name: "Call queue",
   version: 1,
   defaultTag: "call-now",
-  summary: "Gives your team a call task when a contact gets the call tag. It never messages the contact.",
+  summary: "Gives your team a call task when a contact gets the call tag. It only gives your team a task.",
   needs: ["Contact tagged", "Manual Action: Call", "Remove tag"],
   build: ({ folderName, tag, assign, steps }) => ({
     name: "Call queue",
@@ -50,8 +50,8 @@ const taskTemplate = (key: string, name: string, tag: string, summary: string): 
   // Same three steps, the tag the caller passes (the library passes defaultTag), its own name.
   build: (i) => ({ ...CALL_QUEUE.build(i), name }),
 });
-export const NOSHOW_TASK = taskTemplate("noshow_task", "No-show follow-up call", "no-show-follow-up", "Gives your team a call task when a contact gets the no-show tag. It never messages the contact.");
-export const SPEED_TASK = taskTemplate("speed_breach_task", "Slow first reply call", "needs-first-reply", "Gives your team a call task when a lead gets the needs-first-reply tag. It never messages the lead.");
+export const NOSHOW_TASK = taskTemplate("noshow_task", "No-show follow-up call", "no-show-follow-up", "Gives your team a call task when a contact gets the no-show tag. It only gives your team a task.");
+export const SPEED_TASK = taskTemplate("speed_breach_task", "Slow first reply call", "needs-first-reply", "Gives your team a call task when a lead gets the needs-first-reply tag. It only gives your team a task.");
 
 export const TEMPLATES: readonly Template[] = [CALL_QUEUE, SPEED_TASK, NOSHOW_TASK];
 export const templateByKey = (k: string): Template | undefined => TEMPLATES.find((t) => t.key === k);

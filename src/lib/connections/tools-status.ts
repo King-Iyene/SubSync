@@ -41,7 +41,7 @@ export function aiLine(f: AiFacts): string {
   return "Working. Open it to see this month's usage and your limit.";
 }
 
-export const AI_WHAT = "Lets SubSync write briefs, reports and answers from your own numbers. You use your own AI account; SubSync never pays for AI and the AI never messages a lead.";
+export const AI_WHAT = "Lets SubSync write briefs, reports and answers from your own numbers. You use your own AI account; SubSync never pays for AI and the AI never sends anything: a person presses Send.";
 
 // ---------------- Email ----------------
 export type EmailFacts = {

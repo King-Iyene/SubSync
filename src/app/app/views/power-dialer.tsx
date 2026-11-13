@@ -7,7 +7,7 @@ import { ACCOUNTS_ERROR_TEXT, CALL_MODE_BUTTON, CHECKING_TEXT, NO_ACCOUNTS_TEXT,
 import { useApiClient } from "../session";
 
 // "Send to power dialer" (docs/features/DIALQUEUE.md). Tags the chosen leads with the call tag through the safe gateway; the customer's own CRM workflow turns each tag into a call task;
-// then the CRM's Manual Actions page opens in a new tab, where its own "Let's Start" power dialer runs. SubSync never places a call and never messages anyone.
+// then the CRM's Manual Actions page opens in a new tab, where its own "Let's Start" power dialer runs. SubSync never places a call, and sends a message only when a person presses Send.
 
 type Ready = { state: SetupState; tag: string; canMark: boolean; canEdit: boolean };
 type Prev = { ok: boolean; message: string; live: boolean; names: Array<{ key: string; name: string; phone: string | null; list: string }>; plan: { skipped: { dnd: number; noPhone: number; outsideHours: number; recent: number; cap: number } } | null };

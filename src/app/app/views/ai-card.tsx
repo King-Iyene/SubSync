@@ -71,7 +71,7 @@ export function AiPanel({ data, reload, bare = false }: { data: Status; reload: 
       {!bare && <>
         <h3 id="ai-h" className="text-sm font-semibold">AI <span className="font-normal text-muted-foreground">(optional, bring your own)</span></h3>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          AI can word your 7 am brief in plain English. SubSync works out every number itself; the AI only writes around them, and a check throws away any answer with a number we did not give it. It only suggests: it never messages a lead or changes your CRM.
+          AI can word your 7 am brief in plain English. SubSync works out every number itself; the AI only writes around them, and a check throws away any answer with a number we did not give it. It only suggests: nothing is sent to a lead or changed in your CRM until a person confirms it.
           You connect your own AI account, so SubSync never pays for AI and you control the spend. {data.note}
         </p>
       </>}

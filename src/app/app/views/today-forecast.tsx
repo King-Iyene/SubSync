@@ -54,7 +54,7 @@ export function ForecastTab({ m, t, clients, agency }: { m: TodayModel; t: Today
       {bar}
       <p className="text-[0.9375rem] font-medium" data-testid={rows.length === 0 ? "coming-none" : "coming-headline"}>
         {headline}{" "}
-        <WhatIs text={`SubSync looks ahead at what will be late by the end of today if nobody acts: leads whose first reply is due (your reply goal is ${t.targetMinutes} minutes), deals that are about to sit untouched too long, and appointments about to end with no outcome. It never sends anything.`} />
+        <WhatIs text={`SubSync looks ahead at what will be late by the end of today if nobody acts: leads whose first reply is due (your reply goal is ${t.targetMinutes} minutes), deals that are about to sit untouched too long, and appointments about to end with no outcome. It sends nothing by itself.`} />
       </p>
       {dealMoney > 0 && <p className="t-small t-quiet mt-1" data-testid="coming-money">Those deals are worth ${Math.round(dealMoney).toLocaleString("en-US")} between them.</p>}
       {rows.length > 0 && (

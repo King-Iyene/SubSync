@@ -28,9 +28,10 @@ export default function Support() {
             longer.
           </li>
           <li>
-            <strong>What does SubSync access?</strong> Read-only access to your
-            client accounts&apos; contacts, deals, calendars and conversations,
-            only to power the features above.
+            <strong>What does SubSync access?</strong> Access to your
+            client accounts&apos; contacts, deals, calendars and conversations.
+            It can also change things there and send texts and emails, always
+            after a preview and a confirm, and only when a person presses the button.
           </li>
           <li>
             <strong>How do I remove SubSync?</strong> Uninstall it from your

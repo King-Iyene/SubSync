@@ -28,7 +28,8 @@ export const CLAIMS: readonly Claim[] = [
   { id: "owner_delete", text: "Only the owner of the company account can press Delete my data, they must type the word DELETE, and every attempt, allowed or refused, is written to a record that is kept." },
   { id: "settings_audit", text: "Every change to a setting is recorded, with who changed it and when. You can read the history under Settings, Advanced." },
   { id: "ai_own", text: "No artificial-intelligence service receives your data unless an administrator connects their own AI account. SubSync does not choose or pay for one. By default only counts, dollar estimates and the labels you set up yourself (tags, lead sources, pipeline step names) are sent, never names, email addresses, phone numbers or messages, unless that account switches names on, and you can see exactly what was sent." },
-  { id: "no_sending_permission", text: "SubSync cannot send messages to your contacts. It does not ask for that permission, and it measures how fast your team replies instead of replying itself." },
+  { id: "send_on_press", text: "SubSync sends a text or an email only when a person presses Send after a preview (or a schedule they set), never on its own. It never sends to a contact who asked not to be contacted: it asks your CRM again just before each send and stops if it cannot tell. The permission to send is optional, and each send is recorded with who sent it, when and to whom (never the words)." },
+  { id: "changes_crm", text: "SubSync can change things in your CRM: book and update appointments, add and remove tags, update deals, write notes and tasks, change who owns a contact, fix contact data, merge duplicates and set up workflows. Each change needs its own optional permission, shows a preview, needs a confirm and is written to an audit log. The full list is in docs/CRM_WRITES.md." },
   { id: "never_stored", text: "The text of your customers' messages is never copied into SubSync." },
   { id: "kill_switch", text: "We can put SubSync into maintenance mode at once, which stops every sync, job and email." },
   { id: "webhook_ids_3_days", text: "The list of notifications already handled is cleared after 3 days." },
@@ -54,12 +55,13 @@ const requiredCount = SCOPE_GROUPS.flatMap((g) => g.scopes).filter((s) => s.requ
 export function trustSections(): TrustSection[] {
   const store = storeLines({ meetings: true });
   return [
-    { id: "read", title: "What SubSync reads", intro: `SubSync asks your CRM for ${GHL_SCOPES.length} permissions: ${requiredCount} required and ${GHL_SCOPES.length - requiredCount} optional. Fewer is safer, so each has a reason, and an optional one can be declined: the feature that needs it then says "Needs permission: reconnect" and everything else keeps working.`,
+    { id: "read", title: "What SubSync reads and changes", intro: `SubSync asks your CRM for ${GHL_SCOPES.length} permissions: ${requiredCount} required and ${GHL_SCOPES.length - requiredCount} optional. Fewer is safer, so each has a reason, and an optional one can be declined: the feature that needs it then says "Needs permission: reconnect" and everything else keeps working.`,
       items: [
         ...SCOPE_GROUPS.map((g): Item => ({ title: g.title, text: `${g.summary} ${g.scopes.map((s) => `${s.scope} (${s.required ? "required" : "optional"}, ${s.kind}): ${s.why}`).join(" ")}`, kind: "derived" })),
         ...NO_PERMISSION_GROUPS.map((g): Item => ({ title: g.title, text: g.text, kind: "derived" })),
         { title: "Not requested", text: NOT_REQUESTED.map((n) => `${n.scope}: ${n.why}`).join(" "), kind: "derived" },
-        claim("no_sending_permission"),
+        claim("changes_crm"),
+        claim("send_on_press"),
       ] },
     { id: "store", title: "What SubSync stores", intro: "This list is produced from the database itself, table by table, and an automatic test fails when the database holds something that is not on it.",
       items: [...store.map((l): Item => ({ title: l.title, text: l.text, kind: "derived" })), claim("never_stored")] },

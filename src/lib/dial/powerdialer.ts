@@ -1,5 +1,5 @@
 // "Send to power dialer" (docs/features/DIALQUEUE.md, section "One click to the power dialer"). Pure helpers, no network, no browser: the wording of the preview, the setup state of the
-// call queue workflow, the 5 hand-built steps, and the new-tab hand-off. SubSync never places a call and never messages anyone: it tags leads, the customer's own workflow turns the tag
+// call queue workflow, the 5 hand-built steps, and the new-tab hand-off. SubSync never places a call and sends nothing on its own: it tags leads, the customer's own workflow turns the tag
 // into a call task, and the CRM's own Manual Actions page has the "Let's Start" power dialer.
 import { CLICK_MAX } from "./callqueue.ts";
 

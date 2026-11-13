@@ -15,7 +15,7 @@ import { DraftAll, SummaryBlock } from "../ai-team/summary-block";
 import { LeadStoriesButton } from "../ai-team/lead-stories";
 
 // Clients, Proof: for every client account, ONE branded report page the company sends to that client (a secret link, no sign-in) and a printable monthly report. The company reviews each draft and
-// shares it itself; SubSync never sends anything to a client. Real data only: sample rows appear ONLY with ?prfx in the address and say "Sample data". Every count opens exactly its rows.
+// shares it itself; SubSync does not send reports to a client for you: you share them yourself. Real data only: sample rows appear ONLY with ?prfx in the address and say "Sample data". Every count opens exactly its rows.
 type Options = { flags: Record<string, boolean>; periods: Array<{ month: string; label: string }>; defaultPeriod: string; settings: PrSettings; sections: Array<{ key: keyof Sections; label: string }>; general: { name: string | null; color: string | null; logoUrl: string | null } };
 type ListData = { rows: PrRow[]; total: number; all: number; counts: Record<PrStatus, number>; autoDrafts: number; page: number; pages: number; month: string; label: string };
 type ReportData = {

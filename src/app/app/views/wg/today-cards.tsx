@@ -114,7 +114,7 @@ function BriefSettings({ onClose }: { onClose: () => void }) {
           {r.data?.emailAvailable !== false && <button type="button" className="s6-btn" disabled={busy} data-testid="br-test" onClick={() => void run(async () => { await api.post("br/act/settings", body()); const t = await api.post<{ dryRun: boolean; to: string; subject: string; text: string }>("br/act/test", {}); setPreview(t); setMsg(null); h.reload(); })}>Send me a test</button>}
           {msg && <span className="ap-fine" role="status">{msg}</span>}
         </div>
-        <p className="ap-fine">{r.data?.sendingNote ?? "Sample data."} One brief a day. It only reads: it never changes your CRM or messages a lead. Stop it any time with the link at the bottom of the email.</p>
+        <p className="ap-fine">{r.data?.sendingNote ?? "Sample data."} One brief a day. The email itself changes nothing and goes only to you. Stop it any time with the link at the bottom of the email.</p>
       </form>
       {preview && (
         <div data-testid="br-preview"><p className="ap-fine" role="status">{preview.dryRun ? `Rehearsal: nothing was sent. This is exactly what would go to ${preview.to}.` : `A test was sent to ${preview.to}.`}</p><p className="ap-fine"><b>{preview.subject}</b></p><pre className="br-pre">{preview.text}</pre></div>)}

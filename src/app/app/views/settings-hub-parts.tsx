@@ -113,7 +113,7 @@ export function SafetySection() {
     <div className="space-y-4">
       <Card title="Reading by default">
         <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-          <li>SubSync reads your CRM. It never replies to a lead for you.</li>
+          <li>SubSync reads your CRM and can change things in it (book appointments, add tags, update deals, fix contact data) and send texts and emails, always through a preview and a confirm, with an audit log, only when a person presses the button, and never to a contact who asked not to be contacted.</li>
           <li>A change in a client account happens only where you switched it on below, only after a preview, and only after you confirm.</li>
           <li>A dry run shows exactly what would change and changes nothing. While the server&apos;s live switch is off, every change is a dry run, even for an allowed client.</li>
           <li>People who asked not to be contacted, and contacts with open deals, payments or booked appointments, are protected from deletes and merges.</li>

@@ -41,7 +41,7 @@ In **Settings, Integrations, AI** you can connect your own AI account: **Connect
 
 ## What SubSync will never do
 
-- It never sends a message to your contacts.
+- It sends a text or email only when a person on your team presses Send, after a preview, and never to a contact who asked not to be contacted.
 - It never copies the words of a conversation.
 - It changes things in your CRM only if you use Data cleanup (preview first, type the number of changes to confirm, undo available) or switch on meeting notes for contacts.
 - It never shows one client's data to another client. A client's own staff, if you switch that on, see a read-only view of their own account only.

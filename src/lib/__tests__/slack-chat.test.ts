@@ -90,7 +90,7 @@ test("a mention is acknowledged at once and answered in a thread from the accoun
   assert.equal(t.posts[0].token, "xoxb-fake");
   assert.match(t.posts[0].text, /9 leads are waiting/);
   assert.match(t.posts[0].text, /Leads waiting: 9 \(9 rows\) <https:\/\/app\.test\/app#ask\?rows=leads_waiting~from%3D2026-11-06~to%3D2026-11-13&label=Leads%20waiting\|Open the rows>/);
-  assert.match(t.posts[0].text, /Read only/);
+  assert.match(t.posts[0].text, /Nothing was sent or changed/);
 });
 
 test("a direct message is answered without a thread", async () => {

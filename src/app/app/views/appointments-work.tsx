@@ -43,7 +43,7 @@ function ApptTop({ row }: { row: WorkRowData }) {
       {needs && row.url && (
         <p className="mt-2" data-testid="appt-mark-note">
           <ExtLink href={row.url}>Open in your CRM to mark the outcome</ExtLink>
-          <span className="block text-xs text-muted-foreground">Mark it showed or no-show there. SubSync only reads your appointments, so it never changes one.</span>
+          <span className="block text-xs text-muted-foreground">Mark it showed or no-show there. You can also mark it from SubSync, after a preview and a confirm.</span>
         </p>
       )}
       {data && data.history.length > 0 && (

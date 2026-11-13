@@ -31,7 +31,7 @@ import "./speed-ui.css";
 // Speed to lead, rebuilt (docs/SPEED_REVIEW.md). One question: "who is waiting for a first reply, and what do I do first?". Top to bottom: one sentence, one button
 // ("Reply to the oldest waiting lead"), a short list of the five leads to reply to now (See all opens the whole list, searched and paged on the server), how fast
 // replies come, who is slow, and the rest behind "More detail". The leads waiting are the same people Today counts as new leads; every number opens exactly the
-// leads it counts. SubSync measures replies and never sends one.
+// leads it counts. SubSync measures replies. It sends a reply only when a person presses Send.
 
 const CALL_SEEN = "subsync.speed.callSeen";
 const ic = (I: typeof Zap) => <I aria-hidden className="size-4" />;
@@ -117,7 +117,7 @@ export function SpeedView({ go, unanswered = false, start }: { go: GoFn; unanswe
       <header className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden">
         <div className="mr-auto min-w-0">
           <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">Speed to lead</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground" data-testid="page-subtitle">How long new leads wait for a first reply. SubSync measures this; it never sends a reply.</p>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground" data-testid="page-subtitle">How long new leads wait for a first reply. SubSync measures this. It sends a reply only when a person presses Send.</p>
         </div>
         {d.measuring.canChange && <button type="button" className="ds-press inline-flex h-9 items-center rounded-md px-2 text-sm font-medium text-primary underline underline-offset-4" onClick={() => goTab("rules")} data-testid="speed-reply-target">Reply target</button>}
         <GuideButton onClick={() => setGuide(true)} />

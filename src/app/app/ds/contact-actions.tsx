@@ -8,7 +8,7 @@ import { announceCall, useDialer } from "./dial-button";
 
 // Call and Email for ONE person, the same way everywhere People shows one (a list row, the lead panel, the header search). Both open the CRM through the white-label link:
 // the CRM's own dialer and mail box do the rest (it publishes no link straight to them yet, so today they open the person and the page says so once). SubSync never
-// places a call and never sends a message. Before a call or an email the person is told if this contact asked not to be contacted, or if it is outside calling hours.
+// places a call, and sends a message only when a person presses Send. Before a call or an email the person is told if this contact asked not to be contacted, or if it is outside calling hours.
 // There is no call-provider choice: Call always uses the CRM's own dialer.
 
 export type ActionPerson = {
