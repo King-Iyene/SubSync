@@ -12,6 +12,7 @@ import "../speed6.css";
 import "../speed-ui.css";
 import "../ap3/ap3.css";
 import "./pl3.css";
+import "./funnel-fx.css";
 import { useMountDealActions } from "./actions";
 import { DEFAULT_FILTERS, fixturesOn, usePl, type PlFilters } from "./data";
 import { HistoryFunnel, StuckInStep, useHistoryFunnelOn } from "./history-funnel";
