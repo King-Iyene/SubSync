@@ -135,3 +135,24 @@ Needs King's permissions (no data until granted): payments, plans, wallet balanc
 Works: copies dropdown (names, emails, Open, Open in your CRM, hover preview), merge chooser on a clear group (user picks the master, says payments, automations and courses are not visible, asks to check the CRM first). All nine Settings sections open (Account and plan, Connections with Slack and Fathom connected, Permissions "18 not approved" with steps, Alerts, Team and roles, Targets, Data, Modules, Safety). Light mode renders correctly.
 
 Not tested: 390 and 768 widths; bookings and deals created on the imported leads (Create deal reports "Done" but no deal appears in Pipeline, so writes are practice-only); Settings "ten sections" (nine seen).
+
+## Live verification after the builder PRs (13 Nov, KD Squares Test, real app)
+
+**Seen working live:**
+- Date bar: Today, Yesterday, 7/30/90, "More ranges" (By the hour: Last hour, Last 24 hours; Week or month: This week, Last week, This month, Last month), Custom. Label reads "Last 24 hours, 12 Nov 03:52 to 13 Nov 03:51, Lagos time. Figures kept per day count whole days: day precision."
+- Automatic sync: "Live, Updated 40 seconds ago" chip, updating on its own (was 12 minutes before the screen was opened).
+- Pipeline: "Open money, stuck and open counts are as of now" text; compact list (pipeline, open money, deals, stuck, won, lost), sortable; "38 deals ($32,950) left out: test names. Count them" works and turns into "counted in these rows. Leave them out" (won $5,000 and lost $1,500 appear, matching the 120-lead/24-deal CSV).
+- River view (counts mode): stage piles, ribbons with conversion %, hatched stuck marker, explanation line.
+- Speed to lead: "Or pick a list in Call mode", "Call queue workflow: set up in 0 of 3 accounts".
+- Earlier today: Clients grouped tabs and "Not known" wording, duplicates "Likely: names differ" + "Merge this person", Settings sale card, week table, Find a lead by email text, contact title after a tag, New deal pipeline default.
+
+**Found, not fixed:**
+| # | Where | Problem |
+|---|---|---|
+| 21 | Pipeline list | The AGL pipeline shows "$0 open, 0 deals" while 20 open deals worth $33,950 exist (only 1 has an owner). The rule that leaves ownerless deals out of open money is correct, but the row only says "17 deals without a value" and the header says "0 with no owner". The row must say "19 deals without an owner (not counted in money)". |
+| 22 | Speed to lead > Start calling | Does nothing visible when no lead is waiting. Must say "Nobody to call right now" and offer the list picker. |
+| 23 | Appointments | A second date selector sits next to the bar (seen earlier; recheck after date PR #112/#113). |
+| 24 | Deals import | Created a second contact per lead (named by email). |
+| 25 | River | Shows counts as cards because open money is $0 (no owners); the banknote view could not be judged. |
+
+**Not seen yet:** automatic workflow creation (needs reinstall and probe), Fathom link onto a lead, phone widths 390/768, "Mark as set up", the AI platform (not built yet).
