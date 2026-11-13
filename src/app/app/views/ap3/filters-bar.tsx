@@ -18,21 +18,25 @@ const DAYMS = 86_400_000;
 const lastN: Record<string, 7 | 30 | 90> = { last7: 7, last30: 30, last90: 90 };
 
 /** "Appointment date": when the appointment happens. */
-export function DateAxis({ filters, set }: { filters: ApFilters; set: Set }) {
+export function DateAxis({ filters, set, barLabel = null, follows = false, onBar }: { filters: ApFilters; set: Set; /** The date bar's label ("16 Aug to 13 Nov"), when the bar is ready. */ barLabel?: string | null; /** True while this screen uses exactly the bar's dates. */ follows?: boolean; onBar?: () => void }) {
   const [now] = useState(() => Date.now());
   const custom = !!filters.from && !!filters.to;
-  const key = custom ? rangeKey(filters.from, filters.to, now) : (`last${filters.days}` as DatePreset);
+  const own = custom ? rangeKey(filters.from, filters.to, now) : (`last${filters.days}` as DatePreset);
+  // The bar's dates are the default and say so; every other choice says it is for this screen only (never a second, silent date bar).
+  const key = barLabel && follows ? "bar" : own;
   return (
     <>
-      <select className="ap-field" aria-label="Appointment date" value={key} data-testid="ap-days"
+      <select className="ap-field" aria-label="Appointment date: the bar's dates, or this screen only" value={key} data-testid="ap-days"
         onChange={(e) => {
           const v = e.target.value;
-          if (v === "custom") set({ from: iso(Date.parse(`${localDay(Date.now())}T00:00:00Z`) - 29 * DAYMS), to: today() });
+          if (v === "bar") onBar?.();
+          else if (v === "custom") set({ from: iso(Date.parse(`${localDay(Date.now())}T00:00:00Z`) - 29 * DAYMS), to: today() });
           else if (lastN[v]) set({ days: lastN[v], from: "", to: "" });
           else set(presetRange(v as DatePreset, Date.now()));
         }}>
-        {DATE_PRESETS.map(([k, l]) => <option key={k} value={k}>{k === "next7" || /^lastd+$/.test(k) ? l : `Appointments happening: ${l.toLowerCase()}`}</option>)}
-        <option value="custom">Choose dates</option>
+        {barLabel && <option value="bar">Dates from the bar: {barLabel}</option>}
+        {DATE_PRESETS.map(([k, l]) => <option key={k} value={k}>This screen only, appointments happening: {l.toLowerCase()}</option>)}
+        <option value="custom">This screen only: choose dates</option>
       </select>
       {custom && key === "custom" && <>
         <label className="ap-datef"><span className="sr-only">From</span><input type="date" className="ap-field" value={filters.from} max={filters.to} onChange={(e) => e.target.value && set({ from: e.target.value })} data-testid="ap-from" aria-label="From date" /></label>
@@ -56,8 +60,8 @@ export function BookedAxis({ filters, set }: { filters: ApFilters; set: Set }) {
           else if (v === "custom") set({ bookedFrom: iso(Date.parse(`${localDay(Date.now())}T00:00:00Z`) - 6 * DAYMS), bookedTo: today() });
           else { const r = presetRange(v as DatePreset, Date.now()); set({ bookedFrom: r.from, bookedTo: r.to }); }
         }}>
-        <option value="any">Booked any time</option>
-        {DATE_PRESETS.filter(([k]) => k !== "next7").map(([k, l]) => <option key={k} value={k}>{/^lastd+$/.test(k) ? `Booked in the ${l.toLowerCase()}` : `Booked ${l.toLowerCase()}`}</option>)}
+        <option value="any">Booked on: any day</option>
+        {DATE_PRESETS.filter(([k]) => k !== "next7").map(([k, l]) => <option key={k} value={k}>{/^last\d+$/.test(k) ? `Booked on: in the ${l.toLowerCase()}` : `Booked on: ${l.toLowerCase()}`}</option>)}
         <option value="custom">Booked between dates</option>
       </select>
       {on && key === "custom" && <>
@@ -130,7 +134,7 @@ export function ResultLine({ filters }: { filters: ApFilters }) {
   const n = a.data.headline.booked, rate = a.data.headline.trueShowRate;
   return (
     <p className="ap-result" data-testid="ap-result">
-      <b>{n}</b> appointment{n === 1 ? "" : "s"} match{n === 1 ? "es" : ""}{rate !== null && rate !== undefined ? `, ${Math.round(rate * 100)}% showed` : ""}.
+      <b>{n}</b> appointment{n === 1 ? "" : "s"} match{n === 1 ? "es" : ""}{rate !== null && rate !== undefined ? `, true show rate ${Math.round(rate * 100)}% (showed out of all past ones, including ones nobody marked)` : ""}.
       {filters.compare && <Before filters={filters} n={n} range={previousRange(cur.from, cur.to)} />}
     </p>
   );

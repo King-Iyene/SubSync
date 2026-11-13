@@ -242,9 +242,9 @@ export function RecoverTab({ location, level, accounts }: { location: string; le
 
 const KIND_CHIP: Record<CfDealRow["kind"], string> = { stale: "Gone quiet", soon: "About to go quiet", lost: "Lost" };
 
-export function SlippingPanel({ location, showAccount }: { location: string; showAccount: boolean }) {
+export function SlippingPanel({ location, pipeline = "", showAccount }: { location: string; pipeline?: string; showAccount: boolean }) {
   const api = useApiClient();
-  const loc = location ? `&account=${encodeURIComponent(location)}` : "";
+  const loc = `${location ? `&account=${encodeURIComponent(location)}` : ""}${pipeline ? `&pipeline=${encodeURIComponent(pipeline)}` : ""}`;
   const sum = useData<CfDealsSummary>(`cash?part=deals${loc}`);
   const [kind, setKind] = useState<"slipping" | "stale" | "soon" | "lost">("slipping");
   const [rows, setRows] = useState<CfDealRow[]>([]), [total, setTotal] = useState(0), [next, setNext] = useState<string | null>(null), [loading, setLoading] = useState(true), [error, setError] = useState<unknown>(null);

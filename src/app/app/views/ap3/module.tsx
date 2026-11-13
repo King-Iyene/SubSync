@@ -113,6 +113,7 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false, fu
   const barDays = bar.spec.preset === "7d" ? 7 : bar.spec.preset === "30d" ? 30 : bar.spec.preset === "90d" ? 90 : 0;
   // A preset (7, 30 or 90 days) that matches the bar is not an override, even when the two count the first day a few hours apart.
   const overridden = bar.ready && (filters.from && filters.to ? filters.from !== bar.from || filters.to !== bar.to : filters.days !== barDays);
+  const useBarDates = () => setFilters((f) => { const d = barDays; return { ...f, days: (d || 30) as ApFilters["days"], from: d ? "" : bar.from, to: d ? "" : bar.to }; });
   useEffect(() => {
     try {
       const u = new URL(window.location.href);
@@ -190,7 +191,7 @@ export function AppointmentsModule({ go, flowTree = true, leadership = false, fu
       <Page title="Appointments" subtitle="Who booked, who showed, and who is burning your leads." actions={null}>
         <div className="ap-head" role="search" aria-label="Filter appointments" hidden={embedded}>
           <label className="ap-search"><Search aria-hidden className="size-4" /><span className="sr-only">Search by name</span><input ref={search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a name (press /)" data-testid="ap-search" /></label>
-          <DateAxis filters={filters} set={set} />
+          <DateAxis filters={filters} set={set} barLabel={bar.ready ? bar.label : null} follows={!overridden} onBar={useBarDates} />
           {accounts.length > 1 && <SearchSelect label="Account" value={filters.locationId} anyLabel="All accounts" options={accounts.map((a) => ({ value: a.locationId, label: a.name }))} onChange={(v) => set({ locationId: v, calendarId: "", groupId: "", userId: "", booker: "", owner: "" })} testId="ap-account" />}
           {(opts.data?.groups?.length ?? 0) > 0 && <SearchSelect label="Calendar group" value={filters.groupId} anyLabel="All groups" options={groupOptions} onChange={(v) => set({ groupId: v, calendarId: "" })} testId="ap-group" />}
           {calOptions.length > 1 && <SearchSelect label="Calendar" value={filters.calendarId} anyLabel="All calendars" options={calOptions} onChange={(v) => set({ calendarId: v })} testId="ap-calendar" />}

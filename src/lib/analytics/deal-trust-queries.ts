@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import { type LeftOutPart, type LeftOutReason, type LeftOutSummary, LEFT_OUT_REASONS } from "./deal-trust";
+import { inPipelineSql } from "./pipeline-pick";
 import { dealIsStale, dealScopeJoins, daysInStepSql, outOfScope, stepNotJudged, valueSuspect } from "./stage-rules-sql";
 
 // THE shared dollar function (docs/METRICS.md "Deal dollars you can trust"). Pipeline, Today (money row, This week, Numbers), the Account audit, Clients, the brief and the Money views all
@@ -17,16 +18,17 @@ export type DealTrust = {
 };
 export const EMPTY_TRUST: DealTrust = { counted: { deals: 0, dollars: 0 }, stale: { deals: 0, dollars: 0 }, leftOut: { parts: [], deals: 0, dollars: 0, notJudged: 0, pipelinesCounted: 0, pipelinesTotal: 0 } };
 
-export async function dealTrust(inst: string, ids: string[]): Promise<DealTrust> {
+export async function dealTrust(inst: string, ids: string[], pipeline?: string | null): Promise<DealTrust> {
   if (!ids.length) return EMPTY_TRUST;
   const db = sql();
+  const pipe = inPipelineSql(db, pipeline);
   const rows = await db`
     with b as materialized (
       select o.location_id || '|' || coalesce(o.pipeline_id, '') pk, coalesce(sc_pl.name, 'Pipeline') pname, o.monetary_value::float8 v, ${valueSuspect()} reason, ${dealIsStale()} stale, ${stepNotJudged()} nj
       from cached_opportunities o
       join locations l on l.installation_id = o.installation_id and l.location_id = o.location_id and not l.ignored
       ${dealScopeJoins()}
-      where o.installation_id = ${inst} and o.location_id = any(${ids}::text[]) and o.status = 'open' and coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null and not ${outOfScope()}
+      where o.installation_id = ${inst} and o.location_id = any(${ids}::text[]) ${pipe} and o.status = 'open' and coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null and not ${outOfScope()}
     )
     select 'reason' k, reason::text a, null::float8 v, count(*)::int c, coalesce(sum(v), 0)::float8 d, count(distinct pk)::int p, max(v)::float8 mx from b group by reason
     union all
@@ -42,7 +44,7 @@ export async function dealTrust(inst: string, ids: string[]): Promise<DealTrust>
     select count(distinct pname)::int c from (
       select coalesce(sc_pl.name, 'Pipeline') pname, ${valueSuspect()} reason
       from cached_opportunities o ${dealScopeJoins()}
-      where o.installation_id = ${inst} and o.location_id = any(${ids}::text[]) and o.status = 'open' and coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null and not ${outOfScope()}
+      where o.installation_id = ${inst} and o.location_id = any(${ids}::text[]) ${pipe} and o.status = 'open' and coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null and not ${outOfScope()}
     ) x where reason = 'outreach'`.catch(() => [{ c: 0 }]);
   const parts: LeftOutPart[] = [];
   for (const reason of LEFT_OUT_REASONS) {
@@ -66,9 +68,10 @@ export async function dealTrust(inst: string, ids: string[]): Promise<DealTrust>
 export type LeftOutRow = { opportunityId: string; locationId: string; locationName: string | null; name: string | null; contactId: string | null; contactName: string; pipeline: string; stage: string; value: number; reason: LeftOutReason; daysInStep: number };
 
 /** The deals behind a "Left out" line (all reasons, or one), biggest first. Same base and same reason as dealTrust, so the count equals the rows. */
-export async function leftOutRows(inst: string, ids: string[], reason: LeftOutReason | null, size: number, offset: number): Promise<{ rows: LeftOutRow[]; total: number }> {
+export async function leftOutRows(inst: string, ids: string[], reason: LeftOutReason | null, size: number, offset: number, pipeline?: string | null): Promise<{ rows: LeftOutRow[]; total: number }> {
   if (!ids.length) return { rows: [], total: 0 };
   const db = sql();
+  const pipe = inPipelineSql(db, pipeline);
   const rows = await db`
     select x.*, count(*) over ()::int total from (
       select o.opportunity_id, o.location_id, l.name location_name, o.name deal_name, o.contact_id, coalesce(nullif(o.contact_name, ''), o.name, 'Unnamed deal') contact_name, coalesce(sc_pl.name, 'Pipeline') pipeline, coalesce(sc_st.nm, 'Unknown stage') stage,
@@ -76,7 +79,7 @@ export async function leftOutRows(inst: string, ids: string[], reason: LeftOutRe
       from cached_opportunities o
       join locations l on l.installation_id = o.installation_id and l.location_id = o.location_id and not l.ignored
       ${dealScopeJoins()}
-      where o.installation_id = ${inst} and o.location_id = any(${ids}::text[]) and o.status = 'open' and coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null and not ${outOfScope()}
+      where o.installation_id = ${inst} and o.location_id = any(${ids}::text[]) ${pipe} and o.status = 'open' and coalesce(o.monetary_value, 0) > 0 and o.assigned_to is not null and not ${outOfScope()}
     ) x where x.reason is not null ${reason ? db`and x.reason = ${reason}` : db``}
     order by x.v desc, x.opportunity_id limit ${size} offset ${offset}`;
   return {

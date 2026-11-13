@@ -8,6 +8,8 @@ export type DeepLink = {
   days?: 7 | 30 | 90;
   /** One client account, when the number was for one. */
   location?: string | null;
+  /** One pipeline (by name), when the number was for one. */
+  pipeline?: string | null;
   /** The count on the card. The page compares it with the rows it finds and says so when they differ. */
   expect?: number | null;
   /** What the card called it, for the one-line banner. */

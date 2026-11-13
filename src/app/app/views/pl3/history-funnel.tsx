@@ -69,7 +69,10 @@ const OUTCOMES: Array<{ key: Exclude<FunnelDrill, "entered">; label: string; ton
 ];
 
 export function HistoryFunnel({ filters, onOpen, activeId, showAccount }: { filters: PlFilters; onOpen: (d: PlDeal) => void; activeId: string | null; showAccount: boolean }) {
-  const [pipe, setPipe] = useState("");
+  // The pipeline picked at the top of Pipeline is the funnel's pipeline; the funnel's own list can still change it for this section.
+  const [own, setOwn] = useState<{ from: string; v: string }>({ from: filters.pipeline, v: filters.pipeline });
+  const pipe = own.from === filters.pipeline ? own.v : filters.pipeline;
+  const setPipe = (v: string) => setOwn({ from: filters.pipeline, v });
   const f = useData<Pl3Funnel>(filters.from ? path(PATHS.funnel, filters, { pipeline: pipe }) : null);
   const [pick, setPick] = useState<{ step: FunnelStep; drill: FunnelDrill } | null>(null);
   const [page, setPage] = useState(0), [size, setSize] = useState(20);
