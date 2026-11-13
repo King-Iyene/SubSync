@@ -1,3 +1,4 @@
+import { APP_TZ, windowAtMs } from "../design/zone.ts";
 import { properName } from "../people/names.ts";
 import { parseChoice, type DialerChoice } from "../people/dial";
 import { sql, type Sql } from "../db";
@@ -116,7 +117,11 @@ export function filterSql(db: Sql, installationId: string, f: SmartFilter, coldT
     const from = f.seenFrom ?? "1970-01-01";
     const to = f.seenTo ?? "2999-12-31";
     add(db`exists (select 1 from contact_tag_events e where e.installation_id = c.installation_id and e.location_id = c.location_id and e.contact_id = c.contact_id
-      and e.kind = 'added' and e.tag = any(${f.tags}::text[]) and (e.at at time zone 'UTC')::date between ${from}::date and ${to}::date)`);
+      and e.kind = 'added' and e.tag = any(${f.tags}::text[]) and (e.at at time zone ${APP_TZ})::date between ${from}::date and ${to}::date)`);
+  }
+  if (f.addedFrom && f.addedTo) {
+    const w = windowAtMs(f.addedFrom, f.addedTo, f.addedFromTime ?? null, f.addedToTime ?? null);
+    if (w) add(db`c.date_added >= ${new Date(w.fromMs)} and c.date_added < ${new Date(w.toMs)}`);
   }
   if (f.owner) add(f.owner === "none" ? db`nullif(c.assigned_to, '') is null` : db`c.assigned_to = ${f.owner}`);
   if (f.source) add(f.source === "none" ? db`nullif(btrim(c.source), '') is null` : db`lower(btrim(c.source)) = ${f.source.toLowerCase()}`);

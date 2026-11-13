@@ -15,6 +15,5 @@
  "lib/api/client-routes.ts": 1,
  "lib/api/dq-routes.ts": 2,
  "lib/api/growth-api.ts": 1,
- "lib/api/people-actions-routes.ts": 1,
- "lib/api/pipeline3-routes.ts": 2
+ "lib/api/people-actions-routes.ts": 1
 }

@@ -1,3 +1,4 @@
+import { atOf } from "../analytics/window-time";
 import { writeEnabledFor } from "../analytics/cleanup-config";
 import { cleanId, type Scope } from "../analytics/appointments3-queries";
 import { parseApptWindow } from "../analytics/appointments3-intel";
@@ -31,7 +32,7 @@ const intIn = (v: string | null, lo: number, hi: number): number | null => { if 
 
 /** The filters, from an address' query. People and the account split are for agency staff and business admins only. */
 function filtersOf(sp: URLSearchParams, seePeople: boolean, location: string | null): { f: BfFilters; problem: string | null } {
-  const w = parseApptWindow(sp.get("from"), sp.get("to"), Date.now());
+  const w = parseApptWindow(sp.get("from"), sp.get("to"), Date.now(), atOf(sp));
   const age = sp.get("age");
   return {
     problem: w.problem,

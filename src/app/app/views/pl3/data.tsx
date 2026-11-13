@@ -7,8 +7,8 @@ import { adapt, queryOf } from "./adapters";
 import { dealsFixture, FLOW_EMPTY, FLOW_FIXTURE, PIPES_FIXTURE, FORECAST_FIXTURE, HEALTH_FIXTURE, HISTORY_FIXTURE, OVERVIEW_FIXTURE, PEOPLE_FIXTURE, page, PROOF_FIXTURE, SOURCES_FIXTURE, WONLOST_FIXTURE } from "./fixtures";
 
 /** What the person picked. `days` becomes from/to on the server's day boundaries; everything is re-checked on the server (never trusted). */
-export type PlFilters = { days: number; /** The dates of the date bar (YYYY-MM-DD); they replace `days` when both are set. */ from?: string; to?: string; locationId: string; pipeline: string; ownerId: string; q: string; /** Count deals whose name looks like a test (sent as test=1). The company switch counts them always. */ includeTest?: boolean };
-export const DEFAULT_FILTERS: PlFilters = { days: 45, locationId: "", pipeline: "", ownerId: "", q: "" };
+export type PlFilters = { /** The dates of the date bar (YYYY-MM-DD, Lagos days). Nothing is requested until they are known. */ from?: string; to?: string; /** HH:MM, Lagos time, only when the bar has hours. */ fromTime?: string; toTime?: string; locationId: string; pipeline: string; ownerId: string; q: string; /** Count deals whose name looks like a test (sent as test=1). The company switch counts them always. */ includeTest?: boolean };
+export const DEFAULT_FILTERS: PlFilters = { locationId: "", pipeline: "", ownerId: "", q: "" };
 
 const FX = /[?&]plfx=(1|empty|error)/;
 function fxFound(): string {
@@ -49,9 +49,11 @@ const emptyFor = (part: PlPart): unknown => (part === "pipelines" ? { cards: [],
 export function usePl<T>(part: PlPart, f: PlFilters, extra: Record<string, string | number | undefined> = {}) {
   const fx = fixturesOn(), mode = fx ? fxMode() : "";
   const key = queryOf(part, f, extra);
-  const raw = useData<unknown>(fx ? null : key);
+  // No request until the bar's dates are known: a missing date must never become "the last 45 days" or "the last 30 days" by accident.
+  const ready = Boolean(f.from && f.to);
+  const raw = useData<unknown>(fx || !ready ? null : key);
   // The time-lapse comes from its own part of the API (same filters); the flow shows without it until it arrives.
-  const replayKey = part === "money-flow" ? queryOf("money-flow", f).replace("part=money-flow", "part=replay") + "&days=" + Math.max(30, Math.min(90, f.days)) : null;
+  const replayKey = part === "money-flow" && ready ? queryOf("money-flow", f).replace("part=money-flow", "part=replay") : null;
   const aux = useData<unknown>(fx ? null : replayKey);
   const { data: rawData, error: rawError, loading: rawLoading, reload: reloadRaw } = raw, { data: auxData, reload: reloadAux } = aux;
   const live = useMemo(() => ({ data: rawData === null ? null : (adapt(part, rawData, auxData) as T), error: rawError, loading: rawLoading, reload: () => { void reloadRaw(); void reloadAux(); } }), [rawData, rawError, rawLoading, reloadRaw, auxData, reloadAux, part]);

@@ -1,5 +1,6 @@
 import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
-import { utcDayAfterToday } from "../design/zone.ts";
+import { nextMidnightMs } from "../design/zone.ts";
+import { endBound, startBound, type At } from "./window-time.ts";
 import { unansweredBusinessElapsedMs } from "./unanswered-advanced.ts";
 import type {
   Pp3AccountRisk, Pp3LoadState, Pp3Move, Pp3NameState, Pp3Reason, Pp3Role, Pp3TodayLine,
@@ -27,14 +28,12 @@ export const rate = (n: number, of: number, min = MIN_LEADS) => ({ value: of >= 
 export const delta = (current: number, previous: number, min = 10) => ({ current, previous, enough: previous >= min, change: previous >= min ? (current - previous) / previous : null });
 export const clampSize = (n: number): 25 | 50 | 100 => (n >= 100 ? 100 : n >= 50 ? 50 : 25);
 
-export function parseWindow(from: string | null | undefined, to: string | null | undefined, now: number): { from: Date; to: Date; days: number; problem: string | null } {
-  const iso = /^\d{4}-\d{2}-\d{2}$/;
-  const f = from && iso.test(from) ? Date.parse(from) : NaN;
-  const t = to && iso.test(to) ? Date.parse(to) : NaN;
-  const end = Number.isFinite(t) ? t + DAY : utcDayAfterToday(now);
-  const start = Number.isFinite(f) ? f : end - 28 * DAY;
+/** The dates the bar sent: days in the app zone, `to` included (optional `at` hours). The window is [from, to) in real instants. */
+export function parseWindow(from: string | null | undefined, to: string | null | undefined, now: number, at?: At): { from: Date; to: Date; days: number; problem: string | null } {
+  const end = endBound(to, at) ?? nextMidnightMs(now);
+  const start = startBound(from, at) ?? end - 28 * DAY;
   if (end <= start) return { from: new Date(end - 28 * DAY), to: new Date(end), days: 28, problem: "The start date was after the end date, so the last 28 days are shown." };
-  const days = Math.round((end - start) / DAY);
+  const days = Math.max(1, Math.round((end - start) / DAY));
   if (days > MAX_RANGE_DAYS) return { from: new Date(end - MAX_RANGE_DAYS * DAY), to: new Date(end), days: MAX_RANGE_DAYS, problem: `Periods are limited to ${MAX_RANGE_DAYS} days.` };
   return { from: new Date(start), to: new Date(end), days, problem: null };
 }

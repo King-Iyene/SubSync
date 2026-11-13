@@ -1,5 +1,7 @@
 "use client";
 
+import { usePageRange } from "../ds/page-range";
+import { zoneWord } from "@/lib/design/zone";
 import { useEffect, useRef, useState } from "react";
 import { describeFilter, isEmptyFilter, type SmartFilter } from "@/lib/people/filters";
 import { EmptyState, ErrorState, SkeletonRows } from "../ds";
@@ -24,6 +26,7 @@ const sel = (label: string, id: string, value: string, set: (v: string) => void,
 );
 
 export function FilterBuilder({ opts, value, onChange, onClear, plus = false }: { opts: Options | null | undefined; value: SmartFilter; onChange: (f: SmartFilter) => void; onClear: () => void; plus?: boolean }) {
+  const bar = usePageRange();
   const set = (patch: Partial<SmartFilter>) => {
     const next: Record<string, unknown> = { ...value, ...patch };
     for (const k of Object.keys(next)) if (next[k] === "" || next[k] === undefined || next[k] === false) delete next[k];
@@ -54,6 +57,15 @@ export function FilterBuilder({ opts, value, onChange, onClear, plus = false }: 
         <div>
           <label htmlFor="f-to" className="mb-1 block text-xs font-medium">Tag first seen to</label>
           <input id="f-to" type="date" className={inputClass} disabled={!tag} value={value.seenTo ?? ""} onChange={(e) => set({ seenTo: e.target.value })} />
+        </div>
+        <div>
+          <label htmlFor="f-added" className="mb-1 block text-xs font-medium">When they were added</label>
+          <select id="f-added" className={inputClass} value={value.addedFrom ? "range" : ""} data-testid="added-in-range"
+            onChange={(e) => set(e.target.value === "range" && bar.ready ? { addedFrom: bar.from, addedTo: bar.to, addedFromTime: bar.timed ? bar.fromTime : undefined, addedToTime: bar.timed ? bar.toTime : undefined } : { addedFrom: undefined, addedTo: undefined, addedFromTime: undefined, addedToTime: undefined })}>
+            <option value="">Any time (live, as of right now)</option>
+            <option value="range">Added in the dates above</option>
+          </select>
+          {value.addedFrom && <p className="mt-1 text-xs text-muted-foreground" data-testid="added-note">Added {bar.label ? `between ${bar.label}` : "in the dates above"}, {zoneWord()} time. Change the dates in the bar, then pick this again.</p>}
         </div>
         {pick("Owner", "f-owner", value.owner ?? "", (v) => set({ owner: v }), [["none", "No owner"], ...(opts?.owners.map((o) => [o.id, `${o.name} (${fmtInt(o.count)})`] as [string, string]) ?? [])], "Anyone")}
         {pick("Source", "f-source", value.source ?? "", (v) => set({ source: v }), [["none", "No source recorded"], ...(opts?.sources.map((s) => [s.source, `${s.source} (${fmtInt(s.count)})`] as [string, string]) ?? [])], "Any source")}

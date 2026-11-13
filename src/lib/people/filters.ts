@@ -24,6 +24,11 @@ export type SmartFilter = {
   quietDays?: number;
   /** Nobody has logged a call to this person in SubSync: "never", or not within this many days. */
   lastCall?: "never" | "7" | "30";
+  /** "Added in range": people whose record was created between these two days (YYYY-MM-DD, Lagos days, both included), optionally from/to a time of day (HH:MM, Lagos time). Set from the date bar; absent means "Live, as of right now". */
+  addedFrom?: string;
+  addedTo?: string;
+  addedFromTime?: string;
+  addedToTime?: string;
   /** The name of a stage a deal is in. */
   stage?: string;
   /** One client account (ignored for a business or a client's staff, who only have their own). */
@@ -71,6 +76,16 @@ export function parseSmartFilter(input: unknown): { ok: true; filter: SmartFilte
   if (from) f.seenFrom = from;
   if (to) f.seenTo = to;
   if (from && to && from > to) return { ok: false, error: "The first date must not be after the second" };
+  const af = day(o.addedFrom), at = day(o.addedTo);
+  if (af === "bad" || at === "bad") return { ok: false, error: "Dates must look like 2026-10-31" };
+  if ((af === null) !== (at === null)) return { ok: false, error: "Choose both the first and the last day" };
+  if (af && at) {
+    if (af > at) return { ok: false, error: "The first date must not be after the second" };
+    f.addedFrom = af; f.addedTo = at;
+    const tm = (v: unknown) => (typeof v === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : null);
+    const t1 = tm(o.addedFromTime), t2 = tm(o.addedToTime);
+    if (t1 && t2) { f.addedFromTime = t1; f.addedToTime = t2; if (af === at && t1 > t2) return { ok: false, error: "The end time is before the start time" }; }
+  }
   if ((from || to) && !f.tags) return { ok: false, error: "Choose a tag to filter by the day it was tagged" };
   if (o.owner !== undefined && o.owner !== "" && o.owner !== null) {
     if (typeof o.owner !== "string" || (o.owner !== "none" && !USER_ID.test(o.owner))) return { ok: false, error: "Unknown owner" };
@@ -126,6 +141,7 @@ export function describeFilter(f: SmartFilter, names: { owner?: (id: string) => 
   if (f.tags?.length) parts.push(`${f.tagMode === "all" ? "has all of the tags" : f.tags.length > 1 ? "has any of the tags" : "has the tag"} ${f.tags.join(", ")}`);
   if (f.notTag) parts.push(`does not have the tag ${f.notTag}`);
   if (f.seenFrom || f.seenTo) parts.push(`tag first seen ${f.seenFrom ? `from ${f.seenFrom} ` : ""}${f.seenTo ? `to ${f.seenTo}` : ""}`.trim());
+  if (f.addedFrom && f.addedTo) parts.push(`was added ${f.addedFrom === f.addedTo && !f.addedFromTime ? `on ${f.addedFrom}` : `from ${f.addedFrom}${f.addedFromTime ? ` ${f.addedFromTime}` : ""} to ${f.addedTo}${f.addedToTime ? ` ${f.addedToTime}` : ""}`}, Lagos time`);
   if (f.owner) parts.push(f.owner === "none" ? "has no owner" : `owner ${names.owner ? names.owner(f.owner) : f.owner}`);
   if (f.source) parts.push(f.source === "none" ? "has no source" : `source ${f.source}`);
   if (f.quietDays !== undefined) parts.push(`no activity for ${f.quietDays}+ days`);

@@ -1,5 +1,6 @@
 import { decodeRange, encodeRange, resolveRange, validDate, DEFAULT_RANGE, type Compare, type RangeSpec, type Resolved } from "./range.ts";
 import { MAX_RANGE_DAYS } from "./range-limits.ts";
+import { isTime } from "./zone.ts";
 import { pageRangeFromHash, withPageRange } from "./global-filter.ts";
 
 // The ONE date range of the whole app (the shell bar). This file is the single place that decides what the applied range is, how a typed range is checked,
@@ -53,22 +54,24 @@ export function pageSpecOf(hash: string, saved: Saved): { spec: RangeSpec; from:
 export const isDefaultRange = (s: RangeSpec) => s.preset === PAGE_RANGE_DEFAULT.preset && s.compare === "none";
 
 /** Checks two typed dates before they are applied. Returns the plain reason, or null when the range can be applied. Dates are YYYY-MM-DD (the browser's date input gives that whatever the locale shows). */
-export function checkCustom(from: string, to: string, today: string): string | null {
+export function checkCustom(from: string, to: string, today: string, fromTime?: string, toTime?: string): string | null {
   if (!from || !to) return "Pick a start date and an end date.";
   if (!validDate(from) || !validDate(to)) return "One of the dates is not a real date.";
   if (from > to) return "The end date is before the start date.";
   if (to > today) return "The end date is in the future. Pick today or earlier.";
+  if ((fromTime && !isTime(fromTime)) || (toTime && !isTime(toTime))) return "A time must look like 09:30.";
+  if ((fromTime || toTime) && from === to && (fromTime || "00:00") > (toTime || "23:59")) return "The end time is before the start time.";
   const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
   if (days > MAX_RANGE_DAYS) return `A custom range can be at most ${MAX_RANGE_DAYS} days (about 3 years). This one is ${days} days.`;
   return null;
 }
 
-/** The window as the query every screen sends: `from=2026-10-14&to=2026-11-12` (whole UTC days, the end day included). */
-export const windowQuery = (r: Resolved) => `from=${r.current.from}&to=${r.current.to}`;
+/** The window as the query every screen sends: `from=2026-10-14&to=2026-11-12` (whole days in the app zone, the end day included), plus `&fromTime=09:00&toTime=17:30` (Lagos time) when the bar has hours. */
+export const windowQuery = (r: Resolved) => `from=${r.current.from}&to=${r.current.to}${r.at ? `&fromTime=${r.at.fromTime}&toTime=${r.at.toTime}` : ""}`;
 /** The comparison window as a query, or "" when there is none (`cmpFrom=..&cmpTo=..`). */
 export const compareQuery = (r: Resolved) => (r.compare ? `cmpFrom=${r.compare.from}&cmpTo=${r.compare.to}` : "");
 /** A short stable text for the range, for a request key or a React key: changes whenever the window or comparison changes. */
-export const rangeKeyOf = (r: Resolved) => `${r.current.from}~${r.current.to}${r.compare ? `~${r.compare.from}~${r.compare.to}` : ""}`;
+export const rangeKeyOf = (r: Resolved) => `${r.current.from}~${r.current.to}${r.at ? `@${r.at.fromTime}-${r.at.toTime}` : ""}${r.compare ? `~${r.compare.from}~${r.compare.to}` : ""}`;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const fmt = (iso: string) => { const d = new Date(`${iso}T00:00:00Z`); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };

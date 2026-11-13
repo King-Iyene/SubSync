@@ -121,7 +121,7 @@ export function River(p: RiverProps) {
         })}
         {L.nodes.map((nd) => {
           const s = nd.kind === "stage" ? stages[nd.index] : null, x = pt(nd.al + nd.w / 2, 0)[0];
-          const name = s ? s.name : "Won", val = unitShort(nd.open), sub = s ? `${nd.stuck > 0 ? `${s.staleCount} stuck` : ""}` : "";
+          const name = s ? s.name : "Won", val = !s && nd.open === 0 ? "None won" : unitShort(nd.open), sub = s ? `${nd.stuck > 0 ? `${s.staleCount} stuck` : ""}` : "";
           if (vertical) { const ly = pt(nd.al, 0)[1]; return <text key={`x${nd.id}`} className="rv-text" x={6} y={ly - 9}><tspan className="rv-name">{trunc(name, 22)}</tspan><tspan className="rv-val" dx={8}>{val}</tspan>{sub && <tspan className="rv-stucktxt" dx={8}>{sub}</tspan>}<title>{`${name}: ${val}`}</title></text>; }
           return <text key={`x${nd.id}`} className="rv-text" x={x} y={16} textAnchor="middle"><tspan className="rv-name" x={x}>{trunc(name, Math.max(6, Math.floor((width - 24) / (n * 7.2))))}</tspan><tspan className="rv-val" x={x} dy={17}>{val}</tspan>{sub && <tspan className="rv-stucktxt" x={x} dy={14}>{sub}</tspan>}<title>{`${name}: ${val}`}</title></text>;
         })}

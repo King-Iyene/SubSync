@@ -1,3 +1,4 @@
+import { atOf } from "../analytics/window-time";
 import { access, accountsIn, coaching, options, personPanel, scorecards, today, workload, peopleCache, ownedUser, type Flags, type Level, type Links, type Scope } from "../analytics/people3-queries";
 import { exportScorecards, handoff, leaderboard, list, money, nextLead, proof } from "../analytics/people3-queries2";
 import { clampSize, DAY, parseWindow } from "../analytics/people3-intel";
@@ -56,7 +57,7 @@ export async function handlePeople3(ctx: Ctx, h: People3Helpers): Promise<Respon
   if (askedUser && !user) return nothing();
 
   const proofPart = part === "proof";
-  const w = parseWindow(sp.get("from"), sp.get("to"), Date.now());
+  const w = parseWindow(sp.get("from"), sp.get("to"), Date.now(), atOf(sp));
   const win = proofPart && w.days > 90 ? { from: new Date(w.to.getTime() - 90 * DAY), to: w.to, days: 90, problem: "A receipt covers at most 90 days." } : w;
   const sortRaw = sp.get("sort");
   const sort: Pp3Sort = sortRaw && SORTS.has(sortRaw) ? (sortRaw as Pp3Sort) : "answered";

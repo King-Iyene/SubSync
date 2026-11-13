@@ -83,7 +83,7 @@ export function DealList({ part = "list", filters, extra, onOpen, activeId, show
   const [page, setPage] = useState(1), [size, setSize] = useState(20), [sel, setSel] = useState<Set<string>>(new Set());
   // Next and previous use a keyset cursor (the page starts right after the last deal seen), so page 5,000 costs the same as page 1 and the total is not counted again.
   const [cursors, setCursors] = useState<Record<number, { after: string; total: number }>>({});
-  const key = JSON.stringify(extra ?? {}) + filters.days + (filters.from ?? "") + (filters.to ?? "") + filters.locationId + filters.pipeline + filters.ownerId + filters.q;
+  const key = JSON.stringify(extra ?? {}) + (filters.from ?? "") + (filters.to ?? "") + (filters.fromTime ?? "") + (filters.toTime ?? "") + filters.locationId + filters.pipeline + filters.ownerId + filters.q;
   const [prev, setPrev] = useState(key);
   if (prev !== key) { setPrev(key); setPage(1); setSel(new Set()); setCursors({}); }
   const { data, error, loading, reload } = usePl<PlDeals>(part, filters, { ...extra, page, pageSize: size, after: cursors[page]?.after, total: cursors[page]?.total });

@@ -1,5 +1,6 @@
 import { MAX_RANGE_DAYS } from "../design/range-limits.ts";
-import { utcDayAfterToday } from "../design/zone.ts";
+import { nextMidnightMs } from "../design/zone.ts";
+import { endBound, startBound, type At } from "./window-time.ts";
 // Pipeline round 3: the pure part (no database, no network), unit tested. Definitions: docs/METRICS.md "Pipeline 3".
 import { rateRange } from "./pipeline-intel.ts";
 import type { Estimate, FlowStage, Pl3Overview, Pl3Row, Rate } from "./pipeline3-types.ts";
@@ -18,14 +19,13 @@ export const slug = (s: string | null | undefined) => (s ?? "").trim().toLowerCa
 /** The key a stage is merged under across accounts: pipeline name and stage name, lower case. */
 export const stageKey = (pipelineName: string | null | undefined, stageName: string | null | undefined) => `${slug(pipelineName)}|${slug(stageName)}`;
 
-export function parsePlWindow(from: string | null | undefined, to: string | null | undefined, now: number): { from: Date; to: Date; days: number; problem: string | null } {
-  const t = (v: string | null | undefined) => (v && /^\d{4}-\d{2}-\d{2}/.test(v) && Number.isFinite(Date.parse(v)) ? Date.parse(v.slice(0, 10)) : null);
-  let f = t(from), e = t(to), problem: string | null = null;
-  if (e !== null) e += DAY;
-  if (f === null || e === null) { e = utcDayAfterToday(now); f = e - 30 * DAY; if (from || to) problem = "That date range was not understood, so the last 30 days are shown."; }
-  if (e <= f) { e = utcDayAfterToday(now); f = e - 30 * DAY; problem = "The end date was before the start date, so the last 30 days are shown."; }
+/** The dates the bar sent (days in the app zone, `to` included, optional `at` hours): the window [from, to) in real instants. Whole local days, so "today" starts at Lagos midnight. */
+export function parsePlWindow(from: string | null | undefined, to: string | null | undefined, now: number, at?: At): { from: Date; to: Date; days: number; problem: string | null } {
+  let f = startBound(from, at), e = endBound(to, at), problem: string | null = null;
+  if (f === null || e === null) { e = nextMidnightMs(now); f = e - 30 * DAY; if (from || to) problem = "That date range was not understood, so the last 30 days are shown."; }
+  if (e <= f) { e = nextMidnightMs(now); f = e - 30 * DAY; problem = "The end date was before the start date, so the last 30 days are shown."; }
   if (e - f > MAX_WINDOW_DAYS * DAY) { f = e - MAX_WINDOW_DAYS * DAY; problem = `The range is capped at ${MAX_RANGE_DAYS} days (about 3 years).`; }
-  return { from: new Date(f), to: new Date(e), days: Math.round((e - f) / DAY), problem };
+  return { from: new Date(f), to: new Date(e), days: Math.max(1, Math.round((e - f) / DAY)), problem };
 }
 
 export const est = (value: number | null, low: number | null, high: number | null, enough: boolean, formula: string, minNote: string | null): Estimate => ({ value, low, high, enough, estimate: true, formula, minNote });

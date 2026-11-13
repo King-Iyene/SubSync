@@ -1,3 +1,4 @@
+import { atOf } from "../analytics/window-time";
 import { callQueueAll, listCallLists, logOutcome } from "../analytics/call-queries";
 import { parseFilters, type Filters } from "../analytics/call-intel";
 import { teamNames } from "../analytics/inbox-queries";
@@ -85,7 +86,7 @@ async function queueRoute(ctx: Ctx, h: DialHelpers): Promise<Response> {
   if (!isListId(list)) return json({ error: "Unknown list" }, 400);
   const now = Date.now();
   // The bar's dates (the missed-call list is about a period; the others are live lists and ignore them). A bad pair falls back to the usual 30 days.
-  const wp = sp.get("from") !== null && sp.get("to") !== null ? parseWindow(sp.get("from"), sp.get("to"), now) : null;
+  const wp = sp.get("from") !== null && sp.get("to") !== null ? parseWindow(sp.get("from"), sp.get("to"), now, atOf(sp)) : null;
   const range = wp && wp.ok ? { fromMs: wp.win.fromMs, toMs: wp.win.toMs } : defaultRange(now);
   const size = pageSize(sp.get("size"));
   const pageNo = Math.max(0, Math.min(100_000, Math.floor(Number(sp.get("page")) || 0)));

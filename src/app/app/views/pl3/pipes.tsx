@@ -61,7 +61,7 @@ export function PipelineGrid({ filters, onOpen, onIncludeTest }: { filters: PlFi
   useEffect(() => { const t = setTimeout(() => setQ(search.trim()), 300); return () => clearTimeout(t); }, [search]);
   const f = { ...filters, q, pipeline: "" };
   // Everything the rows depend on. When it changes the pages start over (an old cursor never meets new dates).
-  const rk = [q, showEmpty, dir, f.includeTest ? 1 : 0, f.from, f.to, f.days, f.locationId].join("|");
+  const rk = [q, showEmpty, dir, f.includeTest ? 1 : 0, f.from, f.to, f.fromTime, f.toTime, f.locationId].join("|");
   const [more, setMore] = useState<{ rk: string; list: string[] }>({ rk: "", list: [] });
   const cursors = more.rk === rk ? more.list : [];
   const [loaded, setLoaded] = useState<Record<string, { n: number; next: string | null }>>({});

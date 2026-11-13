@@ -1,3 +1,4 @@
+import { atOf } from "../analytics/window-time";
 import { attention, clientsCache, compare, exportCsv, list, options, overview, people, receipt, setup, trends, type Filters, type Links, type Scope } from "../analytics/clients3-queries";
 import { billing } from "../analytics/clients3-billing";
 import { money, moneyHistory } from "../analytics/cl3-money";
@@ -42,7 +43,7 @@ export async function handleClients3(ctx: Ctx, h: Clients3Helpers): Promise<Resp
   const one = asked ? await ownedLocation(ctx.installationId, allowedAll, asked) : null;
   if (asked && !one) return wrap({ rows: [], total: 0, page: 0, size: 20, pages: 1, truncated: false, accounts: [], industries: [], sides: [], points: [] });
   const scope: Scope = { inst: ctx.installationId, allowed: allowedAll };
-  const w = parseWindow(sp.get("from"), sp.get("to"), Date.now());
+  const w = parseWindow(sp.get("from"), sp.get("to"), Date.now(), atOf(sp));
   const lv = sp.get("level");
   const f: Filters = { from: w.from, to: w.to, location: one, q: text(sp.get("q"), 60), industry: text(sp.get("industry"), 80), level: lv && LEVELS.has(lv) ? (lv as Cl3Level) : null };
   const p = Math.max(0, int(sp.get("page"), 0)), size = clampSize(int(sp.get("size"), 20));

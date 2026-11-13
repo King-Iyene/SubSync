@@ -18,7 +18,7 @@ const PATHS = { funnel: "funnel", deals: "funnel-deals", stuck: "stuck", setting
 
 function path(part: string, f: PlFilters, extra: Record<string, string | number | undefined>): string {
   const p = new URLSearchParams({ part });
-  if (f.from && f.to) { p.set("from", f.from); p.set("to", f.to); }
+  if (f.from && f.to) { p.set("from", f.from); p.set("to", f.to); if (f.fromTime && f.toTime) { p.set("fromTime", f.fromTime); p.set("toTime", f.toTime); } }
   if (f.locationId) p.set("location", f.locationId);
   for (const [k, v] of Object.entries(extra)) if (v !== undefined && v !== "") p.set(k, String(v));
   return `pipeline3?${p}`;
@@ -26,7 +26,7 @@ function path(part: string, f: PlFilters, extra: Record<string, string | number 
 
 /** True once the history funnel is switched on for this person (the sub-sections only show then). */
 export function useHistoryFunnelOn(): boolean {
-  const r = useData<{ minSample: number }>(path(PATHS.settings, { days: 0, locationId: "", pipeline: "", ownerId: "", q: "" }, {}));
+  const r = useData<{ minSample: number }>(path(PATHS.settings, { locationId: "", pipeline: "", ownerId: "", q: "" }, {}));
   return !!r.data;
 }
 
@@ -70,14 +70,14 @@ const OUTCOMES: Array<{ key: Exclude<FunnelDrill, "entered">; label: string; ton
 
 export function HistoryFunnel({ filters, onOpen, activeId, showAccount }: { filters: PlFilters; onOpen: (d: PlDeal) => void; activeId: string | null; showAccount: boolean }) {
   const [pipe, setPipe] = useState("");
-  const f = useData<Pl3Funnel>(path(PATHS.funnel, filters, { pipeline: pipe }));
+  const f = useData<Pl3Funnel>(filters.from ? path(PATHS.funnel, filters, { pipeline: pipe }) : null);
   const [pick, setPick] = useState<{ step: FunnelStep; drill: FunnelDrill } | null>(null);
   const [page, setPage] = useState(0), [size, setSize] = useState(20);
   const key = JSON.stringify([pipe, filters.from, filters.to, filters.locationId]);
   const [prev, setPrev] = useState(key);
   if (prev !== key) { setPrev(key); setPick(null); setPage(0); }
   const chosen = f.data?.pipeline ?? "";
-  const list = useData<Pl3FunnelDeals>(pick && chosen ? path(PATHS.deals, filters, { pipeline: chosen, step: pick.step.key, drill: pick.drill, page, size }) : null);
+  const list = useData<Pl3FunnelDeals>(filters.from && pick && chosen ? path(PATHS.deals, filters, { pipeline: chosen, step: pick.step.key, drill: pick.drill, page, size }) : null);
   useEffect(() => { setPage(0); }, [pick?.step.key, pick?.drill]); // eslint-disable-line react-hooks/set-state-in-effect
   const d = f.data;
   return (
@@ -148,7 +148,7 @@ export function StuckInStep({ filters, onOpen, activeId, showAccount }: { filter
   const key = JSON.stringify([filters.locationId, filters.pipeline, filters.q]);
   const [prev, setPrev] = useState(key);
   if (prev !== key) { setPrev(key); setPage(0); }
-  const r = useData<Pl3Stuck>(path(PATHS.stuck, filters, { pipeline: filters.pipeline, q: filters.q.trim() || undefined, page, size }));
+  const r = useData<Pl3Stuck>(filters.from ? path(PATHS.stuck, filters, { pipeline: filters.pipeline, q: filters.q.trim() || undefined, page, size }) : null);
   const d = r.data;
   return (
     <div data-testid="plhf-stuck">

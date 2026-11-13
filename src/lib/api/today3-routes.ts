@@ -1,3 +1,4 @@
+import { atOf } from "../analytics/window-time";
 import { exportProof, getSettings, listRows, markOpened, numbers, options, proof, saveSettings, snooze, today, todayCache, unsnooze, zoneForMeta, forgetToday, type Scope } from "../analytics/today3-queries";
 import { isMoneyList, moneyHero, moneyRows } from "../analytics/today3-money";
 import { accountsIn } from "../analytics/clients3-queries";
@@ -70,7 +71,7 @@ export async function handleToday3(ctx: Ctx, h: Today3Helpers): Promise<Response
     }
     case "numbers": {
       // The date bar's dates (from and to) are read first, and checked here (never trusted); without them the old days choice still works.
-      if (sp.get("from") && sp.get("to")) { const w = parseWindow(sp.get("from"), sp.get("to"), now); return done(await numbers(scope, one, { from: w.from, to: w.to }, now)); }
+      if (sp.get("from") && sp.get("to")) { const w = parseWindow(sp.get("from"), sp.get("to"), now, atOf(sp)); return done(await numbers(scope, one, { from: w.from, to: w.to }, now)); }
       const d = int(sp.get("days"), 30); return done(await numbers(scope, one, d <= 7 ? 7 : d <= 30 ? 30 : 90, now));
     }
     case "settings": {

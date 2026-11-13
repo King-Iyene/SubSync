@@ -50,12 +50,12 @@ A figure that is "as of now" must say so next to the number; narrowing the bar m
 - Server: the request carries `from` and `to` (days, inclusive). Readers convert with the shared helpers in `zone.ts` (`localDay`, `windowMs`, `dayStartMs`, `utcDayAfterToday`). A new reader uses `windowMs(from, to)`.
 - The source guard (`src/lib/__tests__/date-rules.test.ts`) fails when a file builds its own "today" or day window outside the shared module. `date-guard-baseline.json` lists the existing exceptions; it may only shrink.
 
-## 4. Known gaps (honest list)
+## 4. Known gaps (honest list, after the second pass)
 
-1. **Server windows on timestamp columns are whole UTC days.** The browser sends Lagos days; the readers (`parseWindow`, `parseApptWindow`, `parsePlWindow`, speed window, payments window) still turn a day into `00:00 UTC`, so a window starts and ends 1 hour after Lagos midnight. This was left on purpose: the daily rollup tables (`speed_daily`, `client_daily`, `pm_rollup_daily`) are keyed by UTC day, and shifting the reader without moving the rollups would put figures on the wrong day. What is fixed now: "today", the future-date check and the default window all use the Lagos day. To close the gap: key the rollups by Lagos day (additive migration plus backfill), then switch the readers to `windowMs`.
-2. **Time of day (hour) is not part of the range.** Custom is date-only. "Last hour" is not a preset. If wanted: add optional `fromTime` / `toTime` to the spec, then to every reader (needs the gap above closed first).
-3. Exceptions in the guard baseline (each is "today as UTC day" in a server or screen that is not driven by the bar): `clients/details.tsx`, `fn/payouts.tsx` (print date), `pm/sections.tsx` (default "opened on"), `wg/data.ts` (usage wallet series), the exec appointments intel and queries, `bf-queries`, `cash-queries`, `clients-actions-queries`, `clients3-queries`, `dq-queries`, `people3-queries`, `today3-queries`, `client-routes`, `dq-routes`, `growth-api`, `people-actions-routes`, `pipeline3-routes`.
-4. **Pipeline (Money flow cards) is outside this change** (another builder owns `src/app/app/views/pl3/*`). What it must do to match these rules is listed in the PR description.
+1. **Server windows are now Lagos days.** Every timestamp reader that uses a shared parser (parsePlWindow, parseApptWindow, parseWindow of appointments, clients, people and speed, via windowAtMs / startBound / endBound) reads [Lagos midnight, next Lagos midnight). Readers outside those parsers (the guard baseline) still build a UTC day.
+2. **Daily rollups are keyed by the account's local day** (own zone when Postgres knows it, else Africa/Lagos): client_daily, pm_rollup_daily, speed_daily, pipeline_rollup.closed_day. Migration 20261231150000 adds tz (null = legacy UTC row) and forces the first sweep to rebuild the whole window (a UTC day cannot be converted exactly). Rollups NOT yet moved: user_daily, user_workload_daily, appointment_exec_daily, bf_funnel_daily, workflow_daily, account_metrics_daily (still UTC days: up to one hour of edge error).
+3. **Hours** (fromTime / toTime, Lagos time; presets Last hour and Last 24 hours; a custom range may carry times) apply to every timestamp reader that uses the shared parsers. Anything kept per day (rollups) counts whole days and the bar says "day precision". A window with hours has no comparison.
+4. Exceptions in the guard baseline (each is "today as UTC day" outside the bar): see src/lib/__tests__/date-guard-baseline.json. It may only shrink. Pipeline is no longer in it.
 
 ## 5. Screen audit (13 Nov 2026)
 
@@ -77,4 +77,5 @@ PASS = already follows the bar and says so; FIXED = changed here; NEEDS-PL3 = be
 | Account audit, Clean-up, Duplicates, Contact search (Find a lead), Calls, Inbox, Onboarding, Email health | PASS: "Live, as of right now" with a note. Find a lead stays plain "ignores dates"; applying "added in range" is a proposal, not done |
 | Growth, Lead flow, Proof, Forecast, Sources tabs (report filter) | FIXED: follows the bar by default; an override says "this tab only" with "Use the dates above"; "today" is the Lagos day |
 | Proof | PASS (weeks are fixed and labelled) |
-| Pipeline: Money flow cards and every pl3 screen | NEEDS-PL3 |
+| Pipeline: Money flow cards and every pl3 screen | FIXED: dates only from the bar (no days fallback, no clock), nothing requested until the dates are known, "as of now" and "between <bar label>, Lagos time" written next to the numbers, "None" instead of a bare $0 when nothing closed, the replay plays the bar dates |
+| Find a lead | FIXED: optional "Added in the dates above" (default stays Live, as of right now) |

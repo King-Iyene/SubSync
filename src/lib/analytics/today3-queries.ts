@@ -1,3 +1,4 @@
+import { localDay as zoneDay } from "../design/zone";
 import { sql } from "../db";
 import { ttlCache } from "../ttl-cache";
 import { accountsCore, accountsIn, clientsCache, list as clientList, receipt as clientReceipt, type Core, type Filters, type Links } from "./clients3-queries";
@@ -407,18 +408,18 @@ export async function exportProof(s: Scope, one: string | null, weekParam: strin
 }
 
 // ---- numbers (replaces Overview) ----
-const day0 = (d: Date) => d.toISOString().slice(0, 10);
+const day0 = (d: Date) => zoneDay(d.getTime());
 
 /** `win` is the dates of the date bar (whole UTC days: `to` is the start of the day AFTER the last day), or a number of days counted back from today (the old way, kept for callers that have no dates). */
 export async function numbers(s: Scope, one: string | null, win: number | { from: Date; to: Date }, now = Date.now()): Promise<Td3Numbers> {
   const to = typeof win === "number" ? new Date(Math.floor(now / DAY) * DAY + DAY) : win.to, from = typeof win === "number" ? new Date(to.getTime() - win * DAY) : win.from;
   const days = Math.max(1, Math.round((to.getTime() - from.getTime()) / DAY)), pFrom = new Date(from.getTime() - days * DAY);
-  const range = `${day0(from)} to ${day0(new Date(to.getTime() - DAY))}`;
+  const range = `${day0(from)} to ${day0(new Date(to.getTime() - 1))}`;
   const f: Filters = { from, to, location: one, q: null, industry: null, level: null };
   const cores = await accountsCore({ inst: s.inst, allowed: s.allowed }, f, now);
   const ids = cores.map((c) => c.locationId);
   const db = sql();
-  const day = (d: Date) => d.toISOString().slice(0, 10);
+  const day = (d: Date) => zoneDay(d.getTime());
   const [speedNow, speedPrev, outPrev, deals] = ids.length ? await Promise.all([
     db`select percentile_cont(0.5) within group (order by median_seconds)::float8 m, coalesce(sum(answered), 0)::int a from speed_daily where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and day >= ${day(from)}::date and day < ${day(to)}::date and answered > 0 and median_seconds is not null`.catch(() => [{ m: null, a: 0 }]),
     db`select percentile_cont(0.5) within group (order by median_seconds)::float8 m, coalesce(sum(answered), 0)::int a from speed_daily where installation_id = ${s.inst} and location_id = any(${ids}::text[]) and day >= ${day(pFrom)}::date and day < ${day(from)}::date and answered > 0 and median_seconds is not null`.catch(() => [{ m: null, a: 0 }]),
@@ -448,7 +449,7 @@ export async function numbers(s: Scope, one: string | null, win: number | { from
     { id: "stale", label: "Deals gone quiet", value: String(stale), caption: null, enough: true, formula: `Open deals with no movement for ${STALE_DEAL_DAYS} days, by Pipeline's counted-deal rule.`, change: null, estimate: false, opens: { list: "all_stale" }, count: stale },
     { id: "attention", label: "Accounts needing a look", value: `${needAttn} of ${cores.length}`, caption: null, enough: true, formula: "Client accounts Clients marks Act now or Keep an eye.", change: null, estimate: false, opens: { module: "clients" }, count: needAttn },
   ];
-  return { tiles, days, from: day0(from), to: day0(new Date(to.getTime() - DAY)), historyStarts: await historyStartsOf(s.inst, ids), testDealsLeftOut: n(deals[0]?.skipped) };
+  return { tiles, days, from: day0(from), to: day0(new Date(to.getTime() - 1)), historyStarts: await historyStartsOf(s.inst, ids), testDealsLeftOut: n(deals[0]?.skipped) };
 }
 
 // ---- SubSync-only notes: snooze, opened, settings ----

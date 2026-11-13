@@ -5,28 +5,27 @@ import { allowedAccount } from "../api/pl-guard.ts";
 import { routeAllowed } from "../access.ts";
 
 // The screens speak cents and their own words; the API speaks dollars and its own. These tests pin the translation and the address every drill-down builds.
-const F = { days: 45, locationId: "", pipeline: "", ownerId: "", q: "" };
-const NOW = new Date("2026-11-11T12:00:00Z");
+const F = { from: "2026-10-01", to: "2026-11-12", locationId: "", pipeline: "", ownerId: "", q: "" };
 
 test("every screen part has an API part, and an address that the route accepts", () => {
   const parts = ["money-flow", "overview", "needs-attention", "won-lost", "forecast", "people", "sources", "stage-history", "health", "proof", "list", "accounts"] as const;
   for (const p of parts) {
-    const u = new URL("http://x/" + queryOf(p, F, {}, NOW));
+    const u = new URL("http://x/" + queryOf(p, F, {}));
     assert.equal(u.pathname, "/pipeline3");
     assert.equal(u.searchParams.get("part"), API_PART[p]);
-    assert.equal(u.searchParams.get("to"), "2026-11-11");
-    assert.equal(u.searchParams.get("from"), "2026-09-27");
+    assert.equal(u.searchParams.get("to"), "2026-11-12");
+    assert.equal(u.searchParams.get("from"), "2026-10-01");
   }
 });
 
 test("drill-down words become the server's own: status and stale are a bucket, lostReason a reason, the stage key and page are passed whole", () => {
-  const u = new URL("http://x/" + queryOf("list", F, { status: "lost", lostReason: "Went quiet", stage: "sales|proposal sent", owner: "u1", page: 3, pageSize: 50, expect: 12 }, NOW)).searchParams;
+  const u = new URL("http://x/" + queryOf("list", F, { status: "lost", lostReason: "Went quiet", stage: "sales|proposal sent", owner: "u1", page: 3, pageSize: 50, expect: 12 })).searchParams;
   assert.equal(u.get("bucket"), "lost"); assert.equal(u.get("reason"), "Went quiet"); assert.equal(u.get("stage"), "sales|proposal sent"); assert.equal(u.get("owner"), "u1");
   assert.equal(u.get("page"), "2"); assert.equal(u.get("size"), "50"); assert.equal(u.get("expect"), null);
-  assert.equal(new URL("http://x/" + queryOf("list", F, { stale: 1, status: "open" }, NOW)).searchParams.get("bucket"), "stale");
-  assert.equal(new URL("http://x/" + queryOf("list", F, { status: "lost", lostReason: "No reason recorded" }, NOW)).searchParams.get("reason"), "none");
-  assert.equal(new URL("http://x/" + queryOf("list", F, { status: "x; select 1" }, NOW)).searchParams.get("bucket"), null, "an unknown status is not passed on");
-  assert.equal(new URL("http://x/" + queryOf("accounts", F, {}, NOW)).searchParams.get("size"), "100");
+  assert.equal(new URL("http://x/" + queryOf("list", F, { stale: 1, status: "open" })).searchParams.get("bucket"), "stale");
+  assert.equal(new URL("http://x/" + queryOf("list", F, { status: "lost", lostReason: "No reason recorded" })).searchParams.get("reason"), "none");
+  assert.equal(new URL("http://x/" + queryOf("list", F, { status: "x; select 1" })).searchParams.get("bucket"), null, "an unknown status is not passed on");
+  assert.equal(new URL("http://x/" + queryOf("accounts", F, {})).searchParams.get("size"), "100");
 });
 
 test("deals: dollars become cents, the page counts from 1, a bad answer is an empty list", () => {

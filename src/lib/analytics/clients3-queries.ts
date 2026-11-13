@@ -1,4 +1,5 @@
 import { sql } from "../db";
+import { APP_TZ, localDay, rollupUntilDay } from "../design/zone";
 import { ttlCache } from "../ttl-cache";
 import { featureOn } from "../flags";
 import { getSettings } from "./queries";
@@ -35,7 +36,11 @@ const ID = /^[A-Za-z0-9_-]{1,64}$/;
 export const cleanId = (v: unknown): string | null => (typeof v === "string" && ID.test(v) ? v : null);
 const n = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v ? new Date(v as string).toISOString() : null);
-const day = (d: Date) => d.toISOString().slice(0, 10);
+// A day label is a day in the app zone (the daily rollups are keyed by the account's LOCAL day: docs/DATE_RULES.md). `dayTo` is the day AFTER the last day a window touches.
+const day = (d: Date) => localDay(d.getTime());
+const dayTo = (d: Date) => rollupUntilDay(d.getTime());
+/** Each account's zone: its own when Postgres knows it, else the app zone (default Africa/Lagos). */
+const zonesOf = (inst: string, ids: string[]) => sql()`select l.location_id, case when l.timezone is not null and exists (select 1 from pg_timezone_names n where n.name = l.timezone) then l.timezone else ${APP_TZ} end tz from locations l where l.installation_id = ${inst} and l.location_id = any(${ids}::text[])`;
 const like = (q: string) => `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
 type Acct = { id: string; name: string; industry: string | null; lastSyncAt: Date | null; appt: string | null; users: string | null };
@@ -64,31 +69,33 @@ export async function accountsIn(s: Scope, f: Pick<Filters, "location" | "q" | "
 function dailySource(inst: string, ids: string[], since: Date): Frag {
   const db = sql();
   const s = day(since);
+  // Every row is keyed by the account's LOCAL day (its own zone, else Africa/Lagos), so Today, Yesterday, This week and This month land on the right local day. The
+  // read starts a day early (the zone can be ahead of UTC) and the outer filter keeps the local days from `s`.
   return db`
-    select location_id, d as day, sum(new_leads)::int new_leads, sum(booked)::int booked, sum(showed)::int showed, sum(noshow)::int noshow, sum(deals_started)::int deals_started,
+    select u.location_id, u.d as day, max(u.tz) tz, sum(new_leads)::int new_leads, sum(booked)::int booked, sum(showed)::int showed, sum(noshow)::int noshow, sum(deals_started)::int deals_started,
       sum(won)::int won, sum(won_value)::float8 won_value, sum(lost)::int lost, sum(lost_value)::float8 lost_value, sum(staff_messages)::int staff_messages
     from (
-      select location_id, (date_added at time zone 'UTC')::date d, 1 new_leads, 0 booked, 0 showed, 0 noshow, 0 deals_started, 0 won, 0::float8 won_value, 0 lost, 0::float8 lost_value, 0 staff_messages
-        from cached_contacts where installation_id = ${inst} and location_id = any(${ids}::text[]) and date_added >= ${s}::date
+      select t.location_id, z.tz, (t.date_added at time zone z.tz)::date d, 1 new_leads, 0 booked, 0 showed, 0 noshow, 0 deals_started, 0 won, 0::float8 won_value, 0 lost, 0::float8 lost_value, 0 staff_messages
+        from cached_contacts t join (${zonesOf(inst, ids)}) z on z.location_id = t.location_id where t.installation_id = ${inst} and t.location_id = any(${ids}::text[]) and t.date_added >= ${s}::date - 1
       union all
-      select location_id, (created_remote_at at time zone 'UTC')::date, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0
-        from cached_appointments where installation_id = ${inst} and location_id = any(${ids}::text[]) and created_remote_at >= ${s}::date and status is distinct from 'invalid'
+      select t.location_id, z.tz, (t.created_remote_at at time zone z.tz)::date, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0
+        from cached_appointments t join (${zonesOf(inst, ids)}) z on z.location_id = t.location_id where t.installation_id = ${inst} and t.location_id = any(${ids}::text[]) and t.created_remote_at >= ${s}::date - 1 and t.status is distinct from 'invalid'
       union all
-      select location_id, (start_at at time zone 'UTC')::date, 0, 0, (status = 'showed')::int, (status = 'noshow')::int, 0, 0, 0, 0, 0, 0
-        from cached_appointments where installation_id = ${inst} and location_id = any(${ids}::text[]) and start_at >= ${s}::date and start_at < now() and status in ('showed', 'noshow')
+      select t.location_id, z.tz, (t.start_at at time zone z.tz)::date, 0, 0, (t.status = 'showed')::int, (t.status = 'noshow')::int, 0, 0, 0, 0, 0, 0
+        from cached_appointments t join (${zonesOf(inst, ids)}) z on z.location_id = t.location_id where t.installation_id = ${inst} and t.location_id = any(${ids}::text[]) and t.start_at >= ${s}::date - 1 and t.start_at < now() and t.status in ('showed', 'noshow')
       union all
-      select location_id, (created_remote_at at time zone 'UTC')::date, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0
-        from cached_opportunities where installation_id = ${inst} and location_id = any(${ids}::text[]) and created_remote_at >= ${s}::date
+      select t.location_id, z.tz, (t.created_remote_at at time zone z.tz)::date, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0
+        from cached_opportunities t join (${zonesOf(inst, ids)}) z on z.location_id = t.location_id where t.installation_id = ${inst} and t.location_id = any(${ids}::text[]) and t.created_remote_at >= ${s}::date - 1
       union all
-      select location_id, (last_status_change_at at time zone 'UTC')::date, 0, 0, 0, 0, 0, 1, coalesce(monetary_value, 0)::float8, 0, 0, 0
-        from cached_opportunities where installation_id = ${inst} and location_id = any(${ids}::text[]) and status = 'won' and last_status_change_at >= ${s}::date and coalesce(monetary_value, 0) > 0 and assigned_to is not null
+      select t.location_id, z.tz, (t.last_status_change_at at time zone z.tz)::date, 0, 0, 0, 0, 0, 1, coalesce(t.monetary_value, 0)::float8, 0, 0, 0
+        from cached_opportunities t join (${zonesOf(inst, ids)}) z on z.location_id = t.location_id where t.installation_id = ${inst} and t.location_id = any(${ids}::text[]) and t.status = 'won' and t.last_status_change_at >= ${s}::date - 1 and coalesce(t.monetary_value, 0) > 0 and t.assigned_to is not null
       union all
-      select location_id, (last_status_change_at at time zone 'UTC')::date, 0, 0, 0, 0, 0, 0, 0, 1, coalesce(monetary_value, 0)::float8, 0
-        from cached_opportunities where installation_id = ${inst} and location_id = any(${ids}::text[]) and status = 'lost' and last_status_change_at >= ${s}::date and coalesce(monetary_value, 0) > 0 and assigned_to is not null
+      select t.location_id, z.tz, (t.last_status_change_at at time zone z.tz)::date, 0, 0, 0, 0, 0, 0, 0, 1, coalesce(t.monetary_value, 0)::float8, 0
+        from cached_opportunities t join (${zonesOf(inst, ids)}) z on z.location_id = t.location_id where t.installation_id = ${inst} and t.location_id = any(${ids}::text[]) and t.status = 'lost' and t.last_status_change_at >= ${s}::date - 1 and coalesce(t.monetary_value, 0) > 0 and t.assigned_to is not null
       union all
-      select location_id, (at at time zone 'UTC')::date, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
-        from touch_events where installation_id = ${inst} and location_id = any(${ids}::text[]) and at >= ${s}::date and direction = 'outbound' and kind = 'message' and not automated and user_id is not null
-    ) u where d is not null group by location_id, d`;
+      select t.location_id, z.tz, (t.at at time zone z.tz)::date, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+        from touch_events t join (${zonesOf(inst, ids)}) z on z.location_id = t.location_id where t.installation_id = ${inst} and t.location_id = any(${ids}::text[]) and t.at >= ${s}::date - 1 and t.direction = 'outbound' and t.kind = 'message' and not t.automated and t.user_id is not null
+    ) u where u.d is not null and u.d >= ${s}::date group by u.location_id, u.d`;
 }
 
 /** The sweep: upsert the last 120 days of every account's daily row, plus the contact totals. Safe to run twice. Returns rows written. */
@@ -98,12 +105,17 @@ export async function refreshClientRollup(inst: string, now = Date.now()): Promi
   const ids = accts.map((r) => r.location_id as string);
   if (!ids.length) return 0;
   const since = new Date(now - 120 * DAY);
-  const wrote = await db`
-    insert into client_daily (installation_id, location_id, day, new_leads, booked, showed, noshow, deals_started, won, won_value, lost, lost_value, staff_messages, refreshed_at)
-    select ${inst}::uuid, s.location_id, s.day, s.new_leads, s.booked, s.showed, s.noshow, s.deals_started, s.won, s.won_value, s.lost, s.lost_value, s.staff_messages, now() from (${dailySource(inst, ids, since)}) s
-    on conflict (installation_id, location_id, day) do update set new_leads = excluded.new_leads, booked = excluded.booked, showed = excluded.showed, noshow = excluded.noshow, deals_started = excluded.deals_started,
+  // The window is replaced whole, in one transaction: a row keyed by an old (UTC) day must not survive next to the same events counted under their local day.
+  const wrote = await db.begin(async (tx) => {
+    const T = tx as unknown as typeof db;
+    await T`delete from client_daily where installation_id = ${inst} and location_id = any(${ids}::text[]) and day >= ${day(since)}::date`;
+    return T`
+    insert into client_daily (installation_id, location_id, day, tz, new_leads, booked, showed, noshow, deals_started, won, won_value, lost, lost_value, staff_messages, refreshed_at)
+    select ${inst}::uuid, s.location_id, s.day, s.tz, s.new_leads, s.booked, s.showed, s.noshow, s.deals_started, s.won, s.won_value, s.lost, s.lost_value, s.staff_messages, now() from (${dailySource(inst, ids, since)}) s
+    on conflict (installation_id, location_id, day) do update set tz = excluded.tz, new_leads = excluded.new_leads, booked = excluded.booked, showed = excluded.showed, noshow = excluded.noshow, deals_started = excluded.deals_started,
       won = excluded.won, won_value = excluded.won_value, lost = excluded.lost, lost_value = excluded.lost_value, staff_messages = excluded.staff_messages, refreshed_at = now()
     returning 1`;
+  });
   await db`
     insert into client_rollup_state (installation_id, location_id, refreshed_at, first_day, contacts, no_owner, no_phone)
     select ${inst}::uuid, l.location_id, now(), (select min(d.day) from client_daily d where d.installation_id = ${inst} and d.location_id = l.location_id),
@@ -184,7 +196,7 @@ export async function accountsCore(s: Scope, f: Filters, now = Date.now()): Prom
   const daily = await dailyFrom(s.inst, ids, since);
   const wk = (k: number) => day(new Date(spark0.getTime() + k * 7 * DAY));
   const weekCols = [...Array(8)].map((_, k) => `coalesce(sum(new_leads) filter (where day >= '${wk(k)}'::date and day < '${wk(k + 1)}'::date), 0)::int w${k}`).join(", ");
-  const cur = (c: string) => `coalesce(sum(${c}) filter (where day >= '${day(f.from)}'::date and day < '${day(f.to)}'::date), 0)`;
+  const cur = (c: string) => `coalesce(sum(${c}) filter (where day >= '${day(f.from)}'::date and day < '${dayTo(f.to)}'::date), 0)`;
   const prv = (c: string) => `coalesce(sum(${c}) filter (where day >= '${day(prevFrom)}'::date and day < '${day(f.from)}'::date), 0)`;
   const sums = ["new_leads", "booked", "won_value", "staff_messages", "showed", "noshow", "won", "lost"].map((c) => `${cur(c)}::float8 c_${c}, ${prv(c)}::float8 p_${c}`).join(", ");
 
@@ -199,7 +211,7 @@ export async function accountsCore(s: Scope, f: Filters, now = Date.now()): Prom
     staffRows(s.inst, ids, f.from, f.to, now),
     quality(s.inst, ids),
     db`select location_id, percentile_cont(0.5) within group (order by median_seconds)::float8 m from speed_daily where installation_id = ${s.inst} and location_id = any(${ids}::text[])
-       and day >= ${day(f.from)}::date and day < ${day(f.to)}::date and answered > 0 and median_seconds is not null group by 1`.catch(() => []),
+       and day >= ${day(f.from)}::date and day < ${dayTo(f.to)}::date and answered > 0 and median_seconds is not null group by 1`.catch(() => []),
     historyStarts(s.inst, ids),
     quietedMap(s.inst, ids, now).catch(() => new Map<string, string[]>()),
   ]);

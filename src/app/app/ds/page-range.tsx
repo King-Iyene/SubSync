@@ -37,6 +37,8 @@ export type PageRange = {
   resolved: Resolved | null;
   /** The applied dates, "2026-10-14" form (UTC days, the end day included). Empty until ready. */
   from: string; to: string; days: number;
+  /** "09:00" / "17:30" (Lagos time) when the range has hours (Last hour, Last 24 hours, a custom range with times); otherwise empty. `timed` is true then: figures that only exist per day say "day precision". */
+  fromTime: string; toTime: string; timed: boolean;
   /** `from=..&to=..` for a request, and the comparison pairs (empty when there is no comparison). */
   qs: string; cmpQs: string;
   /** Changes whenever the window changes: use it as a React key or in a request key so an answer for other dates is never reused. */
@@ -54,11 +56,15 @@ export function usePageRange(): PageRange {
   const [today, setToday] = useState<string | null>(null);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setToday(todayOf(Date.now())); }, []);
-  const resolved = useMemo(() => (today ? resolveRange(spec, today) : null), [spec, today]);
+  // "Last hour" and "Last 24 hours" are measured from the moment the bar applied them (the clock is read once per applied range, not on every render).
+  // eslint-disable-next-line react-hooks/purity, react-hooks/exhaustive-deps
+  const nowMs = useMemo(() => (today ? Date.now() : 0), [today, snap]);
+  const resolved = useMemo(() => (today ? resolveRange(spec, today, nowMs) : null), [spec, today, nowMs]);
   const apply = useCallback((s: RangeSpec | null) => applyPageRange(s), []);
   return {
     ready: resolved !== null, spec, resolved,
     from: resolved?.current.from ?? "", to: resolved?.current.to ?? "", days: resolved?.current.days ?? 0,
+    fromTime: resolved?.at?.fromTime ?? "", toTime: resolved?.at?.toTime ?? "", timed: resolved?.at != null,
     qs: resolved ? windowQuery(resolved) : "", cmpQs: resolved ? compareQuery(resolved) : "", key: resolved ? rangeKeyOf(resolved) : "",
     label: resolved ? resolved.current.label : "", problem: resolved?.problem ?? null, apply,
   };
