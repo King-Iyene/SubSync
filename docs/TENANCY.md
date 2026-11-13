@@ -41,6 +41,7 @@ A person in one client account never sees another client account's data. An agen
 | `api/hooks/zoom` | signature | Zoom signature with a freshness window |
 | `api/hooks/fathom/[key]` | token | Long random key per connection plus the provider's signature; unknown key gets 404 |
 | `api/hooks/meeting/[token]` | token | Private address token, stored only as a hash; unknown token gets 404 |
+| `api/integrations/ai/callback` | state | Single-use random state (ten minutes, deleted when read) made by the signed-in administrator; the PKCE verifier stays on the server |
 | `api/integrations/[provider]/callback` | state | Signed, expiring state tied to the installation; forged state gets 400 |
 | `api/oauth/callback` | state | One-time authorization code from the platform |
 | `api/oauth/install` | redirect_only | Redirects to the platform's install screen; returns no data |

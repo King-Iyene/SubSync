@@ -153,6 +153,7 @@ import { handleToday3, handleToday3Act } from "./today3-routes";
 import { handleCash, handleCashAct } from "./cash-routes";
 import { handleWg, handleWgAct } from "./wg-routes";
 import { handleBr } from "./br-routes";
+import { handleAi } from "./ai-routes";
 import { handleApptActions } from "./appointment-actions-routes";
 import { handleMeetingList } from "./mn2-routes";
 import { handleAm } from "./am-routes";
@@ -2277,6 +2278,10 @@ async function dispatch(ctx: Ctx): Promise<Response> {
     }
     if (a === "wg" && b === "act" && ctx.segments.length === 3) {
       return await handleWgAct(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
+    }
+    // Bring your own AI: /api/app/ai?part=... and /api/app/ai/act/<name>. Administrators only for the connection (checked inside); flag ai_byo.
+    if (a === "ai" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3))) {
+      return await handleAi(ctx, { allowed: () => allowedIds(ctx) });
     }
     // The 7 am brief: /api/app/br?part=brief|text|settings|history and /api/app/br/act/<settings|test|seen|acted>. Owners and admins only; every choice is the signed-in person's own.
     if (a === "br" && ((method === "GET" && !b && ctx.url.searchParams.has("part")) || (b === "act" && ctx.segments.length === 3))) {

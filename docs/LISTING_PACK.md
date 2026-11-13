@@ -21,7 +21,8 @@ Validate after publishing: search each primary keyword inside the marketplace an
 3. Trust: few permissions, read-only by default, never messages your leads, writes only after preview and confirm, data deleted on uninstall, clear what we store.
 4. Price: free plan plus $11.50 per client account per month after the plan swap (state only after the plan exists).
 5. Support: email, first reply within 24 hours.
-Do NOT mention: exports, messaging leads, AI features, anything switched off (live sends, writes) until it is live.
+6. AI (add this one honest line only once ai_byo is on and verified): "Optional AI wording for your 7 am brief: you connect your own AI account (OpenRouter, an API key from Anthropic, OpenAI or Google, or ChatGPT sign-in once OpenAI approves it), you set the monthly limit, and it only suggests: it never messages your leads or changes your CRM."
+Do NOT mention: exports, messaging leads, any other AI feature, anything switched off (live sends, writes) until it is live.
 
 ## 4. Release notes for 1.1.0 (mandatory field)
 New: Today money strip, Speed to lead "Waiting on the client" alerts, Pipeline step history and stuck deals, Call mode redesign, faster loading, calmer look, duplicates preview. New optional permissions (payments, workflows, calendars, users, tags): each unlocks one screen; nothing breaks if you skip them. Existing installs press Update and approve the optional permissions they want. The call queue workflow is created for you automatically where your CRM allows it (it only creates call tasks for your team and never messages your contacts); otherwise it is a 2-minute guided setup.

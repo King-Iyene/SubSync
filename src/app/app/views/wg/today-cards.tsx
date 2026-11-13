@@ -132,6 +132,23 @@ export function BriefCard({ go, openRecover, hide }: { go: GoFn; openRecover?: (
   const b0 = sample ? sampleBrief() : live.data?.brief ?? null;
   const b = useMemo(() => (b0 && hide ? { ...b0, items: b0.items.filter((i) => !hide(i.key)) } : b0), [b0, hide]);
   const seen = useRef(false);
+  // AI wording: shown only when the account connected its own AI, the job is on and the number check passed (the server decides; any failure here just means no block).
+  const [aiNote, setAiNote] = useState<string | null>(null);
+  const hasBrief = Boolean(b0);
+  useEffect(() => {
+    if (sample || !hasBrief) return;
+    let dead = false;
+    void (async () => {
+      try {
+        const g = await api.get<{ note: string | null }>("ai?part=brief-note");
+        if (dead) return;
+        if (g.note) { setAiNote(g.note); return; }
+        const p = await api.post<{ note: string | null }>("ai/act/brief-note", {});
+        if (!dead && p.note) setAiNote(p.note);
+      } catch { /* no AI block */ }
+    })();
+    return () => { dead = true; };
+  }, [api, sample, hasBrief]);
   // The brief was shown today: recorded once per person per day (the server also keeps it to one row).
   useEffect(() => {
     if (sample || !b || seen.current) return;
@@ -154,6 +171,7 @@ export function BriefCard({ go, openRecover, hide }: { go: GoFn; openRecover?: (
       <h2 className="cl-h">Your brief for {b.dayText ?? b.day}</h2>
       {sample && <p className="ap-fine" role="status" data-testid="br-sample">Sample data: these are not your real clients.</p>}
       <p className="cl-sentence" data-testid="br-headline">{b.headline}</p>
+      {aiNote && <p className="ap-fine" data-testid="br-ai"><b>AI wording (a suggestion):</b> {aiNote}</p>}
       <ol className="br-list">
         {b.items.map((it, n) => (
           <li key={it.key} className="br-item" data-testid={`br-item-${it.section}`}>

@@ -43,4 +43,4 @@ export function toStored(rows: AccountRow[], history: Map<string, AccountHistory
 }
 
 /** Changes that cannot alter any stored number (a notification read mark, feedback, help): they do not dirty the rollup. */
-export const DIRTY_EXEMPT = /^(notifications|feedback|help|roadmap|news|guides|my-connections|team-connections|meeting-[a-z-]+|segments|search)$/;
+export const DIRTY_EXEMPT = /^(notifications|feedback|help|roadmap|news|guides|ai|my-connections|team-connections|meeting-[a-z-]+|segments|search)$/;

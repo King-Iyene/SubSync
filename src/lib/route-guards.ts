@@ -10,6 +10,7 @@ export const ROUTE_GUARDS: RouteGuard[] = [
   { route: "api/hooks/zoom", kind: "signature", guard: "Zoom's signature over the body with the app's secret token, with a freshness window; unsigned requests refused." },
   { route: "api/hooks/fathom/[key]", kind: "token", guard: "A long random key per connection plus the provider's signature. An unknown key returns 404." },
   { route: "api/hooks/meeting/[token]", kind: "token", guard: "A private address token stored only as a hash; an unknown token returns 404." },
+  { route: "api/integrations/ai/callback", kind: "state", guard: "A single-use random state made when the signed-in administrator pressed Connect, valid ten minutes and deleted as it is read; it names the company, the connection and the person. An unknown, used or expired state shows an error and changes nothing." },
   { route: "api/integrations/[provider]/callback", kind: "state", guard: "A signed, expiring state value tied to the installation that started the sign-in; a forged state returns 400." },
   { route: "api/oauth/callback", kind: "state", guard: "The one-time authorization code from the platform; tokens are stored encrypted for the company in the code's own response." },
   { route: "api/oauth/install", kind: "redirect_only", guard: "Redirects to the platform's install screen. Reads and returns no data." },
