@@ -82,26 +82,5 @@
   "size": "1600x900",
   "kB": 389,
   "purpose": "Pipeline cash-flow river with dollars"
- },
- {
-  "file": "13-data-health.png",
-  "extra": true,
-  "size": "1600x900",
-  "kB": 246,
-  "purpose": "Data health: missing phones and emails fixed with preview and undo"
- },
- {
-  "file": "14-lead-sources.png",
-  "extra": true,
-  "size": "1600x900",
-  "kB": 265,
-  "purpose": "Lead intake and capture sources"
- },
- {
-  "file": "15-client-reports.png",
-  "rejected": [
-   "TimeoutError: page.waitForSelector: Timeout 120000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator"
-  ],
-  "purpose": "Client reports: weekly receipt and the shareable client one-pager"
  }
 ]
