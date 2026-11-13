@@ -24,7 +24,7 @@ import type {
 export type Db = ReturnType<typeof sql>;
 export type Frag = ReturnType<Db>;
 export type Scope = { inst: string; allowed: string[] | null };
-export type Filters = { from: Date; to: Date; location?: string | null; pipeline?: string | null; stage?: string | null; stageKey?: string | null; owner?: string | null; source?: string | null; q?: string | null; bucket?: Pl3Bucket | null; reason?: string | null; includeTest?: boolean; /** Pipeline step order: with bucket "flow_reach", deals that got to this step or further (see flowReachCond). */ reachOrd?: number | null; /** Count open deals with no value too (the river in deal-count mode). */ flowDeals?: boolean };
+export type Filters = { from: Date; to: Date; location?: string | null; pipeline?: string | null; stage?: string | null; stageKey?: string | null; owner?: string | null; source?: string | null; q?: string | null; bucket?: Pl3Bucket | null; reason?: string | null; includeTest?: boolean; /** Pipeline step order: with bucket "flow_reach", deals that got to this step or further (see flowReachCond). */ reachOrd?: number | null; /** Count open deals with no value too (the river in deal-count mode). */ flowDeals?: boolean; /** The Funnel: open deals count only when created or moved step in the dates (grouped by the step they are in now). */ flowWindow?: boolean; /** With flowWindow: only the stuck ones. */ flowStale?: boolean };
 export type Rec = Record<string, unknown>;
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -94,16 +94,18 @@ export const P_STALE = (db: Db) => db`d.status = 'open' and d.counted and not d.
 export const P_NO_OWNER = (db: Db) => db`d.status = 'open' and not d.out_of_scope and not d.is_test and d.value > 0 and not d.owner_ok`;
 export const P_NO_VALUE = (db: Db) => db`d.status = 'open' and not d.out_of_scope and not d.is_test and d.value <= 0`;
 /** Open deals the flow draws: counted money deals, plus (in deal-count mode) open deals with no value. The ONE definition behind a river or funnel number and the list that opens behind it. */
-export const flowOpen = (db: Db, dealsMode: boolean): Frag => db`(${P_OPEN(db)} ${dealsMode ? db`or ${P_NO_VALUE(db)}` : db``})`;
+/** A deal is "active in the dates" when it was created or moved step in them (used by the Funnel only; the river shows what is open now). */
+export const inWindow = (db: Db, f: Pick<Filters, "from" | "to">): Frag => db`((d.created_at >= ${f.from} and d.created_at < ${f.to}) or (d.last_stage_change_at >= ${f.from} and d.last_stage_change_at < ${f.to}))`;
+export const flowOpen = (db: Db, dealsMode: boolean, f?: Pick<Filters, "from" | "to" | "flowWindow" | "flowStale">): Frag => db`((${P_OPEN(db)} ${dealsMode ? db`or ${P_NO_VALUE(db)}` : db``}) ${f?.flowWindow ? db`and ${inWindow(db, f)}` : db``} ${f?.flowWindow && f.flowStale ? db`and d.stale` : db``})`;
 /** Won or lost in the chosen dates (test deals left out): the same window the river uses for its vault and drains. */
 export const flowWin = (db: Db, f: Pick<Filters, "from" | "to">): Frag => db`d.last_status_change_at >= ${f.from} and d.last_status_change_at < ${f.to} and not d.is_test`;
 /**
  * "Got past a step": deals that reached the step at `reachOrd` or any later one = open there or later, lost from there or later (in the dates), or won (in the dates). Won deals reached every step.
  * A deal in a step that is no longer in the pipeline (order 999) is not placed, so it is in no step's count and in no step's list.
  */
-export const flowReachCond = (db: Db, f: Pick<Filters, "from" | "to" | "reachOrd" | "flowDeals">): Frag => {
+export const flowReachCond = (db: Db, f: Pick<Filters, "from" | "to" | "reachOrd" | "flowDeals" | "flowWindow">): Frag => {
   const ord = f.reachOrd ?? 0, win = flowWin(db, f);
-  return db`and ((${flowOpen(db, f.flowDeals === true)} and d.stage_ord >= ${ord} and d.stage_ord < 999) or (d.status = 'lost' and ${win} and d.stage_ord >= ${ord} and d.stage_ord < 999) or (d.status = 'won' and ${win}))`;
+  return db`and ((${flowOpen(db, f.flowDeals === true, f)} and d.stage_ord >= ${ord} and d.stage_ord < 999) or (d.status = 'lost' and ${win} and d.stage_ord >= ${ord} and d.stage_ord < 999) or (d.status = 'won' and ${win}))`;
 };
 const P_FLAG = (db: Db) => db`(d.status = 'open' and not d.out_of_scope and (d.is_test or d.stale or d.outlier or (d.value > 0 and not d.owner_ok) or d.value <= 0))`;
 
@@ -122,7 +124,7 @@ function bucketCond(db: Db, s: Scope, f: Filters): Frag {
     case "abandoned": return db`and d.status = 'abandoned' and ${win}`;
     case "no_reason": return db`and d.status = 'lost' and ${win} and d.lost_reason_id is null and d.lost_reason is null`;
     case "booked_appt": return db`and d.contact_id is not null and exists (select 1 from cached_appointments a where a.installation_id = ${s.inst} and a.location_id = d.location_id and a.contact_id = d.contact_id and a.status not in ('cancelled', 'invalid'))`;
-    case "flow_open": return db`and ${flowOpen(db, f.flowDeals === true)}`;
+    case "flow_open": return db`and ${flowOpen(db, f.flowDeals === true, f)}`;
     case "flow_reach": return f.reachOrd ? flowReachCond(db, f) : db`and false`;
     case "no_appt": return db`and (d.contact_id is null or not exists (select 1 from cached_appointments a where a.installation_id = ${s.inst} and a.location_id = d.location_id and a.contact_id = d.contact_id and a.status not in ('cancelled', 'invalid')))`;
     default: return db``;

@@ -10,7 +10,8 @@ import type { Measure } from "@/lib/design/funnel-flow-layout";
 import type { PlDrain, PlMoneyFlow, PlStage } from "@/lib/analytics/pipeline3-types-interim";
 import { useData } from "../../session";
 import { queryOf } from "./adapters";
-import { FunnelFlow } from "./funnel-flow-view";
+import { DotFunnel, FunnelSkeleton } from "./funnel-dots-view";
+import { pathsAtFrame } from "@/lib/design/funnel-replay";
 import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
 import { usePageRange } from "../../ds/page-range";
 import { zoneWord } from "@/lib/design/zone";
@@ -31,9 +32,9 @@ export const hasNoValuedDeals = (f: PlMoneyFlow | null): boolean => !!f && f.sta
 // When no deal has a dollar value the same picture counts DEALS (cards instead of bills) so the screen is never blank. REPLAY plays our own recorded day-by-day stage changes (frames from river-replay.ts);
 // with no recorded movement it says so and offers a clearly labelled SAMPLE instead of faking anything. The old coin stacks are kept in the unused coin file, hidden at King's request.
 
-export type FlowPick = { title: string; count: number; params: { stageId?: string; bucket?: "no_value" | "no_owner" | "test" | "outlier"; stale?: boolean; status?: "won" | "lost"; lostReason?: string; ownerId?: string; source?: string; /** Deals that got to this step (its key) or further: a ribbon or a funnel band. */ reach?: string; /** Open deals of a step, counted the way the flow counts them. */ flowOpen?: boolean; /** Deal-count mode: open deals with no value count too. */ fc?: boolean } };
+export type FlowPick = { title: string; count: number; params: { stageId?: string; bucket?: "no_value" | "no_owner" | "test" | "outlier"; stale?: boolean; status?: "won" | "lost"; lostReason?: string; ownerId?: string; source?: string; /** Deals that got to this step (its key) or further: a ribbon or a funnel band. */ reach?: string; /** Open deals of a step, counted the way the flow counts them. */ flowOpen?: boolean; /** Deal-count mode: open deals with no value count too. */ fc?: boolean; /** Funnel: open deals count only when created or moved step in the dates. */ fw?: boolean; /** Funnel: only the stuck ones. */ fs?: boolean } };
 
-const VIEW_KEY = "pl.flowView";
+const VIEW_KEY = "pl.flowView2";
 type FlowView = "river" | "funnel";
 
 function applyPerson(f: PlMoneyFlow, person: string): { stages: PlStage[]; drains: PlDrain[]; wonCents: number; wonCount: number } {
@@ -62,12 +63,13 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
   const [frame, setFrame] = useState<number | null>(null), [playing, setPlaying] = useState(false), [speed, setSpeed] = useState<string>("1"), [noMove, setNoMove] = useState(false);
   const reduced = useReducedMotion();
   // River or Funnel flow: the choice is remembered on this device.
-  const [flowView, setFlowViewState] = useState<FlowView>("river"), [fm, setFm] = useState<Measure | null>(null);
+  const [flowView, setFlowViewState] = useState<FlowView>("funnel"), [fm, setFm] = useState<Measure | null>(null);
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { try { if (localStorage.getItem(VIEW_KEY) === "funnel") setFlowViewState("funnel"); } catch { /* private window: keep the default */ } }, []);
+  useEffect(() => { try { if (localStorage.getItem(VIEW_KEY) === "river") setFlowViewState("river"); } catch { /* private window: keep the default */ } }, []);
   const setFlowView = (v: FlowView) => { setFlowViewState(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* not remembered */ } };
   // The counts behind the ribbon labels and the funnel (same rule as the lists that open behind a click). Narrowed to the person picked, like the piles.
-  const pathsKey = !sample && filters.from && filters.to ? queryOf("money-flow", { ...filters, ownerId: person || filters.ownerId }).replace("part=money-flow", "part=flow-paths") : null;
+  // The Funnel asks for the deals active in the dates (fw=1); the river keeps counting what is open now.
+  const pathsKey = !sample && filters.from && filters.to ? queryOf("money-flow", { ...filters, ownerId: person || filters.ownerId }).replace("part=money-flow", "part=flow-paths") + (flowView === "funnel" ? "&fw=1" : "") : null;
   const pathsReq = useData<{ paths: FlowPaths | null }>(pathsKey);
   const samplePaths = useMemo(() => (sample && sampleData ? sampleFlowPaths(sampleData) : null), [sample, sampleData]);
   const paths: FlowPaths | null = sample ? samplePaths : pathsReq.data?.paths ?? null;
@@ -80,7 +82,7 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
   useEffect(() => { if (!settle) return; const t = setTimeout(() => setSettle(false), 5600); return () => clearTimeout(t); }, [settle, run]);
   // No deal has a dollar value (and we are not showing the sample): count deals so the screen is never blank.
   const counts = noValued && !sample;
-  const measure: Measure = counts || fm === "deals" ? "deals" : "money";
+  const measure: Measure = counts || fm !== "money" ? "deals" : "money";
   const frames = useMemo(() => (data && replayHasMovement(data.replay) ? buildReplayFrames(data.replay ?? [], data.stages, counts) : null), [data, counts]);
   const replayOn = !!frames && !person;
   const cur = replayOn && frame !== null ? frames[Math.min(frame, frames.length - 1)] : null;
@@ -109,6 +111,9 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
     const byFrom = new Map(pathSteps(paths, counts).map((s) => [s.fromId, s]));
     return view.stages.map((s, i) => { const st = byFrom.get(s.id); return st && st.toId === (view.stages[i + 1]?.id ?? "won") ? st : undefined; });
   }, [paths, view, counts]);
+  // Step history that starts after the first chosen day cannot back a claim about flow between steps: the river then shows the piles only, and says why.
+  const riverClaims = !paths?.history || paths.history.covers;
+  const historyDate = paths?.history?.since ? new Date(paths.history.since).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "recently";
 
   const startSample = () => { setSample(true); setFrame(null); setPlaying(false); setNoMove(false); setPerson(""); };
   const stopSample = () => { setSample(false); setFrame(null); setPlaying(false); setNoMove(false); };
@@ -156,8 +161,8 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
       <div className="pl-flow-bar">
         <h3 className="pl-flow-title">{data.pipelineName}<span className="ap-sub"> · {sample ? data.periodLabel : `${bar.label}, ${zoneWord()} time`}</span></h3>
         <div className="pl-viewtog" role="group" aria-label="Choose the picture" data-testid="pl-viewtog">
+          <button type="button" className="pl-vt" aria-pressed={flowView === "funnel"} onClick={() => setFlowView("funnel")} data-testid="pl-view-funnel">Funnel</button>
           <button type="button" className="pl-vt" aria-pressed={flowView === "river"} onClick={() => setFlowView("river")} data-testid="pl-view-river">River</button>
-          <button type="button" className="pl-vt" aria-pressed={flowView === "funnel"} onClick={() => setFlowView("funnel")} data-testid="pl-view-funnel">Funnel flow</button>
         </div>
         {flowView === "funnel" && (
           <div className="pl-viewtog" role="group" aria-label="Count deals or money" data-testid="pl-ff-measure">
@@ -169,7 +174,7 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
         <select id="pl-person" className="ap-field" value={person} onChange={(e) => { setPerson(e.target.value); setFrame(null); setPlaying(false); }} data-testid="pl-person">
           <option value="">Everyone&apos;s deals</option>{data.people.map((p) => <option key={p.id} value={p.id}>{p.name}&apos;s deals</option>)}
         </select>
-        {flowView === "river" && <div className="pl-replay" data-testid="pl-replay" role="group" aria-label="Replay the flow, day by day">
+        {<div className="pl-replay" data-testid="pl-replay" role="group" aria-label="Replay how deals moved, day by day">
           <button type="button" className="s6-btn" onClick={play} aria-label={playing ? "Pause the replay" : reduced && cur ? "Next day" : "Replay the flow"} data-testid="pl-play">
             {playing ? <Pause aria-hidden className="size-4" /> : cur ? <Play aria-hidden className="size-4" /> : <RotateCcw aria-hidden className="size-4" />}{playing ? "Pause" : reduced && cur ? "Next day" : cur && frame !== null && frame < total - 1 ? "Play" : "Replay"}
           </button>
@@ -183,10 +188,10 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
           </>}
         </div>}
       </div>
-      {flowView === "river" && noMove && !frames && (
-        <p className="ap-fine mb-2 rv-note" role="status" data-testid="pl-nomove">{person ? "Pick everyone's deals to replay: step history is recorded for the whole pipeline." : `Nothing real to replay: ${why.toLowerCase()}`} {!person && <button type="button" className="ap-link" onClick={startSample} data-testid="pl-sample-on-replay">Play a sample replay</button>}</p>
+      {noMove && !frames && (
+        <p className="ap-fine mb-2 rv-note" role="status" data-testid="pl-nomove">{person ? "Pick everyone's deals to replay: step history is recorded for the whole pipeline." : `Nothing real to replay: ${why.toLowerCase()}`} {flowView === "funnel" ? "The dots keep flowing gently, but nothing is replayed." : !person && <button type="button" className="ap-link" onClick={startSample} data-testid="pl-sample-on-replay">Play a sample replay</button>}</p>
       )}
-      {cur && <p className="ap-fine mb-2 rv-daysum" aria-live="polite" data-testid="pl-daysum">{summary}</p>}
+      {cur && flowView === "river" && <p className="ap-fine mb-2 rv-daysum" aria-live="polite" data-testid="pl-daysum">{summary}</p>}
       {quiet && flowView === "river" && (
         <div className="rv-quiet" data-testid="pl-quiet">
           <p><b>What is true right now:</b> {openLine || "no open deals"}.</p>
@@ -196,12 +201,11 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
       )}
       {flowView === "funnel" ? (
         <div ref={wrap} className="rv-host" data-testid="pl-funnel-host">
-          <p className="ap-fine mb-2"><b>As of now:</b> deals still waiting in each step. <b>Between {bar.label || "the dates above"}, {zoneWord()} time:</b> won, lost and how far deals got.</p>
           {pathsReq.error && !sample ? <ErrorState error={pathsReq.error} onRetry={pathsReq.reload} />
-            : !paths ? (pathsReq.data ? <p className="ap-fine" role="status" data-testid="ff-nopipe">No steps were found for this pipeline, so there is no funnel to draw.</p> : <SkeletonRows rows={5} label="Loading the funnel..." />)
-            : <FunnelFlow paths={sample ? sampleFunnelPaths() : paths}measure={measure} width={Math.max(300, width)} reduced={reduced} settle={settle} sample={sample}
-                onReach={(i) => { const st = paths.stages[i]; const n = pathSteps(paths, measure === "deals"); if (i >= paths.stages.length) return pickWon(); onPick({ title: `${dealsText(n[i].fromN)} got to ${st.name} or further`, count: n[i].fromN, params: { reach: st.id, fc: measure === "deals", ownerId: person || undefined } }); }}
-                onWaiting={(i, stuck) => { const st = paths.stages[i], n = pathSteps(paths, measure === "deals")[i]; onPick(stuck ? { title: `${st.name}, stuck deals`, count: st.stuck, params: { stageId: st.id, stale: true, ownerId: person || undefined } } : { title: `${st.name}, still here`, count: n.stillHere, params: { stageId: st.id, flowOpen: true, fc: measure === "deals", ownerId: person || undefined } }); }}
+            : !paths ? (pathsReq.data ? <p className="ap-fine" role="status" data-testid="ff-nopipe">No steps were found for this pipeline, so there is no funnel to draw.</p> : <FunnelSkeleton width={Math.max(300, width)} />)
+            : <DotFunnel paths={sample ? sampleFunnelPaths() : (cur && pathsAtFrame(paths, cur)) || paths} sample={sample || (!!cur && !!pathsAtFrame(paths, cur))} replayLabel={cur && pathsAtFrame(paths, cur) ? cur.date : null} measure={measure} width={Math.max(300, width)} reduced={reduced} windowLabel={sample ? data.periodLabel : `${bar.label}, ${zoneWord()} time`}
+                onReach={(i) => { const st = paths.stages[i]; const n = pathSteps(paths, measure === "deals"); if (i >= paths.stages.length) return pickWon(); onPick({ title: `${dealsText(n[i].fromN)} got to ${st.name} or further`, count: n[i].fromN, params: { reach: st.id, fc: measure === "deals", fw: true, ownerId: person || undefined } }); }}
+                onWaiting={(i, stuck) => { const st = paths.stages[i], n = pathSteps(paths, measure === "deals")[i]; onPick(stuck ? { title: `${st.name}, stuck deals`, count: st.stuck, params: { stageId: st.id, flowOpen: true, fs: true, fw: true, ownerId: person || undefined } } : { title: `${st.name}, still here`, count: n.stillHere, params: { stageId: st.id, flowOpen: true, fc: measure === "deals", fw: true, ownerId: person || undefined } }); }}
                 onLost={(i) => { const st = paths.stages[i]; onPick({ title: `Lost from ${st.name}`, count: st.lost, params: { stageId: st.id, status: "lost", ownerId: person || undefined } }); }}
                 onLostAll={() => onPick({ title: "Lost deals", count: lostAllOf(paths), params: { status: "lost", ownerId: person || undefined } })}
                 onWon={() => onPick({ title: "Won deals", count: paths.won.n, params: { status: "won", ownerId: person || undefined } })}
@@ -209,14 +213,15 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
         </div>
       ) : (<>
       <p className="ap-fine mb-2" data-testid="pl-flow-asof"><b>As of now:</b> the piles (open deals and stuck deals). <b>Between {bar.label || "the dates above"}, {zoneWord()} time:</b> won, lost and what moved on.</p>
-      <p className="ap-fine mb-2">{counts ? "Each card is one deal in that stage." : "Each pile of cash is the money sitting in that stage."} The ribbons show what moved on, with the share that did. Hatched ochre piles are stuck longer than that stage&apos;s own normal. The channel that drains away is lost. Won lands in the vault. Click any pile or ribbon to open exactly those deals.</p>
+      <p className="ap-fine mb-2">{counts ? "Each dot is a share of the deals in that stage (the legend says how many)." : "Each dot is a share of the money sitting in that stage (the legend says how much)."} The ribbons show what moved on, with the share that did. Hatched ochre piles are stuck longer than that stage&apos;s own normal. The channel that drains away is lost. Won lands in the vault. Click any pile or ribbon to open exactly those deals.</p>
 
       <div ref={wrap} className="rv-host">
         <River stages={view.stages} wonCount={view.wonCount} wonCents={view.wonCents} counts={counts} enough={enough} width={Math.max(300, width)} settle={settle && !cur} runKey={run} reduced={reduced}
           movers={cur ? cur.movers : undefined} moverKey={cur ? `${run}-${cur.index}` : undefined} flyMs={ms}
-          steps={cur ? undefined : riverSteps} onPath={sample ? undefined : pickPath}
+          steps={cur || !riverClaims ? undefined : riverSteps} onPath={sample || !riverClaims ? undefined : pickPath}
           onStage={pickStage} onNoValue={pickNoValue} onWon={pickWon} onLostFrom={pickLostFrom} />
       </div>
+      {!riverClaims && !sample && <p className="ap-fine mb-2" role="status" data-testid="pl-river-nohistory">Step history only started {historyDate}, so moves between steps are not shown for these dates (no percentages, no biggest leak). The piles show where deals are now.</p>}
       {pathsReq.error && !sample && !cur && <p className="ap-fine mb-2" role="status" data-testid="pl-paths-error">The counts on the ribbons could not load, so they show no numbers and open nothing. <button type="button" className="ap-link" onClick={() => void pathsReq.reload()}>Try again</button></p>}
       </>)}
 
@@ -233,7 +238,7 @@ export function MoneyFlow({ filters, onPick: realPick }: { filters: PlFilters; o
       )}
       <ul className="sr-only" aria-label="Deals by stage in words">{view.stages.map((s) => <li key={s.id}>{s.name}: {s.count + (counts ? s.noValueCount ?? 0 : 0)} deals{counts ? "" : `, ${money(s.valueCents)}`}, {s.staleCount} stuck, {s.lostCount} lost.</li>)}<li>Won: {view.wonCount} deals{counts ? "" : `, ${money(view.wonCents)}`}.</li>{!counts && <li>Lost: {money(lostTotal)}.</li>}</ul>
       <div className="pl-flow-foot">
-        {flowView === "river" && data.leak && enough && !counts && !cur && <button type="button" className="pl-leak" onClick={() => { const s = data.stages.find((x) => x.name === data.leak!.fromStage); if (s) pickLostFrom(s); }} data-testid="pl-leak">Biggest leak: {money(data.leak.lostCents)} left between <b>{data.leak.fromStage}</b> and <b>{data.leak.toStage}</b>. Open those deals.</button>}
+        {flowView === "river" && riverClaims && data.leak && enough && !counts && !cur && <button type="button" className="pl-leak" onClick={() => { const s = data.stages.find((x) => x.name === data.leak!.fromStage); if (s) pickLostFrom(s); }} data-testid="pl-leak">Biggest leak: {money(data.leak.lostCents)} left between <b>{data.leak.fromStage}</b> and <b>{data.leak.toStage}</b>. Open those deals.</button>}
         {!enough && !sample && <p className="ap-fine" role="status">Not enough closed deals yet ({closed} of {data.minDeals} needed) to name the biggest leak. The picture above is still true.</p>}
         {totalStale > 0 && <p className="ap-fine">{totalStale} stuck deals{counts ? "" : `, ${money(view.stages.reduce((a, s) => a + s.staleValueCents, 0))} in total`}.</p>}
         {data.outlier && <p className="ap-fine">{data.outlier.name} is {pct(data.outlier.share)} of the money, so it is left out of the averages.</p>}

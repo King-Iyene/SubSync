@@ -137,14 +137,14 @@ test("an empty Won column draws an empty vault, never a card or a ghost shape", 
   assert.ok(src.includes("No wins in these dates")); assert.ok(!src.includes("None won"));
   assert.ok(src.includes("emptyVault") && src.includes("rv-vault-door"));
   assert.ok(src.includes('nd.kind === "won" && !nothing && <rect className="rv-vault"'), "the outlined vault card is only drawn when something was won");
-  const ff = readFileSync(new URL("../../app/app/views/pl3/funnel-flow-view.tsx", import.meta.url), "utf8");
-  assert.ok(ff.includes("wonEmpty") && ff.includes("No wins in these dates"));
+  const ff = readFileSync(new URL("../../app/app/views/pl3/funnel-dots-view.tsx", import.meta.url), "utf8");
+  assert.ok(ff.includes("No wins") && ff.includes("in these dates"));
 });
 
 test("the label and the rows come from one rule: the server counts and lists with the same predicates", () => {
   const q = readFileSync(new URL("../analytics/pipeline3-queries.ts", import.meta.url), "utf8"), f = readFileSync(new URL("../analytics/pipeline3-flow-paths.ts", import.meta.url), "utf8");
   assert.ok(q.includes('case "flow_reach": return f.reachOrd ? flowReachCond(db, f)'));
-  assert.ok(q.includes('case "flow_open": return db`and ${flowOpen(db, f.flowDeals === true)}`'));
+  assert.ok(q.includes('case "flow_open": return db`and ${flowOpen(db, f.flowDeals === true, f)}`'));
   for (const piece of ["P_OPEN(db)", "P_NO_VALUE(db)", "P_STALE(db)", "flowWin(db, base)"]) assert.ok(f.includes(piece), piece);
   // Won and lost lists use the same window as the aggregate.
   assert.ok(q.includes('case "won": return db`and d.status = \'won\' and ${win}`') && q.includes("const win = db`d.last_status_change_at >= ${f.from}"));
@@ -153,7 +153,7 @@ test("the label and the rows come from one rule: the server counts and lists wit
 test("a ribbon with no count opens nothing; no vendor words on the new screens", () => {
   const rv = readFileSync(new URL("../../app/app/views/pl3/river-view.tsx", import.meta.url), "utf8");
   assert.ok(rv.includes("canOpen") && rv.includes('data-open={canOpen ? "1" : "0"}'));
-  for (const file of ["funnel-flow-view.tsx", "money-flow.tsx", "river-view.tsx"]) {
+  for (const file of ["funnel-flow-view.tsx", "funnel-dots-view.tsx", "money-flow.tsx", "river-view.tsx"]) {
     const s = readFileSync(new URL(`../../app/app/views/pl3/${file}`, import.meta.url), "utf8");
     assert.ok(!/gohighlevel|highlevel|\bghl\b/i.test(s), file);
   }

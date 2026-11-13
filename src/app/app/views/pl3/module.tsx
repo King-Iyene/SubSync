@@ -13,6 +13,7 @@ import "../speed-ui.css";
 import "../ap3/ap3.css";
 import "./pl3.css";
 import "./funnel-fx.css";
+import "./funnel-dots.css";
 import { useMountDealActions } from "./actions";
 import { DEFAULT_FILTERS, fixturesOn, usePl, type PlFilters } from "./data";
 import { HistoryFunnel, StuckInStep, useHistoryFunnelOn } from "./history-funnel";
@@ -100,7 +101,7 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
   }, [tabs]);
 
   const openDrill = (d: { title: string; count: number; extra: Record<string, string | number | undefined> }) => { setDrill({ ...d, tab }); setTimeout(() => document.getElementById("pl-drill")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 60); };
-  const onPick = (p: FlowPick) => openDrill({ title: p.title, count: p.count, extra: { stage: p.params.stageId, bucket: p.params.bucket, stale: p.params.stale ? 1 : undefined, status: p.params.status ?? "open", reason: p.params.lostReason, owner: p.params.ownerId, source: p.params.source, reach: p.params.reach, flowOpen: p.params.flowOpen ? 1 : undefined, fc: p.params.fc ? 1 : undefined, expect: p.count } });
+  const onPick = (p: FlowPick) => openDrill({ title: p.title, count: p.count, extra: { stage: p.params.stageId, bucket: p.params.bucket, stale: p.params.stale ? 1 : undefined, status: p.params.status ?? "open", reason: p.params.lostReason, owner: p.params.ownerId, source: p.params.source, reach: p.params.reach, flowOpen: p.params.flowOpen ? 1 : undefined, fc: p.params.fc ? 1 : undefined, fw: p.params.fw ? 1 : undefined, fs: p.params.fs ? 1 : undefined, expect: p.count } });
   const sp: SectionProps = { filters, onOpen: setDeal, activeId: deal?.id ?? null, showAccount, go: goTab, onDrill: openDrill };
   const saveView = (name: string) => { const next = [{ name: name.trim().slice(0, 40), filters, tab }, ...views.filter((v) => v.name !== name.trim())].slice(0, 20); setViews(next); writeViews(next); setNaming(false); };
   const applyView = (i: number) => { const v = views[i]; if (!v) return; setFilters(v.filters); setQ(v.filters.q); if (tabs.some((t) => t.key === v.tab)) setTab(v.tab); };

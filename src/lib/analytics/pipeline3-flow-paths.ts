@@ -1,7 +1,7 @@
 import { sql } from "../db";
 import type { FlowPaths, PathSeg, PathStage } from "../design/flow-paths.ts";
 import { MIN_CLOSED, slug } from "./pipeline3-intel.ts";
-import { deals, flowWin, keyOf, names, P_NO_VALUE, P_OPEN, P_STALE, stageMap, type Filters, type Scope } from "./pipeline3-queries";
+import { deals, flowWin, inWindow, keyOf, locs, names, P_NO_VALUE, P_OPEN, P_STALE, stageMap, type Filters, type Scope } from "./pipeline3-queries";
 
 // part=flow-paths (flag pl_money_flow). Read only. The counts behind the river's ribbon labels and the funnel's bands and breakdowns, for ONE pipeline of ONE account.
 // Every number is a SQL aggregate over the same derived deal set (deals()) and the same predicates the lists behind a click use (flowOpen, flowWin, flowReachCond in
@@ -29,10 +29,12 @@ export async function flowPaths(s: Scope, f: Filters, opts: { people: boolean })
   const stages = new Map<string, PathStage>(list.map((m) => [m.id, { id: m.id, name: m.name, order: m.order, open: 0, openCents: 0, noValue: 0, stuck: 0, stuckCents: 0, lost: 0, lostCents: 0 }]));
   const base: Filters = { ...f, bucket: null, stage: null, stageKey: null, reachOrd: null };
   const w = deals(s, base), win = flowWin(db, base);
-  const [byStage, [won], owners, sources, label] = await Promise.all([
+  // The Funnel (fw=1): open deals count only when created or moved step in the dates, grouped by the step they are in now, so 7, 30 and 90 days give different numbers.
+  const aw = f.flowWindow ? db`and ${inWindow(db, f)}` : db``;
+  const [byStage, [won], owners, sources, label, [hist]] = await Promise.all([
     db`with ${w} select d.location_id, d.stage_id,
-        count(*) filter (where ${P_OPEN(db)})::int open_n, coalesce(sum(d.value) filter (where ${P_OPEN(db)}), 0)::float8 open_v, count(*) filter (where ${P_NO_VALUE(db)})::int nv_n,
-        count(*) filter (where ${P_STALE(db)})::int stuck_n, coalesce(sum(d.value) filter (where ${P_STALE(db)}), 0)::float8 stuck_v,
+        count(*) filter (where ${P_OPEN(db)} ${aw})::int open_n, coalesce(sum(d.value) filter (where ${P_OPEN(db)} ${aw}), 0)::float8 open_v, count(*) filter (where ${P_NO_VALUE(db)} ${aw})::int nv_n,
+        count(*) filter (where ${P_STALE(db)} ${aw})::int stuck_n, coalesce(sum(d.value) filter (where ${P_STALE(db)} ${aw}), 0)::float8 stuck_v,
         count(*) filter (where d.status = 'lost' and ${win})::int lost_n, coalesce(sum(d.value) filter (where d.status = 'lost' and ${win}), 0)::float8 lost_v
       from d group by 1, 2`,
     db`with ${w} select count(*)::int n, coalesce(sum(d.value), 0)::float8 v,
@@ -41,7 +43,9 @@ export async function flowPaths(s: Scope, f: Filters, opts: { people: boolean })
     opts.people ? db`with ${w} select coalesce(d.owner, 'none') k, count(*)::int n, coalesce(sum(d.value), 0)::float8 v from d where d.status = 'won' and ${win} group by 1 order by n desc, k limit ${OTHERS_MAX}` : Promise.resolve([]),
     db`with ${w} select coalesce(d.source, 'none') k, count(*)::int n, coalesce(sum(d.value), 0)::float8 v from d where d.status = 'won' and ${win} group by 1 order by n desc, k limit ${OTHERS_MAX}`,
     names(s.inst),
+    db`select min(h.at) since from deal_history h where h.installation_id = ${s.inst} and h.kind in ('created', 'stage') and h.location_id in (select x.location_id from (${locs(s, f.location)}) x)`,
   ]);
+  const since = hist?.since ? new Date(hist.since as string) : null;
   let lostElsewhere = 0;
   for (const r of byStage) {
     const si = keyOf(sm, r.location_id, r.stage_id), st = si && si.pipelineKey === want ? stages.get(si.key) : undefined;
@@ -59,5 +63,6 @@ export async function flowPaths(s: Scope, f: Filters, opts: { people: boolean })
       bySource: seg(sources as Array<Record<string, unknown>>, (k) => (k === "none" ? "No source recorded" : k)),
     },
     lostElsewhere, minDeals: MIN_CLOSED,
+    history: { since: since ? since.toISOString() : null, covers: since !== null && since.getTime() <= f.from.getTime() },
   };
 }
