@@ -2,8 +2,8 @@
 // (one pattern per rule, constants below are read by both), and the tests compare the two on fixtures.
 // A deal that fails a rule is never deleted. It is left out of every dollar figure and said out loud ("Left out: ...") with a way to see it.
 
-/** Whole words that make a deal look like a test. Postgres reads this with `~*`. */
-export const TEST_NAME_PATTERN = "(^|[^a-z0-9])(test|testing|demo|dummy|sample|fake)([^a-z0-9]|$)|^xtest-";
+/** Whole words that make a deal look like a test (only these, as whole words: "Contested Will" and "Attestation" are real names). Postgres reads this with `~*`. A company can count such deals anyway (Settings, Targets). */
+export const TEST_NAME_PATTERN = "(^|[^a-z0-9])(test|demo|dummy|sample|lorem)([^a-z0-9]|$)|^xtest-";
 const TEST_RE = new RegExp(TEST_NAME_PATTERN, "i");
 export const looksLikeTestName = (...names: Array<string | null | undefined>): boolean => names.some((n) => TEST_RE.test(n ?? ""));
 

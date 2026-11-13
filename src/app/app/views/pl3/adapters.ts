@@ -118,7 +118,7 @@ export function adapt(part: PlPart, raw: unknown, aux?: unknown): unknown {
   }
 }
 // ---- the address of one part of the real API ----
-export type PlFiltersLike = { days: number; from?: string; to?: string; locationId: string; pipeline: string; ownerId: string; q: string };
+export type PlFiltersLike = { days: number; from?: string; to?: string; locationId: string; pipeline: string; ownerId: string; q: string; includeTest?: boolean };
 const DEAL_STATUS = new Set(["open", "won", "lost", "abandoned"]);
 /** Drill-down words are translated to the server's own (status or stale become bucket, lostReason becomes reason, pageSize becomes size); the server re-checks every one of them. */
 export function queryOf(part: PlPart, f: PlFiltersLike, extra: Record<string, string | number | undefined> = {}, now = new Date()): string {
@@ -129,6 +129,8 @@ export function queryOf(part: PlPart, f: PlFiltersLike, extra: Record<string, st
   if (f.pipeline) p.set("pipeline", f.pipeline);
   if (f.ownerId) p.set("owner", f.ownerId);
   if (f.q.trim()) p.set("q", f.q.trim());
+  if (f.includeTest) p.set("test", "1");
+  if (extra.dir === "asc") p.set("dir", "asc");
   const status = typeof extra.status === "string" && DEAL_STATUS.has(extra.status) ? extra.status : "";
   if (part === "list") { const bucket = extra.stale ? "stale" : status; if (bucket) p.set("bucket", bucket); }
   if (extra.stage) p.set("stage", String(extra.stage));

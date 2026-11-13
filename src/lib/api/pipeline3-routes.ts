@@ -80,7 +80,7 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
     }
     case "stuck": return done(await stuck(scope, f, await historySettings(ctx.installationId), p, size, link));
     case "funnel-settings": return wrap({ ...(await historySettings(ctx.installationId)), canEdit: ctx.kind === "agency", pipelines: (await pipelineNames(scope, { from: f.from, to: f.to, location: null })).map((x) => x.name).slice(0, 100) });
-    case "pipelines": return done(await pipelineCards(scope, { from: f.from, to: f.to, location: one, q: f.q, showEmpty: sp.get("empty") === "1", after: sp.get("after"), size: int(sp.get("size"), 24) }));
+    case "pipelines": return done(await pipelineCards(scope, { from: f.from, to: f.to, location: one, q: f.q, showEmpty: sp.get("empty") === "1", after: sp.get("after"), size: int(sp.get("size"), 24), includeTest: f.includeTest, asc: sp.get("dir") === "asc" }));
     case "replay": return done(await replay(scope, f, int(sp.get("days"), 30)));
     case "receipt": {
       const wk = sp.get("week") ?? "";

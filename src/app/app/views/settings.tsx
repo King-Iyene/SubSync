@@ -12,6 +12,7 @@ import { ConnectionsSlot } from "./settings-slot-connections";
 import { WriteAccessCard } from "./write-access";
 import { IgnoredLeadsSettings } from "./speed-ignored-settings";
 import { SaleBasisSettings } from "./sale-basis-settings";
+import { DealRulesSettings } from "./deal-rules-settings";
 import { PipelineHistoryCard } from "./settings-pipeline-history";
 import { WatchingSlot } from "./settings-slot-watching";
 import { DailyBriefLine } from "./notifications";
@@ -285,6 +286,7 @@ export function SettingsView({ openSection, embedded }: { openSection?: SectionI
               </Card>
               {data.features?.sp_ignored_leads === true && <IgnoredLeadsSettings />}
               {!embedded && data.features?.appt_booking_share !== false && <SaleBasisSettings />}
+              {!embedded && <DealRulesSettings />}
               {data.features?.inbox_breach_alert === true && (
                 <Card title="Unanswered alert escalation">
                   <label htmlFor="inbox-ack-grace" className="mb-1 block text-sm font-medium">Escalate an unread alert after (minutes)</label>

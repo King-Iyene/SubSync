@@ -7,7 +7,7 @@ import { adapt, queryOf } from "./adapters";
 import { dealsFixture, FLOW_EMPTY, FLOW_FIXTURE, PIPES_FIXTURE, FORECAST_FIXTURE, HEALTH_FIXTURE, HISTORY_FIXTURE, OVERVIEW_FIXTURE, PEOPLE_FIXTURE, page, PROOF_FIXTURE, SOURCES_FIXTURE, WONLOST_FIXTURE } from "./fixtures";
 
 /** What the person picked. `days` becomes from/to on the server's day boundaries; everything is re-checked on the server (never trusted). */
-export type PlFilters = { days: number; /** The dates of the date bar (YYYY-MM-DD); they replace `days` when both are set. */ from?: string; to?: string; locationId: string; pipeline: string; ownerId: string; q: string };
+export type PlFilters = { days: number; /** The dates of the date bar (YYYY-MM-DD); they replace `days` when both are set. */ from?: string; to?: string; locationId: string; pipeline: string; ownerId: string; q: string; /** Count deals whose name looks like a test (sent as test=1). The company switch counts them always. */ includeTest?: boolean };
 export const DEFAULT_FILTERS: PlFilters = { days: 45, locationId: "", pipeline: "", ownerId: "", q: "" };
 
 const FX = /[?&]plfx=(1|empty|error)/;

@@ -95,7 +95,7 @@ type Method = "GET" | "POST" | "PUT" | "DELETE";
 // optionally the second. Everything not listed is refused for that kind (default deny).
 type Rule = [Method, string, string?];
 
-const GET_VIEWS = ["today", "overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "people", "start", "appointments", "appointment-insights", "pipeline3", "clients3", "people3", "today3", "cash", "cu", "dq", "payments", "finance", "audit", "speed", "roadmap", "freshness", "client-trends", "workflows", "data-health"];
+const GET_VIEWS = ["today", "deal-rules", "overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "contact", "people", "start", "appointments", "appointment-insights", "pipeline3", "clients3", "people3", "today3", "cash", "cu", "dq", "payments", "finance", "audit", "speed", "roadmap", "freshness", "client-trends", "workflows", "data-health"];
 
 // Anyone may send feedback, report a problem or suggest something on the roadmap (stage F8): each is stored against the person and account named in the signed
 // A person may keep their own saved views of the Unanswered messages page (inbox/views): they hold only filter choices, scoped to the person.
@@ -140,7 +140,7 @@ const BUSINESS_RULES: Rule[] = [
   ["POST", "email", "check"], ["POST", "alerts"], ["POST", "duplicates"], ["POST", "cu"], ["POST", "dq"], ["POST", "usage"], ["POST", "today", "action"], ["POST", "today", "views"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "audit", "share"], ["POST", "audit", "revoke"], ["POST", "audit", "prefs"], ["POST", "sync"], ["POST", "call-lists"], ["POST", "call-outcomes"], ["POST", "inbox", "outcome"],
   ["POST", "payments", "act"], ["POST", "workflows"], ["PUT", "workflows"], ["DELETE", "workflows"], ["POST", "data-health"], ["PUT", "data-health"], ["POST", "settings", "test-slack"], ["POST", "settings", "purge"], ["POST", "api-keys"],
   ["DELETE", "call-lists"], ["DELETE", "today", "views"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PEOPLE_DAILY_RULES,
-  ...APPT_ACTION_RULES, ...PIPELINE_ACTION_RULES, ...PEOPLE3_ACTION_RULES, ...TODAY3_ACTION_RULES, ...CASH_ACTION_RULES, ["POST", "finance", "dispute"], ["GET", "team"], ["PUT", "team"], ["PUT", "settings"], ["PUT", "goals"], ["PUT", "appointments", "targets"], ["PUT", "appointments", "sale-basis"], ["PUT", "appointments", "exec-target"], ["PUT", "speed", "target"], ["PUT", "accounts"], ["PUT", "stage-rules"],
+  ...APPT_ACTION_RULES, ...PIPELINE_ACTION_RULES, ...PEOPLE3_ACTION_RULES, ...TODAY3_ACTION_RULES, ...CASH_ACTION_RULES, ["POST", "finance", "dispute"], ["GET", "team"], ["PUT", "team"], ["PUT", "settings"], ["PUT", "goals"], ["PUT", "appointments", "targets"], ["PUT", "appointments", "sale-basis"], ["PUT", "deal-rules", "test-names"], ["PUT", "appointments", "exec-target"], ["PUT", "speed", "target"], ["PUT", "accounts"], ["PUT", "stage-rules"],
 ];
 
 export function routeAllowed(kind: AccessKind, method: string, segments: string[]): boolean {

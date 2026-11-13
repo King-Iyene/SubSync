@@ -13,7 +13,7 @@ test("#10 Clients today never says everything is fine when plans cannot be read"
   assert.match(t.headline, /needs permission|cannot read/i);
 });
 test("#12 money flow says deals without a value, not 0 deals", () => {
-  assert.match(src("app/app/views/pl3/pipes.tsx"), /without a value \(not counted in money\)/);
+  assert.match(src("app/app/views/pl3/pipe-list.ts"), /without a value \(not counted in money\)/);
   assert.match(src("app/app/views/pl3/money-flow.tsx"), /without a value/);
 });
 test("#13 the funnel example is offered only with no valued deals, and is marked Example", () => {
