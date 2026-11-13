@@ -1,0 +1,25 @@
+Opportunity Name,Contact Email,Pipeline,Stage,Lead Value,Status,Source
+Test deal 101,king+lead101@kdsquares.com,AGL Sales Pipeline_Leprofessor,New Lead,500,open,QA import
+Test deal 102,king+lead102@kdsquares.com,AGL Sales Pipeline_Leprofessor,New Lead,750,open,QA import
+Test deal 103,king+lead103@kdsquares.com,AGL Sales Pipeline_Leprofessor,New Lead,1200,open,QA import
+Test deal 104,king+lead104@kdsquares.com,AGL Sales Pipeline_Leprofessor,New Lead,2500,open,QA import
+Test deal 105,king+lead105@kdsquares.com,AGL Sales Pipeline_Leprofessor,Audit Call Booked,900,open,QA import
+Test deal 106,king+lead106@kdsquares.com,AGL Sales Pipeline_Leprofessor,Audit Call Booked,3000,open,QA import
+Test deal 107,king+lead107@kdsquares.com,AGL Sales Pipeline_Leprofessor,Audit Call Booked,1500,open,QA import
+Test deal 108,king+lead108@kdsquares.com,AGL Sales Pipeline_Leprofessor,Audit Call Booked,450,open,QA import
+Test deal 109,king+lead109@kdsquares.com,AGL Sales Pipeline_Leprofessor,Audit Call Completed,2200,open,QA import
+Test deal 110,king+lead110@kdsquares.com,AGL Sales Pipeline_Leprofessor,Audit Call Completed,1800,open,QA import
+Test deal 111,king+lead111@kdsquares.com,AGL Sales Pipeline_Leprofessor,Audit Call Completed,650,open,QA import
+Test deal 112,king+lead112@kdsquares.com,AGL Sales Pipeline_Leprofessor,Audit Call Completed,4000,open,QA import
+Test deal 113,king+lead113@kdsquares.com,AGL Sales Pipeline_Leprofessor,Interested - Check Out Sent,1100,open,QA import
+Test deal 114,king+lead114@kdsquares.com,AGL Sales Pipeline_Leprofessor,Interested - Check Out Sent,2800,open,QA import
+Test deal 115,king+lead115@kdsquares.com,AGL Sales Pipeline_Leprofessor,Interested - Check Out Sent,950,open,QA import
+Test deal 116,king+lead116@kdsquares.com,AGL Sales Pipeline_Leprofessor,Interested - Check Out Sent,1700,open,QA import
+Test deal 117,king+lead117@kdsquares.com,AGL Sales Pipeline_Leprofessor,Pending Payment,3500,open,QA import
+Test deal 118,king+lead118@kdsquares.com,AGL Sales Pipeline_Leprofessor,Pending Payment,600,open,QA import
+Test deal 119,king+lead119@kdsquares.com,AGL Sales Pipeline_Leprofessor,Pending Payment,1350,open,QA import
+Test deal 120,king+lead120@kdsquares.com,AGL Sales Pipeline_Leprofessor,Pending Payment,2000,open,QA import
+Test deal won 1,king+lead121@kdsquares.com,AGL Sales Pipeline_Leprofessor,Pending Payment,3200,won,QA import
+Test deal won 2,king+lead122@kdsquares.com,AGL Sales Pipeline_Leprofessor,Pending Payment,1800,won,QA import
+Test deal lost 1,king+lead123@kdsquares.com,AGL Sales Pipeline_Leprofessor,Audit Call Booked,900,lost,QA import
+Test deal lost 2,king+lead124@kdsquares.com,AGL Sales Pipeline_Leprofessor,New Lead,600,lost,QA import
