@@ -350,3 +350,6 @@ One list: AI (own row, Connect your AI, inline connect options, usage, caps, typ
 | Quick tour is a non-blocking card (Esc or click away, shown once) | built, live |
 | Custom date box has visible From and To (Lagos time) | built, live |
 | Every file download shows a notice and an open-in-new-tab fallback | built, live |
+
+## Send messages (13 Nov 2026, flag send_messages, default off)
+Conversation view (already live in the lead panel and Unanswered), composer (text and email, one lead), Send to selected (cap 20, typed SEND n), templates, per-account sending rules, guardrail matrix. Status: built, unit tested (guard matrix, preview equals sent, own sends excluded, copy test). Tested against live data: NO. No real message was sent; WRITE_GHL_LIVE and the other live switches were not touched. Not verified: the exact CRM request shape for sending (from the platform's published API description), whether the CRM reports per-channel do-not-contact in the contact answer (the code reads dnd and dndSettings, and stops if neither is present), scheduled sends (not offered).

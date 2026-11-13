@@ -64,7 +64,15 @@ const PROOFS: Record<string, Proof[]> = {
   settings_audit: [has("src/lib/feedback-queries.ts", "settings\\.changed"), has("src/lib/api/router.ts", "logSettingsChange\\(ctx\\.installationId")],
   // AI is the customer's own connection, off by default, and names never leave without the account's opt-in (the gateway refuses it).
   ai_own: [has("src/lib/ai/gateway.ts", "includesNames && !conn\\.shareNames"), has("src/lib/ai/gateway.ts", "AI_KILL_ALL"), has("src/lib/flags-core.ts", "\"ai_byo\"")],
-  no_sending_permission: [() => { assert.ok(!(GHL_SCOPES as readonly string[]).includes("conversations/message.write")); assert.ok(!SCOPE_GROUPS.some((g) => g.scopes.some((s) => (s.scope as string) === "conversations/message.write"))); }],
+  // Sending: the permission is optional, the feature is off by default, nothing sends without the person's confirm, and the do-not-contact mark is re-read just before the request.
+  send_on_press: [
+    () => { const s = SCOPE_GROUPS.flatMap((g) => g.scopes).find((x) => (x.scope as string) === "conversations/message.write"); assert.ok(s && s.required === false && (GHL_SCOPES as readonly string[]).includes("conversations/message.write")); },
+    () => assert.ok(DEFAULT_OFF.has("send_messages" as never)),
+    has("src/lib/ghl/workbench.ts", "if \\(!a\\.confirmed\\) return \\{ outcome: \"needs_confirm\" \\}"),
+    has("src/lib/api/send-routes.ts", "preSend"), has("src/lib/ghl/send-guard.ts", "dnd_unknown"), has("src/lib/api/send-routes.ts", "message\\.send"),
+  ],
+  // Changes to the CRM: the list is in one place and every change goes through the gateway files.
+  changes_crm: [() => assert.ok(exists("docs/CRM_WRITES.md")), has("src/lib/ghl/crm-gateway.ts", "WRITE_GHL_LIVE"), has("src/lib/ghl/workbench.ts", "WRITE_GHL_LIVE"), has("src/lib/ghl/appointment-gateway.ts", "WRITE_GHL_LIVE")],
   never_stored: [() => {
     const schema = schemaFromMigrations();
     for (const n of NEVER_STORED) { const cols = schema.get(n.table); assert.ok(cols, n.table); assert.deepEqual([...cols].filter((c) => n.columns.test(c)), [], `${n.table}: ${n.claim}`); }

@@ -18,7 +18,7 @@ Validate after publishing: search each primary keyword inside the marketplace an
 ## 3. Long description (outline; keep every line true today)
 1. Who it is for: agencies and appointment-driven businesses (home services, med spas, solar, real estate, coaches).
 2. What it does (live): Today (what to do first, money at risk), Speed to lead (first reply time, missed calls, waiting on the client alerts), Appointments (show rate, outcomes, no-show recovery), Clients (health of every account), Pipeline (stage history, deals stuck in a step), Find a lead (search across accounts, call lists), Money (plans, failed payments when permission granted, payouts), Clean-up (duplicates, data quality, never touches Do Not Disturb), Meeting notes, Workflows health, 7am brief.
-3. Trust: few permissions, read-only by default, never messages your leads, writes only after preview and confirm, data deleted on uninstall, clear what we store.
+3. Trust: few permissions, changes things in your CRM and sends texts and emails only when a person presses the button, after a preview and a confirm, never to a contact who asked not to be contacted, data deleted on uninstall, clear what we store.
 4. Price: free plan plus $11.50 per client account per month after the plan swap (state only after the plan exists).
 5. Support: email, first reply within 24 hours.
 6. AI (add this one honest line only once ai_byo is on and verified): "Optional AI wording for your 7 am brief: you connect your own AI account (OpenRouter, an API key from Anthropic, OpenAI or Google, or ChatGPT sign-in once OpenAI approves it), you set the monthly limit, and it only suggests: it never messages your leads or changes your CRM."

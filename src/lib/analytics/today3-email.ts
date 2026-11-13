@@ -4,7 +4,7 @@ import { unsubscribeUrl } from "../unsubscribe";
 import { emailDue, emailText, validZone } from "./today3-intel";
 import { today } from "./today3-queries";
 
-// The daily Today email: the same ranked list as the screen, one link, one message per person at the chosen hour of the business's own day. It reads only. It never messages a lead.
+// The daily Today email: the same ranked list as the screen, one link, one message per person at the chosen hour of the business's own day. It goes only to the people you chose.
 // It goes through the one outward gate (realTransports, then the SEND_EMAIL_LIVE switch): with the switch off it writes a "WOULD SEND" audit line and sends nothing.
 const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 

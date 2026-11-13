@@ -262,7 +262,7 @@ export function SettingsView({ openSection, embedded }: { openSection?: SectionI
               </Card>
               <PipelineHistoryCard />
               <Card title="Speed to lead">
-                <p className="mb-3 text-sm text-muted-foreground">How fast a new lead should hear from a person. A lead cools in minutes, so the target is short. SubSync does not send replies: it measures how long your team took. Messages from workflows and campaigns are not replies unless you say so.</p>
+                <p className="mb-3 text-sm text-muted-foreground">How fast a new lead should hear from a person. A lead cools in minutes, so the target is short. SubSync measures how long your team took. It sends a reply only when a person presses Send. Messages from workflows and campaigns are not replies unless you say so.</p>
                 <div className="flex flex-wrap items-end gap-4">
                   <div>
                     <label htmlFor="speed-target" className="mb-1 block text-sm font-medium">Reply target (minutes)</label>

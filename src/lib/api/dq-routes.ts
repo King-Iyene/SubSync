@@ -27,7 +27,7 @@ import { ownedLocation } from "./tenant-guard";
 // Who is asking and which client accounts they may see come from the verified session only (`allowed`). An account id from the request goes through ownedLocation before any query and is never
 // echoed; a cursor is a strict shape; a source key, a tier and a range are parsed against fixed lists. Every list is a keyset page. Reads are open to everyone who can see the account; a merge,
 // a delete or a bulk run is for an administrator, leaves out protected contacts, is capped, needs words that name the contact or the count, and is a dry run unless the server switch AND the
-// account's own opt-in are on. SubSync never replies to anyone and never sends a message.
+// account's own opt-in are on. SubSync sends a message only when a person presses Send, never on its own.
 
 type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
 export type DqHelpers = { allowed: () => Promise<string[] | null>; links: () => Promise<ReturnType<typeof deepLinks>>; locationToken: (locationId: string) => Promise<string>; actor: (ctx: Ctx) => string | null };

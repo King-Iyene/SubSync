@@ -12,7 +12,8 @@ import { ApiError, useApiClient } from "../../session";
 
 export type Mode = { masterOn: boolean; optedIn: boolean; live: boolean; demo: boolean };
 export type Warn = { id: string; text: string };
-export type Plan = { summary: string; blockers: Warn[]; warnings: Warn[]; reversible: boolean; fields: string[] };
+export type SendPreview = { channel: "SMS" | "Email"; subject: string | null; text: string; to: string; from: string; segments: number; footerAdded: boolean };
+export type Plan = { summary: string; blockers: Warn[]; warnings: Warn[]; reversible: boolean; fields: string[]; /** For a text or an email: exactly what the server will send, to whom and from where. */ send?: SendPreview };
 export type Pending = { action: Action; plan: Plan; mode: Mode; /** What will be sent, shown in a quote (a message or a note). Held in the browser only. */ quote?: string; verb: string; typeName?: string };
 export type Result = { tone: "done" | "dry" | "error"; text: string; /** Which kind of change this is about ("message", "note"...). */ kind?: string; undo?: Action | null; retry?: Action | null };
 
@@ -85,7 +86,15 @@ export function ReviewSheet({ r, name }: { r: Runner; name: string }) {
             <p className="text-[17px] font-semibold leading-snug" data-testid="wb-review-summary">{p.plan.summary}</p>
             <button type="button" aria-label="Cancel" onClick={() => { r.cancel(); setTyped(""); }} className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg hover:bg-muted"><X aria-hidden className="size-5" /></button>
           </div>
-          {p.quote && <blockquote className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-words border-l-2 border-primary pl-3 text-[15px] leading-relaxed" data-testid="wb-review-quote">{p.quote}</blockquote>}
+          {p.plan.send && (
+            <div className="mt-2 text-sm" data-testid="wb-send-preview">
+              <p><span className="text-muted-foreground">To:</span> <strong>{p.plan.send.to || "no address"}</strong> <span className="text-muted-foreground">by {p.plan.send.channel === "Email" ? "email" : "text"}, from {p.plan.send.from}</span></p>
+              {p.plan.send.subject && <p><span className="text-muted-foreground">Subject:</span> {p.plan.send.subject}</p>}
+              <blockquote className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap break-words border-l-2 border-primary pl-3 text-[15px] leading-relaxed" data-testid="wb-send-text">{p.plan.send.text}</blockquote>
+              <p className="mt-1 text-xs text-muted-foreground">{p.plan.send.channel === "SMS" ? `${p.plan.send.segments} text part${p.plan.send.segments === 1 ? "" : "s"}. ` : ""}{p.plan.send.footerAdded ? "Your opt-out line was added at the end. " : ""}This is exactly what will be sent.</p>
+            </div>
+          )}
+          {p.quote && !p.plan.send && <blockquote className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-words border-l-2 border-primary pl-3 text-[15px] leading-relaxed" data-testid="wb-review-quote">{p.quote}</blockquote>}
           {!p.mode.live && <p className="mt-2 text-sm text-muted-foreground" data-testid="wb-review-dry">{p.mode.demo ? "This is the demo: nothing is ever sent." : !p.mode.masterOn ? "Changes from SubSync are switched off, so confirming only records what would have happened. Nothing reaches your CRM." : "This account is not allowed to change things from SubSync yet (Settings), so confirming only records what would have happened."}</p>}
           {p.plan.blockers.length > 0 && <ul className="mt-2 space-y-1 text-[15px] font-medium text-destructive" data-testid="wb-review-blockers">{p.plan.blockers.map((b) => <li key={b.id}><ShieldAlert aria-hidden className="mr-1.5 inline size-4 align-text-bottom" />{b.text}</li>)}</ul>}
           {p.plan.warnings.map((w) => (

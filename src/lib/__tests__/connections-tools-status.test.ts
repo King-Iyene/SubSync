@@ -16,7 +16,7 @@ test("AI row status: every state has its own plain word", () => {
   assert.equal(aiStatus({ ...base, connection: { provider: "openai", model: "m", status: "connected", paused: true } }).text, "Paused");
   assert.equal(aiStatus({ ...base, connection: { provider: "openai", model: "m", status: "needs_attention", paused: false } }).tone, "bad");
   assert.match(aiLine(base), /not using any AI/);
-  assert.match(AI_WHAT, /never messages a lead/);
+  assert.match(AI_WHAT, /never sends anything/);
 });
 
 test("Email row status follows the saved address, the last check and the sending switch", () => {

@@ -247,6 +247,21 @@ export const INVENTORY: Record<string, TableInfo> = {
     personal: { actor: "the sign-in id of who saved it", actor_name: "the name of who saved it", tag: "the tag SubSync added" },
     notPersonal: ["kind", "outcome", "idem_key", "status", "note_id", "task_id", "tag_added", "detail"],
   },
+  message_sends: {
+    noun: "a log of each text or email a person sent from SubSync (who, when, which channel, the result and a one-way hash of the words; never the words themselves)", line: "conversations",
+    personal: { contact_id: "the contact the message was for", actor: "the sign-in id of who pressed Send", actor_name: "the name of who pressed Send" },
+    notPersonal: ["channel", "text_hash", "result", "dry_run", "idem_key", "ghl_message_id", "segments"],
+  },
+  message_templates: {
+    noun: "the quick message templates you wrote (your own words, with merge fields; never a customer's message)", line: "sign_in",
+    personal: { created_by: "the name of who wrote the template" },
+    notPersonal: ["name", "channel", "subject", "body"],
+  },
+  message_send_settings: {
+    noun: "your sending rules per client account (pause, quiet hours, daily limits, the opt-out line)", line: "sign_in",
+    personal: { updated_by: "the name of who changed them" },
+    notPersonal: ["paused", "quiet_start_hour", "quiet_end_hour", "per_person_hour", "per_person_day", "account_day", "dup_minutes", "footer_enabled", "footer_text", "link_allowlist", "allow_agency_send"],
+  },
   meeting_deliveries: { noun: "a list of meeting deliveries already handled (ids only)", line: "meetings" },
   field_write_state: { noun: "which meeting last filled each contact field SubSync updates (ids and times only, never the value)", line: "meetings" },
   shared_audits: { noun: "share links", line: "shares", personal: { payload: "a snapshot of totals, finding titles, fix steps and how each number is counted, with client names removed, plus your business name and colour" } },

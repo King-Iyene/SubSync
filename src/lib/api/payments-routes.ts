@@ -126,7 +126,7 @@ async function handleAct(ctx: Ctx, h: PaymentsHelpers, flags: Record<string, boo
   }
 
   if (part === "resend") {
-    // Messages a customer. Off until King approves it (CLAUDE.md rule: SubSync never replies for the agency).
+    // Messages a customer. Off until King approves it (a message to a customer needs a person to press Send).
     if (!flags.pm_resend) return json({ error: "This is not switched on for your account" }, 404);
     const loc = await ownedLocation(inst, allowed, body.location);
     const id = typeof body.id === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(body.id) ? body.id : null;

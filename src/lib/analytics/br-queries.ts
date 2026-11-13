@@ -14,7 +14,7 @@ import { briefIgnored } from "./ignored-leads-alerts";
 
 // The database side of the 7 am brief. It READS what SubSync already computes (Today, missed leads, slipping deals, save-this-account, wallet, payments) and keeps its own record of each brief
 // (br_history: shown or sent, opened, acted). The email goes through the one outward gate (realTransports, then the SEND_EMAIL_LIVE switch): with the switch off it writes a "WOULD SEND" line
-// and sends nothing. It never messages a lead and never changes the CRM. A person's choices (br_prefs) are that person's own: every read and write here is keyed by the installation AND the
+// and sends nothing. It goes only to the people you chose and changes nothing in the CRM. A person's choices (br_prefs) are that person's own: every read and write here is keyed by the installation AND the
 // verified user, never by anything the browser sends.
 
 export type BriefFlags = { cf_save: boolean; cf_recover: boolean; cf_deals: boolean; wg_wallet: boolean; pm_module: boolean; td_today: boolean; fn_today?: boolean; sp_ignored?: boolean };

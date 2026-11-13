@@ -5,7 +5,7 @@ import { digestDue, digestEmail, localWeekday, validZone, type DigestDeals } fro
 import { dealsSummary, saveBoard } from "./cash-queries";
 
 // The morning "save this account" digest: ONE email per person per business day, at the chosen hour of the business's own day, outside quiet days and quiet hours.
-// It only reads. It never messages a lead. It goes through the one outward gate (realTransports, then the SEND_EMAIL_LIVE switch): with the switch off it writes a "WOULD SEND" line
+// It only reads. It goes only to the people you chose. It goes through the one outward gate (realTransports, then the SEND_EMAIL_LIVE switch): with the switch off it writes a "WOULD SEND" line
 // and sends nothing (dry run). Muted accounts are left out. Safe to call every hour: the day key is claimed first, so a second run on the same day sends nothing.
 /** Returns how many emails were handed to the gate (sent or, with the switch off, written as a dry run). */
 export async function runSaveDigest(inst: string, now = Date.now()): Promise<number> {

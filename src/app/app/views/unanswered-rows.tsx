@@ -12,7 +12,7 @@ import { LeadDrawer, PopMenu, RowButton, useDialer, type LeadSeed, type MenuItem
 
 // One person who is waiting for a reply: one row, one grid, one small button column and a quiet three-dot menu (KF-8). Reply opens the conversation in the CRM through the
 // white-label link. Show person opens the shared lead panel. Call and Email in the menu open the contact in the CRM (its own dialer and mail box), or your own phone app
-// only if the person chose that in the Dialer setting; SubSync never sends a message. Before a call the person is told if the customer asked not to be contacted or if it is
+// only if the person chose that in the Dialer setting; SubSync sends a message only when a person presses Send. Before a call the person is told if the customer asked not to be contacted or if it is
 // outside calling hours. SubSync keeps no message text (a promise on this screen), so a row says who, which channel, how long and who owns them, and Reply opens the message.
 
 export type WaitRow = {

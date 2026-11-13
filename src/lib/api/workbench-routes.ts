@@ -14,6 +14,7 @@ import { buildOwnerOptions } from "../ghl/owner-list";
 import { installationHasScope } from "../analytics/cleanup-queries";
 import { isOurNote } from "../people/writeback";
 import { liveRoute, findRoute, refreshLead } from "../live/live-route";
+import { bulkRoute, messageRoute, sendStateFor, settingsRoute, templatesRoute } from "./send-routes";
 import { crmSource } from "../live/live-read";
 import { cacheConversations } from "../live/live-cache";
 
@@ -152,6 +153,10 @@ export async function handleWorkbench(ctx: Ctx, h: WorkbenchHelpers): Promise<Re
   if (m === "GET" && b === "live") return liveRoute(ctx, h);
   if (m === "GET" && b === "find") return findRoute(ctx, h);
   if (m === "POST" && (b === "preview" || b === "do")) return actRoute(ctx, h, b === "do");
+  const sd = { allowed: () => h.allowed(), locationToken: h.locationToken, loadLead: async (loc: string, cid: string) => { const l = await loadLead(ctx, await h.allowed(), loc, cid); return l ? { target: l.target, locationName: l.locationName } : null; } };
+  if (m === "POST" && (b === "send-bulk-preview" || b === "send-bulk")) return bulkRoute(ctx, sd, ((await ctx.request.json().catch(() => null)) as Record<string, unknown> | null) ?? {}, b === "send-bulk");
+  if (b === "send-settings" && (m === "GET" || m === "POST")) return settingsRoute(ctx, sd);
+  if (b === "send-templates" && (m === "GET" || m === "POST")) return templatesRoute(ctx, sd);
   return json({ error: "Not found" }, 404);
 }
 
@@ -175,6 +180,7 @@ async function contextRoute(ctx: Ctx, h: WorkbenchHelpers): Promise<Response> {
     crmUrl: lead.conversationId ? links.conversation(locationId, lead.conversationId) : links.contact(locationId, contactId),
     usersNeedPermission: users.every((u) => u.id === lead.ownerId) && !(await installationHasScope(ctx.installationId, "users.readonly")), tags: lead.tags, fields: lead.fields, ownerId: lead.ownerId, ownerName, locationName: lead.locationName, users, deals, dealExtra, lastConversation, appointments: appts, pipelines, pipelineUse,
     me: actorOf(ctx),
+    send: await sendStateFor(ctx, locationId),
     templates: TEMPLATES.map((t) => ({ id: t.id, label: t.label, channel: t.channel, subject: t.subject ? fillTemplate(t.subject, { name: lead.target.name, owner: ctx.session.userName ?? ownerName, business: lead.locationName }) : null, text: fillTemplate(t.text, { name: lead.target.name, owner: ctx.session.userName ?? ownerName, business: lead.locationName }) })),
   });
 }
@@ -223,6 +229,10 @@ async function threadRoute(ctx: Ctx, h: WorkbenchHelpers): Promise<Response> {
 async function actRoute(ctx: Ctx, h: WorkbenchHelpers, doIt: boolean): Promise<Response> {
   const body = (await ctx.request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return json({ error: "Send the action" }, 400);
+  // A text or an email goes through its own path (send-routes.ts): the flag, the rules, the live do-not-contact check, the preview and the record.
+  if ((body.action as { kind?: unknown } | null)?.kind === "message") {
+    return messageRoute(ctx, { allowed: () => h.allowed(), locationToken: h.locationToken, loadLead: async (loc, cid) => { const l = await loadLead(ctx, await h.allowed(), loc, cid); return l ? { target: l.target, locationName: l.locationName } : null; } }, body, doIt);
+  }
   const parsed = parseAction(body.action);
   if (!parsed.ok) return json({ error: parsed.error }, 400);
   const action: Action = parsed.action;

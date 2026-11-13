@@ -3,7 +3,7 @@
 import type { AskResult } from "../ai/data/ask.ts";
 
 export const QUESTION_MAX = 300;
-export const HELP_TEXT = "Ask me about your leads, replies, appointments, deals or data quality. For example: \"who hasn't been answered?\" or \"how many no-shows this week?\". I only read your numbers. I never message your leads or change anything.";
+export const HELP_TEXT = "Ask me about your leads, replies, appointments, deals or data quality. For example: \"who hasn't been answered?\" or \"how many no-shows this week?\". I only answer from your numbers. I do not send anything or change anything: sending and changes are done in SubSync by a person, after a preview.";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -27,7 +27,7 @@ export function formatAnswer(r: Extract<AskResult, { ok: true }>, o: { appUrl: s
     out.push("", "*Where this comes from*");
     for (const c of r.answer.citations.slice(0, 6)) out.push(`• ${esc(c.label)}: ${esc(c.value)} (${c.rowCount.toLocaleString("en-US")} ${c.rowCount === 1 ? "row" : "rows"}) <${rowsLink(o.appUrl, c.rowsHash, c.label, o.locationId)}|Open the rows>`);
   }
-  out.push("", `_${esc(r.window)}. Read only: SubSync never messages your leads or changes your records._`);
+  out.push("", `_${esc(r.window)}. Answered from your numbers. Nothing was sent or changed._`);
   return out.join("\n");
 }
 

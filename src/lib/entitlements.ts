@@ -239,6 +239,7 @@ export const FEATURES = [
   "ai_deal_forecast",
   "slack_chat",
   "ai_slack_reports",
+  "send_messages",
   "st_settings",
   "st_guides",
   "st_news",

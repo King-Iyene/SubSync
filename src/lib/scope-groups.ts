@@ -18,7 +18,7 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
   { id: "accounts", title: "Your client accounts", summary: "Which accounts SubSync is connected to, and the one-account-at-a-time access it reads them with.", scopes: [
     { scope: "locations.readonly", kind: "read", required: true, why: "Names, time zones and contact details of your client accounts, so every number is shown against the right account and clock." },
     { scope: "oauth.readonly", kind: "read", required: true, why: "Lists the accounts SubSync is installed on, so a new account is found without you doing anything." },
-    { scope: "oauth.write", kind: "change", required: true, why: "Lets SubSync read one client account at a time with a key limited to that account. The platform offers no read-only way to do this. It changes nothing in your accounts." },
+    { scope: "oauth.write", kind: "change", required: true, why: "Lets SubSync read one client account at a time with a key limited to that account. The platform offers no read-only way to do this. It does not change anything in your accounts by itself." },
   ] },
   { id: "contacts", title: "Contacts", summary: "People in your accounts.", scopes: [
     { scope: "contacts.readonly", kind: "read", required: true, why: "Contacts and their tags, source, owner and do-not-contact flag, for search, call lists, data health and lead counts." },
@@ -31,6 +31,7 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
   { id: "calls", title: "Conversations and calls", summary: "Who wrote to a lead, when, and whether a person or an automation did.", scopes: [
     { scope: "conversations.readonly", kind: "read", required: true, why: "The conversation list: last message, direction, channel and unread count, for unanswered messages. Message text is never copied." },
     { scope: "conversations/message.readonly", kind: "read", required: false, why: "The messages inside a conversation, only to see who sent each one and when (a person or an automation, a call or a text). This is the only way to measure true speed to lead. The text of a message is never stored." },
+    { scope: "conversations/message.write", kind: "change", required: false, why: "Only to send a text or an email to one lead when a person presses Send, after a preview. Optional. SubSync never sends on its own and never to a contact who asked not to be contacted. Without it the message box says: Needs permission, reconnect." },
     { scope: "conversations/reports.readonly", kind: "read", required: false, why: "For coming, richer response-time numbers (conversation reports). Not used yet: nothing in SubSync uses it today, and skipping it changes nothing." },
   ] },
   { id: "appointments", title: "Appointments", summary: "Bookings and what happened to them.", scopes: [
@@ -83,9 +84,8 @@ export const NO_PERMISSION_GROUPS = [
 
 /** What SubSync does NOT ask for, and why (docs/CAPABILITIES.md). Asking for these would need a new release and a new approval from every install. */
 export const NOT_REQUESTED: ReadonlyArray<{ id: string; scope: string; why: string }> = [
-  { id: "invoice_send", scope: "invoices.write", why: "Sending an invoice again. Not asked for: it would message your client's customer, and SubSync does not message anyone for you." },
+  { id: "invoice_send", scope: "invoices.write", why: "Sending an invoice again. Not asked for: it would message your client's customer, and SubSync sends a message only when a person presses Send in the message box." },
   { id: "conversation_delete", scope: "conversations.write", why: "Deleting a conversation. Not asked for: SubSync does not delete anyone's conversations." },
-  { id: "send", scope: "conversations/message.write", why: "Sending messages. Never asked for: SubSync does not reply to anyone, it measures how fast your team does." },
 ];
 
 const ALL: ReadonlyArray<ScopeInfo> = SCOPE_GROUPS.flatMap((g) => g.scopes);

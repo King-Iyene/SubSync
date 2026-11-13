@@ -17,7 +17,7 @@ import { UnansweredRoom, type Embedded, type UiPayload } from "./unanswered-room
 // sentence, one button ("Reply to the oldest of the 14 people waiting", which opens that conversation in your CRM), the five people to reply to now (See all opens the whole
 // list, searched, filtered by how long, channel and owner, and paged on the server), how long they have waited (the one chart; each bar opens its people), and where they are
 // (clients for an agency, owners inside one account). A person is counted once, by the rule Today uses; the new leads who have not written yet are the only difference from
-// Today's number and the page says so. SubSync shows who is waiting and never sends a reply; it keeps no message text, so a row says who, which channel, how long and who owns them.
+// Today's number and the page says so. SubSync shows who is waiting and sends a reply only when a person presses Send; it keeps no message text, so a row says who, which channel, how long and who owns them.
 
 type Home = {
   now: number; slaHours: number; windowDays: number; multi: boolean; accountCount: number; seePeople: boolean; kind: string;
@@ -92,7 +92,7 @@ function LegacyInbox({ go, embedded }: { go: GoFn; embedded?: Embedded }) {
       <header className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 print:hidden">
         <div className="mr-auto min-w-0">
           {embedded ? <h2 className="sr-only">Unanswered messages</h2> : <h1 className="text-[1.65rem] font-semibold leading-tight tracking-tight">Unanswered messages</h1>}
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground" data-testid="page-subtitle">Customers who wrote and are still waiting for a reply. SubSync shows who they are; it never sends a reply.</p>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground" data-testid="page-subtitle">Customers who wrote and are still waiting for a reply. SubSync shows who they are; it sends a reply only when a person presses Send.</p>
         </div>
         <PopMenu label="More" items={menu} testId="inbox-more" triggerClassName={MORE_TRIGGER}>More<ChevronDown aria-hidden className="size-3.5" /></PopMenu>
       </header>

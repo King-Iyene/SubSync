@@ -253,6 +253,8 @@ export type RunArgs = {
   ack: readonly string[];
   token: () => Promise<string>;
   now?: Date;
+  /** Runs inside the live path, just before the request goes out (a message: the do-not-contact re-check). Returns blockers to stop. It fails closed: a thrown error stops the send. */
+  preSend?: () => Promise<Blocker[]>;
 };
 
 export type RunResult =
@@ -294,6 +296,11 @@ export async function runAction(a: RunArgs, deps: GatewayDeps = {}): Promise<Run
   const done = await outward(
     { flag: "WRITE_GHL_LIVE", verb: a.action.kind === "message" ? "SEND" : "WRITE", what: `crm.workbench.${plan.op}`, installationId: a.installationId, ids: { locationId: a.target.locationId, contactId: a.target.contactId }, fields: plan.fields },
     async (): Promise<RunResult> => {
+      if (a.preSend) {
+        let stop: Blocker[];
+        try { stop = await a.preSend(); } catch { stop = [{ id: "check_failed", text: "SubSync could not run its last safety check. Nothing was sent." }]; }
+        if (stop.length) return { outcome: "blocked", blockers: stop };
+      }
       await (deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms))))(SPACING_MS);
       const res = await ghlFetch(
         `${GHL_API}${req.path}`,

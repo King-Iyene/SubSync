@@ -23,7 +23,7 @@ export const plainCount = (n: number, one: string, many = `${one}s`) => `${n.toL
 
 /** The one line under the headline: what the numbers are and what they are not (N78). */
 export function measuringSentence(m: { targetMinutes: number; countAutomated: boolean; businessHours: boolean }): string {
-  return `SubSync measures how fast your team replies. It does not send any replies itself. Your reply target is ${plainCount(m.targetMinutes, "minute")}. ${m.countAutomated ? "Automatic messages count as a reply." : "Automatic messages, like an instant thanks-we-got-your-message text, do not stop the clock. Only a reply from a person does."}${m.businessHours ? " Leads that arrive out of hours start their clock at opening time." : ""}`;
+  return `SubSync measures how fast your team replies. It sends a reply only when a person presses Send, never on its own. Your reply target is ${plainCount(m.targetMinutes, "minute")}. ${m.countAutomated ? "Automatic messages count as a reply." : "Automatic messages, like an instant thanks-we-got-your-message text, do not stop the clock. Only a reply from a person does."}${m.businessHours ? " Leads that arrive out of hours start their clock at opening time." : ""}`;
 }
 
 /** The automatic first message against the person's reply, as short sentences. An empty list means there is nothing to say yet. */
