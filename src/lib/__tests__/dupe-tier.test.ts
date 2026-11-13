@@ -99,3 +99,9 @@ test("the bulk merge count excludes the lowered group", () => {
   assert.equal(applyLowering(tally(), lowered()).certain.groups, 2);
   assert.equal(BULK_BUTTON(rowsOf("certain").length), "Merge all certain matches (2)");
 });
+
+test("source guard: tab counts and the first page of each list apply the same name rule before reading", () => {
+  const q = src("src/lib/analytics/dq-queries.ts");
+  assert.match(q, /export async function tierCounts\(s: Scope\)[^{]*\{\s*await healTiers\(s\);/);
+  assert.match(q, /if \(!after && tier !== "possible"\) await healTiers\(s\)/);
+});
