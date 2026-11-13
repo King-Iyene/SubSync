@@ -15,10 +15,13 @@ export function dealOf(r: Pl3Row): PlDeal {
 }
 export const dealsOf = (p: Partial<Page<Pl3Row>> | null | undefined): PlDeals => ({ total: p?.total ?? 0, page: (p?.page ?? 0) + 1, pageSize: p?.size ?? 20, rows: arr<Pl3Row>(p?.rows).map(dealOf), next: p?.next ?? null });
 
+/** The Overview shows its empty state only when there is truly nothing: no open deal of any kind (with or without a value) and nothing won or lost in the dates. Never from the money count alone, never from the date window for open deals. */
+export function overviewIsEmpty(h: PlOverview["headline"]): boolean { return Math.max(h.openAll ?? 0, h.openCount) === 0 && h.wonCents === 0 && h.lostCents === 0; }
+
 export function overviewOf(o: Pl3Overview | null): PlOverview {
   const h = o?.health;
   return {
-    headline: { openCount: o?.openCount ?? 0, openValueCents: c(o?.openValue?.value), staleCount: o?.stale?.count ?? 0, staleValueCents: c(o?.stale?.value), wonCents: c(o?.wonLast30?.value), lostCents: c(o?.lostLast30?.value), winRate: o?.winRate?.value ?? null, winRateDeals: o?.winRate?.of ?? 0 },
+    headline: { openCount: o?.openCount ?? 0, openAll: Math.max(o?.openAll ?? 0, o?.openCount ?? 0), openValueCents: c(o?.openValue?.value), staleCount: o?.stale?.count ?? 0, staleValueCents: c(o?.stale?.value), wonCents: c(o?.wonLast30?.value), lostCents: c(o?.lostLast30?.value), winRate: o?.winRate?.value ?? null, winRateDeals: o?.winRate?.of ?? 0 },
     bigUntouched: o?.bigUntouched ? { count: o.bigUntouched.count, valueCents: c(o.bigUntouched.value), days: o.bigUntouched.days } : undefined,
     sentence: typeof o?.headline === "string" ? o.headline : "", leak: null, minDeals: 15, excluded: { zeroValue: h?.noValue ?? 0, noOwner: h?.noOwner ?? 0, test: h?.test ?? 0, outlier: h?.outliers ?? 0 }, outlier: null, trust: o?.trust ?? null,
   };
