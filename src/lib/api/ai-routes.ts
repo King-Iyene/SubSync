@@ -2,6 +2,7 @@ import { briefFor, getPrefs, type BriefFlags } from "../analytics/br-queries";
 import { accountNote, companyNote, peekCompanyNote, realDeps } from "../ai/brief";
 import { killedGlobally } from "../ai/gateway";
 import { JOBS, liveJobs } from "../ai/jobs";
+import { jobEnabled } from "../ai/data/flags";
 import { chatgptKeys, chatgptRedirect, callbackUrl, chatgptAuthorizeUrl, exchangeChatgpt, exchangeOpenRouter, newState, openrouterAuthorizeUrl, pkcePair, OPENROUTER_BASE } from "../ai/oauth";
 import { AiError, isProvider, listModels, METHOD_COST, PROVIDER_HELP, PROVIDER_NAME, PROVIDERS, recommendedModel, safeBaseUrl, type Cfg, type Fetch, type ProviderId } from "../ai/providers";
 import { deleteConnection, historyFor, publicConnection, saveConnection, sentFor, setFeedback, startPending, takePending, updateSettings, usage, dbStore } from "../ai/store";
@@ -75,7 +76,7 @@ export async function handleAi(ctx: Ctx, deps: Deps): Promise<Response> {
       return json({
         canManage: true, level: m.level, connection: conn, usage: u, killed: killedGlobally(), flags: { ...jobFlags(on), ...dealFlags }, methods,
         providers: PROVIDERS.map((id) => ({ id, name: PROVIDER_NAME[id], ...PROVIDER_HELP[id] })), methodCost: METHOD_COST,
-        jobs: liveJobs().filter((j) => !isDealJobId(j.id) || on(DEAL_JOB_FLAG[j.id])).map((j) => ({ id: j.id, title: j.title, approval: j.approval })), accountConnections: Number(own[0]?.n ?? 0),
+        jobs: liveJobs().filter((j) => jobEnabled(on, j.id) && (!isDealJobId(j.id) || on(DEAL_JOB_FLAG[j.id]))).map((j) => ({ id: j.id, title: j.title, approval: j.approval })), accountConnections: Number(own[0]?.n ?? 0),
         note: "A ChatGPT or Claude chat subscription cannot be used with a key. Use an API key, OpenRouter, or (when OpenAI approves it) sign in with ChatGPT.",
       });
     }

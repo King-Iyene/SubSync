@@ -1,6 +1,7 @@
 import { LEAD_JOBS, LEAD_JOB_IDS } from "./jobs-lead";
 import { DEAL_JOB_DEFS } from "./deal-jobs";
 import type { Schema } from "./safety";
+import { DATA_JOB_DEFS } from "./jobs-data";
 
 // The job registry: every AI job is one entry here. The gateway (gateway.ts) runs any live entry the same way: kill switches, the customer's spend cap, rate limit, idempotency,
 // tool whitelist, post-check and the run log. To add a job: add an entry, write its input builder (a pure function that builds the prompt from that tenant's own rows) and its
@@ -43,12 +44,8 @@ export const JOBS: Record<JobId, JobDef> = {
     output: { kind: "text", maxChars: 900 }, tools: [], maxTokens: 400, maxToolRounds: 0,
     system: `You write the short note at the top of a business owner's morning brief. You are given the numbers already worked out. Write 2 to 4 sentences. Money first (the estimated revenue at risk), then who or what has been waiting, then the one thing to do first. ${WORDS_RULES}`,
   },
-  data_review: { id: "data_review", title: "Data review", status: "planned", approval: "suggest", privacy: "names_optin", costClass: "large", output: { kind: "json", schema: { type: "object", props: {} }, maxChars: 4000 }, tools: [], maxTokens: 1200, maxToolRounds: 6, system: "" },
-  data_clean: { id: "data_clean", title: "Data cleaning proposals", status: "planned", approval: "approve", privacy: "names_optin", costClass: "small", output: { kind: "json", schema: { type: "object", props: {} }, maxChars: 4000 }, tools: [], maxTokens: 1200, maxToolRounds: 4, system: "" },
-  ask_data: { id: "ask_data", title: "Ask your data", status: "planned", approval: "suggest", privacy: "names_optin", costClass: "large", output: { kind: "json", schema: { type: "object", props: {} }, maxChars: 3000 }, tools: [], maxTokens: 1200, maxToolRounds: 6, system: "" },
-  dup_adjudicate: { id: "dup_adjudicate", title: "Duplicate adjudication", status: "planned", approval: "approve", privacy: "names_optin", costClass: "large", output: { kind: "json", schema: { type: "object", props: {} }, maxChars: 2000 }, tools: [], maxTokens: 600, maxToolRounds: 2, system: "" },
   ...LEAD_JOBS,
-  setup_audit: { id: "setup_audit", title: "Setup auditor", status: "planned", approval: "suggest", privacy: "aggregate", costClass: "large", output: { kind: "json", schema: { type: "object", props: {} }, maxChars: 4000 }, tools: [], maxTokens: 1200, maxToolRounds: 6, system: "" },
+  ...DATA_JOB_DEFS, // data and question jobs (ask_data, data_review, data_clean, dup_adjudicate, setup_audit): defined in jobs-data.ts, override the planned entries above
   ...DEAL_JOB_DEFS, // the four deal jobs live in deal-jobs.ts (health, follow-up plan, win/loss review, forecast in words)
 };
 

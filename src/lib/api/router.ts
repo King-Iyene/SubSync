@@ -154,6 +154,7 @@ import { handleCash, handleCashAct } from "./cash-routes";
 import { handleWg, handleWgAct } from "./wg-routes";
 import { handleBr } from "./br-routes";
 import { handleAi } from "./ai-routes";
+import { handleAiData } from "./ai-data-routes";
 import { handleWfm } from "./wfm-routes";
 import { handleApptActions } from "./appointment-actions-routes";
 import { handleMeetingList } from "./mn2-routes";
@@ -2289,6 +2290,10 @@ async function dispatch(ctx: Ctx): Promise<Response> {
     // Bring your own AI: /api/app/ai?part=... and /api/app/ai/act/<name>. Administrators only for the connection (checked inside); flag ai_byo.
     if (a === "ai" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3) || (b === "lead" && ctx.segments.length === 3))) {
       return await handleAi(ctx, { allowed: () => allowedIds(ctx), locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), links: async () => (await scope(ctx)).links });
+    }
+    // AI data jobs (Ask your data, data review, cleaning proposals, duplicate judge, setup auditor): /api/app/aid?part=... and /api/app/aid/act/<name>. Each job has its own flag; checked inside.
+    if (a === "aid" && ((method === "GET" && !b) || (b === "act" && ctx.segments.length === 3))) {
+      return await handleAiData(ctx, { allowed: () => allowedIds(ctx) });
     }
     // The 7 am brief: /api/app/br?part=brief|text|settings|history and /api/app/br/act/<settings|test|seen|acted>. Owners and admins only; every choice is the signed-in person's own.
     if (a === "br" && ((method === "GET" && !b && ctx.url.searchParams.has("part")) || (b === "act" && ctx.segments.length === 3))) {
