@@ -220,7 +220,7 @@ async function payments(inst: string, locs: Loc[], byName: Map<string, string>, 
   // the agency's own clients that are late with their plan
   for (const [name, days, amount] of [["Sunrise Roofing Co", 9, 497], ["Green Leaf Landscaping", 23, 297]] as const) {
     const loc = byName.get(name), ps = loc ? perLoc.get(loc) : undefined;
-    if (loc && ps?.length) add(loc, { ...ps[0], name }, "plan", `demo-plan-${loc}`, { status: "past_due", problem: "past_due_plan", amount, days, plan: name === "Sunrise Roofing Co" ? "Growth" : "Starter", src: "Agency plan" });
+    if (loc && ps?.length) add(loc, { ...ps[0], name }, "plan", `demo-plan-${loc}`, { status: "past_due", problem: "past_due_plan", amount, days, plan: name === "Sunrise Roofing Co" ? "Growth" : "Starter", src: "Our plan" });
   }
   for (const part of chunk(items, 200)) {
     await db`insert into pm_items (installation_id, location_id, kind, item_id, status_raw, status_mapped, problem_kind, amount, amount_refunded, currency, unit_check, due_date, contact_id, contact_name, contact_email, plan_name, source_name, live_mode,
@@ -281,6 +281,6 @@ export async function planItems(inst: string): Promise<void> {
   }
   if (!rows.length) return;
   await db`insert into pm_items (installation_id, location_id, kind, item_id, status_raw, status_mapped, problem_kind, amount, amount_refunded, currency, unit_check, contact_name, plan_name, source_name, live_mode, occurred_at, first_seen, last_seen, rank_score)
-    select ${inst}, x.loc, 'plan', x.id, 'active', 'active', null, x.amount, 0, 'USD', 'assumed_major', x.loc, x.plan, 'Agency plan', true, x.at::timestamptz, x.at::timestamptz, now(), 0
+    select ${inst}, x.loc, 'plan', x.id, 'active', 'active', null, x.amount, 0, 'USD', 'assumed_major', x.loc, x.plan, 'Our plan', true, x.at::timestamptz, x.at::timestamptz, now(), 0
     from jsonb_to_recordset(${db.json(rows as never)}) as x(loc text, id text, amount numeric, plan text, at text) on conflict do nothing`;
 }

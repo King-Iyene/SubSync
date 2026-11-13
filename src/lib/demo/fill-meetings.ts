@@ -10,7 +10,7 @@ const SUMMARIES = [
   ["Walked through the quote and the install dates. They want the earlier slot and asked for a payment plan.", ["Send the revised quote by Friday", "Hold the earlier install slot for 48 hours", "Check if a 3 part payment plan is allowed"]],
   ["First call. Lead came from a Facebook ad. Interested, but comparing two other companies.", ["Send before and after photos", "Call back Tuesday after they talk to their partner"]],
   ["Follow-up on the proposal. Happy with the price, worried about timing over the holidays.", ["Confirm the holiday schedule in writing", "Book the start date"]],
-  ["Discovery call. Their last agency never answered leads fast. Speed to lead is their main worry.", ["Share the reply-time report", "Set up the missed call text back", "Schedule a review in two weeks"]],
+  ["Discovery call. Their last provider never answered leads fast. Speed to lead is their main worry.", ["Share the reply-time report", "Set up the missed call text back", "Schedule a review in two weeks"]],
   ["Quick check-in after the first month. Bookings are up, they want more weekend slots.", ["Open Saturday slots on the calendar", "Send the monthly report"]],
   ["Customer asked to reschedule and to bring a family member. Agreed on Thursday morning.", ["Move the appointment to Thursday 10am", "Send a reminder the day before"]],
 ] as const;
@@ -77,7 +77,7 @@ async function fill(db: ReturnType<typeof sql>, inst: string): Promise<void> {
     ["Walk-in estimate: M. Alvarez", "no_match", ["m.alvarez@alvarez-build.example.net"], "Quoted a kitchen refit. Wants to think about it.", 2],
     ["Call with Sam Ortiz", "duplicate_contact", ["sam.ortiz@ortiz-co.example.net"], "Two contact records share this email, so SubSync did not guess.", 3],
     ["Intro call: Brandt Realty", "cross_account", ["office@brandt-realty.example.net"], "The same email is a contact in two client accounts, so SubSync did not guess.", 4],
-    ["Team sync with the agency", "no_external_attendee", ["dana@brightpath-demo.example.com"], "Internal call, no client on it.", 5],
+    ["Team sync with the sales team", "no_external_attendee", ["dana@brightpath-demo.example.com"], "Internal call, no client on it.", 5],
   ];
   for (const [i, [title, reason, emails, summary, days]] of waiting.entries()) {
     n++;
