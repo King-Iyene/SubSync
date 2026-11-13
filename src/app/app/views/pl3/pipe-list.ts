@@ -2,16 +2,45 @@ import type { PipeCard, Pl3Cards } from "@/lib/analytics/pipeline3-types";
 import { money, moneyShort } from "./format.ts";
 
 // Pure pieces of the pipeline list (pipes.tsx), kept apart so tests can read them without a browser.
-const d = (v: number) => money(v * 100), ds = (v: number) => moneyShort(v * 100), n = (v: number) => v.toLocaleString("en-US");
+const d = (v: number) => money(v * 100), n = (v: number) => v.toLocaleString("en-US");
 export const PIPE_PAGE = 12;
 
-/** The quiet notes under a row's name. */
-export function rowNotes(c: PipeCard): string[] {
-  const out: string[] = [];
-  if (c.zeroValueCount > 0) out.push(`${n(c.zeroValueCount)} ${c.zeroValueCount === 1 ? "deal" : "deals"} without a value (not counted in money)`);
-  if (c.noOwnerCount > 0) out.push(`${n(c.noOwnerCount)} no owner`);
-  if (c.outlierCount > 0) out.push(`${c.outlierCount} big deal${c.outlierCount === 1 ? "" : "s"} apart (${ds(c.outlierValue)}), not added to open money`);
+/** Every reason open deals are left out of a pipeline's money, as counts. The same shape feeds a row, the river header and the Overview line, so they cannot disagree. */
+export type LeftOutCounts = { zeroValue: number; noOwner: number; test: number; outlier?: number; outlierCents?: number; /** "Count deals without an owner" is on: they are inside the money, so they are not "left out". */ ownerCounted?: boolean; /** Test-named deals are counted (screen toggle or setting). */ testsCounted?: boolean };
+export type LeftOutReasonKey = "no_value" | "no_owner" | "test" | "outlier";
+const dealsOf = (k: number) => `${n(k)} ${k === 1 ? "deal" : "deals"}`;
+/** One entry per reason with a count above zero, in a fixed order. `key` is the drill-down bucket that opens exactly these rows. */
+export function leftOutParts(x: LeftOutCounts): Array<{ key: LeftOutReasonKey; count: number; text: string }> {
+  const out: Array<{ key: LeftOutReasonKey; count: number; text: string }> = [];
+  if (x.zeroValue > 0) out.push({ key: "no_value", count: x.zeroValue, text: `${dealsOf(x.zeroValue)} without a value` });
+  if (x.noOwner > 0 && !x.ownerCounted) out.push({ key: "no_owner", count: x.noOwner, text: `${dealsOf(x.noOwner)} without an owner` });
+  if (x.test > 0 && !x.testsCounted) out.push({ key: "test", count: x.test, text: `${n(x.test)} test-named` });
+  const o = x.outlier ?? 0;
+  if (o > 0) out.push({ key: "outlier", count: o, text: `${n(o)} big deal${o === 1 ? "" : "s"} apart${x.outlierCents ? ` (${moneyShort(x.outlierCents)})` : ""}` });
   return out;
+}
+/** The one quiet sentence: "Left out of the money: 17 deals without a value, 19 deals without an owner." Null when nothing is left out. */
+export function leftOutSentence(x: LeftOutCounts | null | undefined): string | null {
+  const parts = x ? leftOutParts(x) : [];
+  return parts.length ? `Left out of the money: ${parts.map((p) => p.text).join(", ")}.` : null;
+}
+/** How many deals the line above names (what the parts add up to). */
+export const leftOutTotal = (x: LeftOutCounts): number => leftOutParts(x).reduce((a, p) => a + p.count, 0);
+
+/** A row's left-out counts, from its card. `opts` says which of the switches already count their deals. */
+export const cardLeftOut = (c: PipeCard, opts: { ownerCounted?: boolean; testsCounted?: boolean } = {}): LeftOutCounts =>
+  ({ zeroValue: c.zeroValueCount, noOwner: c.noOwnerCount, test: c.testCount ?? 0, outlier: c.outlierCount, outlierCents: c.outlierValue * 100, ...opts });
+
+/** The quiet notes under a row's name: one short reason each, every reason that left deals out (the counts add up to the deals the row does not count). */
+export function rowNotes(c: PipeCard, opts: { ownerCounted?: boolean; testsCounted?: boolean } = {}): string[] {
+  return leftOutParts(cardLeftOut(c, opts)).map((p) => p.text);
+}
+
+/** The line about deals without an owner: how many are left out, why, and one tap to count them (company setting, with a preview). Null when there is nothing to say. */
+export function ownerlessNote(count: number, counted: boolean): { text: string; action: "count" | "leave" | null } | null {
+  if (counted) return { text: "Deals without an owner are counted, because \"Count deals without an owner\" is on in Settings, Targets.", action: "leave" };
+  if (count <= 0) return null;
+  return { text: `${dealsOf(count)} without an owner (not counted in money): assign owners in your CRM or tap Count them.`, action: "count" };
 }
 
 /** The line about test-named deals: how many are left out and one tap to count them (or leave them out again). Null when there is nothing to say. */

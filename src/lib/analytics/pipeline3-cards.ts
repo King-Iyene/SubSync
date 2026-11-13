@@ -68,7 +68,7 @@ export async function pipelineCards(s: CardScope, o: CardOpts): Promise<Pl3Cards
         ${cur ? (o.asc ? db`and (open_v > ${cur.v} or (open_v = ${cur.v} and (location_id, pipeline_id) > (${cur.loc}, ${cur.pid})))` : db`and (open_v < ${cur.v} or (open_v = ${cur.v} and (location_id, pipeline_id) > (${cur.loc}, ${cur.pid})))`) : db``}
       order by open_v ${o.asc ? db`asc` : db`desc`}, location_id, pipeline_id limit ${size + 1}
     )
-    select (select coalesce(json_agg(pg order by pg.open_v ${o.asc ? db`asc` : db`desc`}, pg.location_id, pg.pipeline_id), '[]'::json) from pg) rows, (select coalesce(count_test_deals, false) from settings where installation_id = ${s.inst}) count_tests,
+    select (select coalesce(json_agg(pg order by pg.open_v ${o.asc ? db`asc` : db`desc`}, pg.location_id, pg.pipeline_id), '[]'::json) from pg) rows, (select coalesce(count_test_deals, false) from settings where installation_id = ${s.inst}) count_tests, (select coalesce(count_ownerless_deals, false) from settings where installation_id = ${s.inst}) count_ownerless,
       (select coalesce(json_agg(json_build_object('l', p.location_id, 'p', p.pipeline_id, 'st', p.stages)), '[]'::json) from pipelines p where p.installation_id = ${s.inst} and (p.location_id, p.pipeline_id) in (select location_id, pipeline_id from pg)) defs_json, (select row_to_json(tot) from tot) tot,
       (select coalesce(json_agg(json_build_object('l', sg.location_id, 'p', sg.pipeline_id, 's', sg.stage_id, 'v', sg.open_v)), '[]'::json) from sg
         where sg.open_v > 0 and (sg.location_id, sg.pipeline_id) in (select location_id, pipeline_id from pg)) stage_values`)[0] ?? {};
@@ -102,6 +102,6 @@ export async function pipelineCards(s: CardScope, o: CardOpts): Promise<Pl3Cards
   const last = page[page.length - 1];
   return {
     refreshing: !fresh, cards, next: more && last ? `${Number(last.open_v).toFixed(2).replace(/\.00$/, "")}|${last.location_id}|${last.pipeline_id}` : null,
-    totals: { pipelines: t.shown, emptyHidden: o.showEmpty ? 0 : t.empty_n, openValue: Math.round(t.open_v), wonValue: Math.round(t.won_v), lostValue: Math.round(t.lost_v), openCount: t.open_n, wonCount: t.won_n, lostCount: t.lost_n, staleCount: t.stale_n, noOwnerCount: t.no_owner_n, testCount: Number(t.test_n ?? 0), testValue: Math.round(Number(t.test_v ?? 0)), all: Number(t.all_n ?? 0), countsTests: r.count_tests === true ? "setting" : inclTest ? "toggle" : null },
+    totals: { pipelines: t.shown, emptyHidden: o.showEmpty ? 0 : t.empty_n, openValue: Math.round(t.open_v), wonValue: Math.round(t.won_v), lostValue: Math.round(t.lost_v), openCount: t.open_n, wonCount: t.won_n, lostCount: t.lost_n, staleCount: t.stale_n, noOwnerCount: t.no_owner_n, testCount: Number(t.test_n ?? 0), testValue: Math.round(Number(t.test_v ?? 0)), all: Number(t.all_n ?? 0), countsTests: r.count_tests === true ? "setting" : inclTest ? "toggle" : null, countsOwnerless: r.count_ownerless === true },
   };
 }

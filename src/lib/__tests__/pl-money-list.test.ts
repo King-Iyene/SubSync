@@ -113,8 +113,8 @@ test("pagination: one button below the last page, 'Showing 12 of 22', gone when 
 
 test("rows: quiet notes keep the no-value info; nothing-yet pipelines get words, not placeholder lines", () => {
   assert.deepEqual(rowNotes(card()), []);
-  assert.deepEqual(rowNotes(card({ zeroValueCount: 3 })), ["3 deals without a value (not counted in money)"]);
-  assert.deepEqual(rowNotes(card({ zeroValueCount: 1, noOwnerCount: 2 })), ["1 deal without a value (not counted in money)", "2 no owner"]);
+  assert.deepEqual(rowNotes(card({ zeroValueCount: 3 })), ["3 deals without a value"]);
+  assert.deepEqual(rowNotes(card({ zeroValueCount: 1, noOwnerCount: 2 })), ["1 deal without a value", "2 deals without an owner"]);
   const ui = read("app/app/views/pl3/pipes.tsx");
   assert.match(ui, /Nothing in this pipeline yet\./);
   assert.match(ui, /stages\.every\(\(s\) => s\.value <= 0\)\) return <span className="pl-mini pl-mini-none"/, "no empty dashed bar");
