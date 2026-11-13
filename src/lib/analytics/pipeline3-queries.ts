@@ -94,7 +94,7 @@ export const P_STALE = (db: Db) => db`d.status = 'open' and d.counted and not d.
 export const P_NO_OWNER = (db: Db) => db`d.status = 'open' and not d.out_of_scope and not d.is_test and d.value > 0 and not d.owner_ok`;
 export const P_NO_VALUE = (db: Db) => db`d.status = 'open' and not d.out_of_scope and not d.is_test and d.value <= 0`;
 /** Open deals the flow draws: counted money deals, plus (in deal-count mode) open deals with no value. The ONE definition behind a river or funnel number and the list that opens behind it. */
-export const flowOpen = (db: Db, dealsMode: boolean): Frag => (dealsMode ? db`(${P_OPEN(db)} or ${P_NO_VALUE(db)})` : P_OPEN(db));
+export const flowOpen = (db: Db, dealsMode: boolean): Frag => db`(${P_OPEN(db)} ${dealsMode ? db`or ${P_NO_VALUE(db)}` : db``})`;
 /** Won or lost in the chosen dates (test deals left out): the same window the river uses for its vault and drains. */
 export const flowWin = (db: Db, f: Pick<Filters, "from" | "to">): Frag => db`d.last_status_change_at >= ${f.from} and d.last_status_change_at < ${f.to} and not d.is_test`;
 /**
