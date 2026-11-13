@@ -152,6 +152,8 @@ A live version cannot be edited or unpublished by us. Rollback is two things: (a
 - [ ] Database size: Find lead's tables and indexes take about 715 MB per 1M contacts; the current plan is 500 MB. Upgrade the database plan (Supabase Pro, check size) before a large agency installs.
 - [ ] Support email or phone live with a 24-hour reply (needed for review), logo and support details filled in the portal.
 
+> UPDATE 13 Nov 2026 (King): there is now NO free plan. The draft has one plan, **Growth**, Paid, monthly, $11.50 per client account, 14-day free trial, id `6af521842a5c6a72fd97d767`. The old Free Plan (`6ae40eb4f65e3c03823476b8`) and the $5 plan are deleted from the draft. Feature lines: "Manage every client account from one screen", "Speed to lead: see who is waiting and who to call first", "Appointments, no-shows and win-back lists that recover lost leads", "Pipeline money: where deals sit, what is stuck, who wins", "Alerts and exports for every client account". Steps 1 and 2 below are done; "Free Plan feature lines" no longer apply. Code maps Growth to full access and keeps the old Free Plan id as legacy full access.
+
 ## 6. BEFORE ANY PILOT ONLY: swap the plan to $11.50 (do not do this in this release)
 
 Why separate: prices cannot be edited, and changes apply to new installs only, so no outside install may land on the $5 plan.

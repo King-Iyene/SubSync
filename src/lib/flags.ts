@@ -1,7 +1,7 @@
 import { sql } from "./db";
 import { entitlements, FEATURES, type Feature, type Plan } from "./entitlements";
 import { lockedFeatures } from "./entitlements-core";
-import { entitlementsMode, tierForInstallation } from "./entitlements-queries";
+import { entitlementsMode, planStateForInstallation } from "./entitlements-queries";
 import { resolveFeatures } from "./flags-core";
 
 // Reads the feature switches from the database. A short cache keeps this off the hot path; demo mode
@@ -29,11 +29,12 @@ export async function resolveEntitlements(plan: Plan, installationId?: string, d
   const base = entitlements(plan);
   const flagged = resolveFeatures(FEATURES, await overrides(), process.env.FLAGS_ALL_ON === "true");
   const mode = entitlementsMode();
-  const tier = mode === "open" || demo || !installationId ? "pro" : await tierForInstallation(installationId);
+  const state = mode === "open" || demo || !installationId ? { tier: "pro" as const, trialEnded: false } : await planStateForInstallation(installationId);
+  const tier = state.tier;
   const locked = lockedFeatures(FEATURES, tier, mode).filter((f) => flagged[f]);
   const features = { ...flagged };
   for (const f of locked) features[f] = false;
-  return { ...base, enforced: mode === "enforced", features, off: FEATURES.filter((f) => !flagged[f]) as string[], locked: locked as string[] };
+  return { ...base, enforced: mode === "enforced", trialEnded: state.trialEnded, features, off: FEATURES.filter((f) => !flagged[f]) as string[], locked: locked as string[] };
 }
 
 export async function featureOn(feature: Feature): Promise<boolean> {

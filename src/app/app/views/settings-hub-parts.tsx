@@ -5,13 +5,14 @@ import { COMPANY } from "@/lib/company";
 import { FEATURE_NEEDS } from "@/lib/scope-groups";
 import { NEEDS_PERMISSION } from "@/lib/meeting-wording";
 import { HIDEABLE_MODULES } from "@/lib/settings2";
+import { InlineAlert } from "../ds";
 import { useData } from "../session";
 import { Badge, Btn, Card, ErrorBox, Loading } from "../ui";
 import { WriteAccessCard } from "./write-access";
 import { useStState } from "./st-state";
 import type { PermissionGroup } from "./settings-parts";
 
-export type Home = { kind: string; plan: string; canManage: boolean; level: string; enforced: boolean; since: string | null; demo: boolean };
+export type Home = { kind: string; plan: string; canManage: boolean; level: string; enforced: boolean; trialEnded?: boolean; since: string | null; demo: boolean };
 
 export function ReadOnlyNote() {
   return <p className="border-l-2 border-warning py-1 pl-3 text-sm" data-testid="read-only">Only your administrator can change these. You can read them here.</p>;
@@ -19,11 +20,11 @@ export function ReadOnlyNote() {
 
 // ---------------- Account and plan ----------------
 export function PlanCard({ home }: { home: Home }) {
-  const word = home.plan === "pro" ? "Pro" : home.plan === "starter" ? "Starter" : "Free";
   return (
     <Card title="Your plan">
-      <p className="flex flex-wrap items-center gap-2 text-sm"><Badge tone={home.plan === "free" ? "neutral" : "good"}>{word}</Badge>
-        <span className="text-muted-foreground">{home.enforced ? "Some pages are part of the paid plan." : "Every page is open to you right now."}</span></p>
+      {home.trialEnded ? <InlineAlert tone="warning" title="Your 14-day trial has ended" className="mb-3">Your data is kept and nothing was deleted. To carry on with every page, choose the Growth plan ($11.50 per client account per month) in the marketplace where you installed SubSync.</InlineAlert> : null}
+      <p className="flex flex-wrap items-center gap-2 text-sm"><Badge tone={home.trialEnded ? "neutral" : "good"}>Growth</Badge>
+        <span className="text-muted-foreground">{home.trialEnded ? "Some pages are paused until you choose the plan." : "Try it free for 14 days, then $11.50 per client account per month."}</span></p>
       <p className="mt-2 text-xs text-muted-foreground">Billing and plan changes are handled in the marketplace where you installed SubSync. SubSync never asks for a card.</p>
     </Card>
   );

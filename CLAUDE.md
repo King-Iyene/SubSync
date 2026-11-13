@@ -205,6 +205,8 @@ With "Everyone" install there is ONE price line: a price per client account per 
 |---|---|---|
 | Free | $0 | Instant Audit, overview, contact search, data health |
 | Pro (final, still to be created) | $11.50 per client account per month | Everything in Wave 1 |
+
+> NOTE 13 Nov 2026 (King, owner): the free plan is gone. The marketplace draft has ONE plan, **Growth**, Paid, monthly, $11.50 per client account per month, 14-day free trial (the only free period), plan id `6af521842a5c6a72fd97d767`. The old Free Plan (`6ae40eb4f65e3c03823476b8`) and $5 plan were deleted from the draft; installs on them stay mapped as legacy full access. Wording: "Try it free for 14 days, then $11.50 per client account per month". The table above is kept for history.
 | Higher tier (later, as a new plan) | $9 to $19 per client account per month (hypothesis) | AI brief, anomaly detection, forecasts |
 
 **How it works:**

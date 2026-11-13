@@ -50,7 +50,7 @@ export function OverviewView({ go }: { go: GoFn }) {
       {note && <InlineAlert tone="info" className="mb-4">{note}</InlineAlert>}
       {data.hiddenAccounts > 0 && (
         <InlineAlert tone="info" className="mb-4">
-          Your free plan covers {data.entitlements.accountLimit} client accounts. {data.hiddenAccounts} more are hidden until you upgrade.
+          Your plan shows {data.entitlements.accountLimit} client accounts. {data.hiddenAccounts} more are hidden until you choose the Growth plan.
         </InlineAlert>
       )}
 

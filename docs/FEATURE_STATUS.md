@@ -350,3 +350,4 @@ One list: AI (own row, Connect your AI, inline connect options, usage, caps, typ
 | Quick tour is a non-blocking card (Esc or click away, shown once) | built, live |
 | Custom date box has visible From and To (Lagos time) | built, live |
 | Every file download shows a notice and an open-in-new-tab fallback | built, live |
+| Growth plan mapping (one paid plan, 14-day trial, legacy Free Plan kept, trial-ended banner in Settings) | built; entitlements stay in open mode; not tested on live data |

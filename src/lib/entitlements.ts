@@ -301,6 +301,8 @@ export function entitlements(plan: Plan, enforce = false) {
   return {
     plan,
     enforced: enforce,
+    /** True when the 14-day trial ended without the Growth plan (enforced mode only; data is always kept). */
+    trialEnded: false as boolean,
     accountLimit: null as number | null,
     features: Object.fromEntries(FEATURES.map((f) => [f, true])) as Record<Feature, boolean>,
     /** Features that are switched off (see flags.ts). */
