@@ -6,6 +6,7 @@ import { DEFAULT_APP_DOMAIN } from "../links";
 import { effectiveLogo, validLogoUrl } from "../brand-logo";
 import { countedInScope, dealIsStale, dealScopeJoins, daysInStepSql, outOfScope } from "./stage-rules-sql";
 import { currentSnapshotVersion, snapshotOk } from "./definitions-sql";
+import { inPipelineSql } from "./pipeline-pick";
 
 // Every query is scoped by installation_id. Counts are cast to int/float8 so the driver does
 // not hand back strings.
@@ -328,7 +329,8 @@ export async function scoreHistory(installationId: string, days = 30): Promise<M
 // Deal hygiene per account: open deals that are missing a value or a contact, or have sat for 90+ days.
 export type HygieneRow = { locationId: string; locationName: string | null; open: number; noValue: number; noContact: number; ancient: number };
 
-export async function dealHygiene(installationId: string): Promise<HygieneRow[]> {
+export async function dealHygiene(installationId: string, pipeline?: string | null, locationId?: string | null): Promise<HygieneRow[]> {
+  const pipe = inPipelineSql(sql(), pipeline), only = locationId ? sql()`and o.location_id = ${locationId}` : sql()``;
   const rows = await sql()`
     select l.location_id, l.name,
       count(*) filter (where o.status = 'open')::int open_n,
@@ -338,7 +340,7 @@ export async function dealHygiene(installationId: string): Promise<HygieneRow[]>
     from locations l
     join (
       select o.*, coalesce(greatest(o.last_stage_change_at, o.last_action_at, o.updated_remote_at, o.last_status_change_at), o.created_remote_at, o.synced_at) act
-      from cached_opportunities o ${dealScopeJoins()} where o.installation_id = ${installationId} and not (o.status = 'open' and ${outOfScope()})
+      from cached_opportunities o ${dealScopeJoins()} where o.installation_id = ${installationId} ${pipe} ${only} and not (o.status = 'open' and ${outOfScope()})
     ) o on o.installation_id = l.installation_id and o.location_id = l.location_id
     where l.installation_id = ${installationId} and not l.ignored
     group by l.location_id, l.name
@@ -442,8 +444,9 @@ export type StaleDealsPage = { rows: DealRow[]; total: number; totalValue: numbe
  * `total` and `totalValue` are the true figures even when `limit` cuts the rows. `floorDays` (optional) also asks for at least that many days in the step; it is never the staleness rule.
  * `ids` is the caller's own accounts (null = every account of the installation, for a caller that already limited by `locationId`).
  */
-export async function staleDealsPage(installationId: string, o: { ids?: string[] | null; locationId?: string; limit?: number; floorDays?: number }): Promise<StaleDealsPage> {
+export async function staleDealsPage(installationId: string, o: { ids?: string[] | null; locationId?: string; limit?: number; floorDays?: number; pipeline?: string | null }): Promise<StaleDealsPage> {
   const db = sql();
+  const pipe = inPipelineSql(db, o.pipeline);
   const scope = o.locationId ? db`and o.location_id = ${o.locationId}` : db``;
   const only = o.ids ? db`and o.location_id = any(${o.ids}::text[])` : db``;
   const floor = o.floorDays && o.floorDays > 0 ? db`and ${daysInStepSql()} >= ${Math.floor(o.floorDays)}` : db``;
@@ -454,7 +457,7 @@ export async function staleDealsPage(installationId: string, o: { ids?: string[]
     from cached_opportunities o
     join locations l on l.installation_id = o.installation_id and l.location_id = o.location_id and not l.ignored
     ${dealScopeJoins()}
-    where o.installation_id = ${installationId} and o.status = 'open' and ${countedInScope()} and ${dealIsStale()} ${scope} ${only} ${floor}
+    where o.installation_id = ${installationId} and o.status = 'open' and ${countedInScope()} and ${dealIsStale()} ${scope} ${only} ${pipe} ${floor}
     order by o.monetary_value desc, o.opportunity_id
     limit ${o.limit ?? 200}`;
   return {
@@ -466,8 +469,8 @@ export async function staleDealsPage(installationId: string, o: { ids?: string[]
   };
 }
 
-export async function staleDeals(installationId: string, floorDays: number, limit = 200, locationId?: string): Promise<DealRow[]> {
-  return (await staleDealsPage(installationId, { locationId, limit, floorDays })).rows;
+export async function staleDeals(installationId: string, floorDays: number, limit = 200, locationId?: string, pipeline?: string | null): Promise<DealRow[]> {
+  return (await staleDealsPage(installationId, { locationId, limit, floorDays, pipeline })).rows;
 }
 
 export type PipelineCell = {

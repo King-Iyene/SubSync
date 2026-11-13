@@ -1,5 +1,6 @@
 import { sql } from "../db";
 import { afterHoursSummary } from "./comms-intel";
+import { inPipelineSql } from "./pipeline-pick";
 import { countedInScope, dealScopeJoins } from "./stage-rules-sql";
 
 function visible(installationId: string, allowed: string[] | null) {
@@ -16,8 +17,9 @@ export type GapDeal = {
 // 4.9: counted open deals (a value, an owner, in play: docs/METRICS.md) whose contact has not been touched (activity or a message) for `days` days
 // or more. The total, the dollars and the stage breakdown are counted in the database over every such deal, never over a capped list, so the
 // numbers are the real ones; only the rows shown are limited, and the screen says how many there are in all.
-export async function communicationGaps(installationId: string, allowed: string[] | null, days = 7, rowLimit = 15) {
+export async function communicationGaps(installationId: string, allowed: string[] | null, days = 7, rowLimit = 15, pipeline?: string | null) {
   const db = sql();
+  const pipe = inPipelineSql(db, pipeline);
   const from = db`
     from cached_opportunities o join (${visible(installationId, allowed)}) loc on loc.location_id = o.location_id
     ${dealScopeJoins()}
@@ -25,7 +27,7 @@ export async function communicationGaps(installationId: string, allowed: string[
     left join lateral (
       select greatest(c.last_activity_at, (select max(v.last_message_at) from cached_conversations v
         where v.installation_id = o.installation_id and v.location_id = o.location_id and v.contact_id = o.contact_id)) t) touch on true
-    where o.installation_id = ${installationId} and o.status = 'open' and ${countedInScope()} and o.contact_id is not null
+    where o.installation_id = ${installationId} ${pipe} and o.status = 'open' and ${countedInScope()} and o.contact_id is not null
       and (touch.t is null or touch.t < now() - make_interval(days => ${days}::int))`;
   const [totals, stageRows, rows] = await Promise.all([
     db`select count(*)::int n, coalesce(sum(o.monetary_value), 0)::float8 value ${from}`,

@@ -1,6 +1,7 @@
 import { sql } from "../db";
 import type { Deal } from "./pipeline-intel";
 import { countedInScope, dealScopeJoins, outOfScope } from "./stage-rules-sql";
+import { inPipelineSql } from "./pipeline-pick";
 import { currentSnapshotVersion, snapshotOk } from "./definitions-sql";
 
 const ms = (v: unknown) => (v instanceof Date ? v.getTime() : null);
@@ -8,9 +9,10 @@ const ms = (v: unknown) => (v instanceof Date ? v.getTime() : null);
 // All deals for the installation (ignored accounts left out), with pipeline and stage names. When
 // the plan limits accounts, `allowed` lists the visible ones. Capped so one huge agency cannot
 // exhaust memory; the cap keeps the most recently active deals.
-export async function loadDeals(installationId: string, allowed: string[] | null, locationId?: string): Promise<Deal[]> {
+export async function loadDeals(installationId: string, allowed: string[] | null, locationId?: string, pipeline?: string | null): Promise<Deal[]> {
   const db = sql();
   const only = locationId ? db`and o.location_id = ${locationId}` : db``;
+  const pipe = inPipelineSql(db, pipeline);
   const limited = allowed ? db`and o.location_id = any(${allowed}::text[])` : db``;
   const rows = await db`
     select o.opportunity_id, o.location_id, l.name location_name, coalesce(o.pipeline_id, '') pipeline_id,
@@ -22,7 +24,7 @@ export async function loadDeals(installationId: string, allowed: string[] | null
     from cached_opportunities o
     join locations l on l.installation_id = o.installation_id and l.location_id = o.location_id and not l.ignored
     ${dealScopeJoins()}
-    where o.installation_id = ${installationId} ${only} ${limited}
+    where o.installation_id = ${installationId} ${only} ${limited} ${pipe}
       and (o.status <> 'open' or ${countedInScope()})
     order by coalesce(greatest(o.last_action_at, o.updated_remote_at, o.last_stage_change_at), o.created_remote_at, o.synced_at) desc nulls last
     limit 60000`;
@@ -37,8 +39,9 @@ export async function loadDeals(installationId: string, allowed: string[] | null
 // Open deals left out of every dollar figure and count (metrics.ts: a counted deal has a value above zero and an owner, and stage-rules.ts: it
 // is not in a closed-out or ignored stage or in a pipeline marked not in use). loadDeals above never returns them, so each screen that shows a
 // total says how many were left out and why. The three reasons never overlap: a deal in a closed-out stage is counted there only.
-export async function excludedOpenDeals(installationId: string, allowed: string[] | null, locationId?: string) {
+export async function excludedOpenDeals(installationId: string, allowed: string[] | null, locationId?: string, pipeline?: string | null) {
   const db = sql();
+  const pipe = inPipelineSql(db, pipeline);
   const only = locationId ? db`and o.location_id = ${locationId}` : db``;
   const limited = allowed ? db`and o.location_id = any(${allowed}::text[])` : db``;
   const [r] = await db`
@@ -49,7 +52,7 @@ export async function excludedOpenDeals(installationId: string, allowed: string[
     from cached_opportunities o
     join locations l on l.installation_id = o.installation_id and l.location_id = o.location_id and not l.ignored
     ${dealScopeJoins()}
-    where o.installation_id = ${installationId} ${only} ${limited}
+    where o.installation_id = ${installationId} ${only} ${limited} ${pipe}
       and o.status = 'open' and not ${countedInScope()}`;
   return { count: (r?.total as number) ?? 0, closedOut: (r?.closed_out as number) ?? 0, noValue: (r?.no_value as number) ?? 0, noOwner: (r?.no_owner as number) ?? 0 };
 }

@@ -11,6 +11,7 @@ import { parseTodayAccounts, withTodayAccounts } from "@/lib/analytics/today-que
 import { useData, useInflight } from "../session";
 import { usePageRange } from "./page-range";
 import { RightNowNote } from "./own-window";
+import { datesNote } from "@/lib/design/dates-note";
 import { remember, remembered } from "./remember";
 
 // ONE filter bar for every page that shows numbers (KF-11): always open, never behind a triangle. Left: which client accounts are counted (agency only), a button
@@ -223,6 +224,7 @@ export function GlobalFilterBar({ view, agency, value, onChange, onAllClients }:
       </div></div>
       <div className="mb-4 print:hidden">
       {mode === "now" && <RightNowNote view={view} label={pageLabel} />}
+      {(mode === "range" || mode === "dates") && datesNote(view, pageLabel, zoneWord()) && <p className="mt-1.5 text-sm text-muted-foreground" data-testid="dates-note">{datesNote(view, pageLabel, zoneWord())}</p>}
       {notes.length > 0 && (
         <ul className="space-y-0.5 text-sm text-muted-foreground">
           {notes.map((n) => <li key={n.text}>{n.text} <button type="button" className="font-medium text-primary underline" onClick={() => onChange({ ...value, ...n.clear })}>{n.clear.hideTest === false ? "Show them" : "Show all"}</button></li>)}

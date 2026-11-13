@@ -93,7 +93,7 @@ export async function handlePipeline3(ctx: Ctx, h: Pl3Helpers): Promise<Response
       const wk = sp.get("week") ?? "";
       // A receipt is for a Monday-to-Sunday week in the app zone (a Lagos week starts at Lagos midnight).
       const monday = dayStartMs(mondayOfDay(localDay(now - 7 * DAY))) as number;
-      return done(await receipt(scope, one, isRealDay(wk) ? new Date(dayStartMs(wk) as number) : new Date(monday)));
+      return done(await receipt(scope, one, isRealDay(wk) ? new Date(dayStartMs(wk) as number) : new Date(monday), f.pipeline ?? null));
     }
     case "detail": {
       const dl = await ownedAccount(ctx.installationId, allowedAll, sp.get("location"));

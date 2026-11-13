@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useApiClient, useData } from "../session";
+import { pickPath } from "@/lib/design/pipeline-pick-link";
+import { usePick } from "./pl3/pick-context";
 import type { Deal } from "../types";
 import { Btn, Card, Empty, ErrorBox, ExtLink, fmtInt, fmtMoney, fmtPct, Loading, PageHeader, Stat, Table, Td, Th } from "../ui";
 import { QuietDeals } from "./quiet-deals";
@@ -36,7 +38,7 @@ type HygieneData = {
 };
 
 function Hygiene() {
-  const { data, error, loading, reload } = useData<HygieneData>("hygiene");
+  const { data, error, loading, reload } = useData<HygieneData>(pickPath("hygiene", usePick()));
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;
@@ -69,14 +71,15 @@ function Hygiene() {
 
 function Stale() {
   const api = useApiClient();
+  const pick = usePick();
   const [left, setLeft] = useState(false);
-  const { data, error, loading, reload } = useData<{ leftOut: boolean; total: number; totalValue: number; trust: TrustBasisData; deals: Array<Deal & { leftOutReason?: string }> }>(`stale?left=${left ? 1 : 0}`);
+  const { data, error, loading, reload } = useData<{ leftOut: boolean; total: number; totalValue: number; trust: TrustBasisData; deals: Array<Deal & { leftOutReason?: string }> }>(pickPath(`stale?left=${left ? 1 : 0}`, pick));
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <span className="text-sm text-muted-foreground">{left ? "Deals left out of the dollar figures (never deleted)." : "Open deals that have sat in their step longer than that step usually takes in the same account."}</span>
         <label className="text-sm" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={left} onChange={(e) => setLeft(e.target.checked)} data-testid="stale-left-toggle" /> Show the deals left out</label>
-        <span className="ml-auto"><Btn onClick={() => api.download("export/stale", "subsync-stale-deals.csv")}>Export CSV</Btn></span>
+        <span className="ml-auto"><Btn onClick={() => api.download(pickPath("export/stale", pick), "subsync-stale-deals.csv")}>Export CSV</Btn></span>
       </div>
       {loading && !data ? <Loading /> : error ? <ErrorBox error={error} onRetry={reload} /> : !data ? null : (
         <>
@@ -108,7 +111,7 @@ function Stale() {
 }
 
 function Pipeline() {
-  const { data, error, loading, reload } = useData<Pipelines>("pipelines");
+  const { data, error, loading, reload } = useData<Pipelines>(pickPath("pipelines", usePick()));
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox error={error} onRetry={reload} />;
   if (!data) return null;

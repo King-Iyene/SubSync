@@ -401,7 +401,8 @@ export async function forecast(s: Scope, f: Filters): Promise<Pl3Forecast> {
       : { value: p.p, low: p.low, high: p.high, enough: p.enough, estimate: true as const, formula: "Chance a deal that reached this stage is won, from your own history, shrunk toward your overall win rate (80% range).", minNote: p.enough ? null : `Fewer than 20 deals reached this stage (${n}); your overall rate is used.` };
     return { stageId: key, stageName: b.stageNames.get(key) ?? key, p: est, passed: n, assumed: p.assumed };
   }).sort((x, y) => y.passed - x.passed).slice(0, 40);
-  const tr = trackRecord(track.map((r) => ({ day: day(r.day), low: num(r.low), mid: num(r.mid), high: num(r.high), actual: num(r.actual) })));
+  // The saved forecasts and their results are kept per account, not per pipeline: with one pipeline picked there is no honest track record to show.
+  const tr = trackRecord(f.pipeline ? [] : track.map((r) => ({ day: day(r.day), low: num(r.low), mid: num(r.mid), high: num(r.high), actual: num(r.actual) })));
   return {
     next30: forecastEstimate(openValue, b.won, b.closed, b.cycle),
     weightedOpen: weightedPipeline(open.map((o) => ({ value: o.value, p: probOf(b, o.key) })), b.prior, b.closed),
@@ -494,7 +495,7 @@ export async function stageHistory(s: Scope, f: Filters, p: number, size: number
   const by = new Map<string, { key: string; name: string; pipeline: string | null; stays: number; med: number[]; p75: number[]; p90: number[]; lim: number[]; est: boolean }>();
   for (const r of stats) {
     const si = keyOf(sm, r.location_id, r.stage_id);
-    if (!si) continue;
+    if (!si || (f.pipeline && slug(si.pipelineName) !== slug(f.pipeline))) continue;
     const c = by.get(si.key) ?? { key: si.key, name: si.name, pipeline: si.pipelineName, stays: 0, med: [], p75: [], p90: [], lim: [], est: false };
     c.stays += num(r.stays);
     if (r.med !== null) c.med.push(num(r.med)); if (r.p75 !== null) c.p75.push(num(r.p75)); if (r.p90 !== null) c.p90.push(num(r.p90)); c.lim.push(num(r.lim));
@@ -718,8 +719,8 @@ export async function replay(s: Scope, f: Filters, days: number): Promise<Pl3Rep
 
 // ---------- weekly receipt ----------
 
-export async function receipt(s: Scope, location: string | null, weekStart: Date): Promise<Pl3Receipt> {
-  const db = sql(), from = weekStart, to = new Date(weekStart.getTime() + 7 * DAY), f: Filters = { from, to, location: location ?? undefined }, w = deals(s, f);
+export async function receipt(s: Scope, location: string | null, weekStart: Date, pipeline: string | null = null): Promise<Pl3Receipt> {
+  const db = sql(), from = weekStart, to = new Date(weekStart.getTime() + 7 * DAY), f: Filters = { from, to, location: location ?? undefined, pipeline }, w = deals(s, f);
   const win = db`d.last_status_change_at >= ${from} and d.last_status_change_at < ${to} and not d.is_test`;
   const [[t], [mv], [ac], [one]] = await Promise.all([
     db`with ${w} select count(*) filter (where d.status = 'won' and ${win})::int won_n, coalesce(sum(d.value) filter (where d.status = 'won' and ${win}), 0)::float8 won_v,
@@ -732,8 +733,9 @@ export async function receipt(s: Scope, location: string | null, weekStart: Date
         (select sum(m.open_value)::float8 from account_metrics_daily m join (${locs(s, location)}) l on l.location_id = m.location_id where m.installation_id = ${s.inst} and m.day = ${localDay(to.getTime() - 1)}::date) b`,
     location ? db`select name from locations where installation_id = ${s.inst} and location_id = ${location}` : db`select null::text name where false`,
   ]);
-  const flow = await moneyFlow(s, { from, to, location: location ?? undefined }).catch(() => null);
-  const pipelineChange = ac?.a !== null && ac?.a !== undefined && ac?.b !== null && ac?.b !== undefined ? Math.round(num(ac.b) - num(ac.a)) : null;
+  const flow = await moneyFlow(s, { from, to, location: location ?? undefined, pipeline }).catch(() => null);
+  // The daily open-money history is kept per account, so with one pipeline picked there is no honest figure for its change.
+  const pipelineChange = pipeline ? null : ac?.a !== null && ac?.a !== undefined && ac?.b !== null && ac?.b !== undefined ? Math.round(num(ac.b) - num(ac.a)) : null;
   const won = { value: num(t?.won_v), n: num(t?.won_n) }, lost = { value: num(t?.lost_v), n: num(t?.lost_n) };
   const body = { weekStart: localDay(from.getTime()), loc: location, moved: num(mv?.moved), won, lost, newDeals: num(t?.new_n), unclogged: num(mv?.unclogged) };
   const parts: string[] = [];

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useData } from "../session";
+import { pickPath } from "@/lib/design/pipeline-pick-link";
+import { usePick } from "./pl3/pick-context";
 import { DataList, EmptyState, ErrorState, LeadDrawer, OpenLeadButton, SkeletonRows, type Column, type LeadSeed } from "../ds";
 import { fmtInt, fmtMoney } from "../ui";
 
@@ -25,7 +27,7 @@ const columns: Array<Column<Deal>> = [
 export function QuietDeals() {
   const [days, setDays] = useState<number>(7);
   const [open, setOpen] = useState<number | null>(null);
-  const { data, error, loading, reload } = useData<Data>(`deal-gaps?days=${days}`);
+  const { data, error, loading, reload } = useData<Data>(pickPath(`deal-gaps?days=${days}`, usePick()));
   const withContact = (data?.deals ?? []).filter((d) => d.contactId);
   const seeds: LeadSeed[] = withContact.map((d) => ({ contactId: d.contactId as string, locationId: d.locationId, name: d.contactName ?? dealName(d), locationName: d.locationName, url: d.url, note: `${dealName(d)}, ${fmtMoney(d.value)}, ${d.pipelineName}: ${d.stageName}. No contact for ${d.daysSinceContact ?? "many"} days.` }));
   return (

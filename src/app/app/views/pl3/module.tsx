@@ -6,6 +6,8 @@ import { usePageRange } from "../../ds/page-range";
 import { Bookmark, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { takeDeepLink } from "@/lib/design/deep-link";
+import { hashWithPick, pickFromHash } from "@/lib/design/pipeline-pick-link";
+import { PickContext } from "./pick-context";
 import type { PlDeal } from "@/lib/analytics/pipeline3-types-interim";
 import { GroupedTabs, Page } from "../../ds";
 import "../speed6.css";
@@ -67,11 +69,13 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
   const [tab, setTab] = useState<TabKey>("overview");
   // A click from the Today "Money at risk" card opens the quiet-deals section (see deep-link.ts).
   const arrived = useRef(false);
+  // The pipeline and account may come in the address (`pp`, `pa`): a pasted link or a bookmark shows the same deals its sender saw.
+  const [picks, setFilters] = useState<PlFilters>(() => { if (typeof window === "undefined") return DEFAULT_FILTERS; const h = pickFromHash(window.location.hash); return { ...DEFAULT_FILTERS, pipeline: h.pipeline, locationId: h.location }; });
+  // A card that counted ONE account opens Pipeline on that account, so its number and the rows behind it are the same deals.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { if (arrived.current) return; const dl = takeDeepLink("pipeline"); if (!dl) return; arrived.current = true; if (tabs.some((t) => t.key === dl.tab)) setTab(dl.tab as TabKey); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (arrived.current) return; const dl = takeDeepLink("pipeline"); if (!dl) return; arrived.current = true; if (tabs.some((t) => t.key === dl.tab)) setTab(dl.tab as TabKey); if (dl.location || dl.pipeline) setFilters((f) => ({ ...f, locationId: dl.location ?? f.locationId, pipeline: dl.pipeline ?? f.pipeline })); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // The dates are the date bar's (one range for the whole app). What this screen keeps is the account, pipeline, owner and search; the dates are laid over them.
   const bar = usePageRange();
-  const [picks, setFilters] = useState<PlFilters>(DEFAULT_FILTERS);
   const filters = useMemo<PlFilters>(() => ({ ...picks, from: bar.ready ? bar.from : undefined, to: bar.ready ? bar.to : undefined, fromTime: bar.ready && bar.timed ? bar.fromTime : undefined, toTime: bar.ready && bar.timed ? bar.toTime : undefined }), [picks, bar.ready, bar.from, bar.to, bar.timed, bar.fromTime, bar.toTime]);
   const [q, setQ] = useState("");
   const [deal, setDeal] = useState<PlDeal | null>(null);
@@ -79,6 +83,8 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
   const [views, setViews] = useState<SavedView[]>([]);
   const [naming, setNaming] = useState(false);
   const [picked, setPicked] = useState<{ name: string; account: string } | null>(null);
+  // The picked pipeline and account travel in the address, so reloading or sharing the page keeps them.
+  useEffect(() => { try { const next = hashWithPick(window.location.hash, { pipeline: picks.pipeline, location: picks.locationId }); if (next !== window.location.hash && window.location.hash.length > 1) window.history.replaceState(null, "", next); } catch { /* the pick still applies on this screen */ } }, [picks.pipeline, picks.locationId]);
   const openCard = useCallback((c: PipeCard) => { setPicked({ name: c.name, account: c.accountName }); setDrill(null); setFilters((f) => ({ ...f, locationId: c.locationId, pipeline: c.name })); }, []);
   const [version, setVersion] = useState(0);
   const search = useRef<HTMLInputElement>(null), top = useRef<HTMLDivElement>(null);
@@ -90,6 +96,7 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
   const index = tabs.findIndex((t) => t.key === tab);
   const goTab = useCallback((k: string) => { setTab(k as TabKey); setDrill(null); top.current?.scrollIntoView({ block: "start", behavior: "smooth" }); }, []);
   const accounts = Array.isArray(health.data?.rows) ? health.data.rows : [];
+  const shownPick = picked ?? (filters.pipeline ? { name: filters.pipeline, account: accounts.find((a) => a.locationId === filters.locationId)?.name ?? "All accounts" } : null);
   const showAccount = !filters.locationId && (accounts.length || 2) > 1;
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -103,7 +110,8 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
   const onPick = (p: FlowPick) => openDrill({ title: p.title, count: p.count, extra: { stage: p.params.stageId, bucket: p.params.bucket, stale: p.params.stale ? 1 : undefined, status: p.params.status ?? "open", reason: p.params.lostReason, owner: p.params.ownerId, source: p.params.source, reach: p.params.reach, flowOpen: p.params.flowOpen ? 1 : undefined, fc: p.params.fc ? 1 : undefined, expect: p.count } });
   const sp: SectionProps = { filters, onOpen: setDeal, activeId: deal?.id ?? null, showAccount, go: goTab, onDrill: openDrill };
   const saveView = (name: string) => { const next = [{ name: name.trim().slice(0, 40), filters, tab }, ...views.filter((v) => v.name !== name.trim())].slice(0, 20); setViews(next); writeViews(next); setNaming(false); };
-  const applyView = (i: number) => { const v = views[i]; if (!v) return; setFilters(v.filters); setQ(v.filters.q); if (tabs.some((t) => t.key === v.tab)) setTab(v.tab); };
+  // A saved view brings back its account AND its pipeline (the picker shows the pipeline from the filters, so it can never say "All pipelines" while a pipeline is applied).
+  const applyView = (i: number) => { const v = views[i]; if (!v) return; setPicked(null); setFilters({ ...DEFAULT_FILTERS, ...v.filters }); setQ(v.filters.q ?? ""); if (tabs.some((t) => t.key === v.tab)) setTab(v.tab); };
 
   const drillList = drill && drill.tab === tab ? (
     <div id="pl-drill" className="mt-5" data-testid="pl-drill">
@@ -115,7 +123,7 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
     switch (tab) {
       case "overview": return <><Overview {...sp} />{drillList}</>;
       case "flow": return filters.pipeline && filters.locationId
-        ? <><p className="ap-fine mb-2"><button type="button" className="ap-link" onClick={() => { setPicked(null); setFilters((f) => ({ ...f, pipeline: "" })); }} data-testid="pl-allpipes">All pipelines</button>{picked ? ` / ${picked.account} / ${picked.name}` : ""}</p><MoneyFlow filters={filters} onPick={onPick} />{drillList}</>
+        ? <><p className="ap-fine mb-2"><button type="button" className="ap-link" onClick={() => { setPicked(null); setFilters((f) => ({ ...f, pipeline: "" })); }} data-testid="pl-allpipes">All pipelines</button>{shownPick ? ` / ${shownPick.account} / ${shownPick.name}` : ""}</p><MoneyFlow filters={filters} onPick={onPick} />{drillList}</>
         : <PipelineGrid filters={filters} onOpen={openCard} onIncludeTest={(v) => setFilters((f) => ({ ...f, includeTest: v }))} />;
       case "needs": return <NeedsAttention {...sp} />;
       case "wonlost": return <><WonLost {...sp} />{drillList}</>;
@@ -126,7 +134,7 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
       case "proof": return <><Proof {...sp} />{drillList}</>;
       case "funnel": return <HistoryFunnel filters={filters} onOpen={setDeal} activeId={deal?.id ?? null} showAccount={showAccount} />;
       case "stuck": return <StuckInStep filters={filters} onOpen={setDeal} activeId={deal?.id ?? null} showAccount={showAccount} />;
-      case "slipping": return <SlippingPanel location={filters.locationId} showAccount={showAccount} />;
+      case "slipping": return <SlippingPanel location={filters.locationId} pipeline={filters.pipeline} showAccount={showAccount} />;
       case "classic": return <div className="[&_h1]:sr-only"><PipelineView /><DealMoves /></div>;
       case "stale": return <div className="[&_h1]:sr-only"><DealsView /></div>;
     }
@@ -137,16 +145,16 @@ export function PipelineModule({ moneyFlow = true, actions = false }: { moneyFlo
       <Page title="Pipeline" subtitle="Where your deal money sits, and what is stuck." actions={<button type="button" className="s6-btn" onClick={() => { setTab("stale"); setDrill(null); }} data-testid="pl-export">Stale deals and CSV export</button>}>
         <div className="ap-head" role="search" aria-label="Filter deals" hidden={tab === "classic" || tab === "stale"}>
           <label className="ap-search"><Search aria-hidden className="size-4" /><span className="sr-only">Search by deal or contact</span><input ref={search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a deal (press /)" data-testid="pl-search" /></label>
-          <span className="ap-fine" data-testid="pl-days">Dates: {bar.label}, {zoneWord()} time, from the bar above. Open money, stuck and open counts are as of now.</span>
+          <span className="ap-fine" data-testid="pl-days">Dates: {bar.label}, {zoneWord()} time, from the bar above. Open money, stuck and open counts are as of now. {shownPick ? `Showing only ${shownPick.name}${filters.locationId ? ` in ${shownPick.account}` : " in every account"}.` : "Showing all pipelines."}</span>
           {accounts.length > 1 && <select className="ap-field" aria-label="Account" value={filters.locationId} onChange={(e) => { setPicked(null); setFilters({ ...filters, locationId: e.target.value, pipeline: "" }); }} data-testid="pl-account"><option value="">All accounts</option>{accounts.map((a) => <option key={a.locationId} value={a.locationId}>{a.name}</option>)}</select>}
-          {moneyFlow && <PipelinePicker filters={filters} value={picked} onPick={openCard} onClear={() => { setPicked(null); setFilters((f) => ({ ...f, pipeline: "" })); }} />}
+          {moneyFlow && <PipelinePicker filters={filters} value={shownPick} onPick={openCard} onClear={() => { setPicked(null); setFilters((f) => ({ ...f, pipeline: "" })); }} />}
           <select className="ap-field" aria-label="Saved views" value="" onChange={(e) => applyView(Number(e.target.value))} data-testid="pl-views"><option value="" disabled>Saved views{views.length ? ` (${views.length})` : ""}</option>{views.map((v, i) => <option key={v.name} value={i}>{v.name}</option>)}</select>
           {naming ? <NameView onSave={saveView} onCancel={() => setNaming(false)} /> : <button type="button" className="s6-btn" onClick={() => setNaming(true)} data-testid="pl-save-view"><Bookmark aria-hidden className="size-4" />Save view</button>}
           {(filters.locationId || filters.q) && <button type="button" className="s6-btn" onClick={() => { setFilters(DEFAULT_FILTERS); setQ(""); }}><X aria-hidden className="size-4" />Clear</button>}
         </div>
         {fixturesOn() && <p className="ap-fine mb-2" role="status">Sample data: these are not your real deals.</p>}
         <GroupedTabs testId="pl-groups" groups={PL_GROUPS} available={tabs.map((t) => t.key)} active={index < 0 ? tabs[0]?.key ?? "overview" : tab} labels={Object.fromEntries(tabs.map((t) => [t.key, t.label]))} tips={Object.fromEntries(tabs.map((t) => [t.key, t.tip]))} onSelect={(k) => { setTab(k as TabKey); setDrill(null); }} label="Pipeline sections" />
-        <div data-testid={`pl-tab-${tab}`}>{content}</div>
+        <PickContext.Provider value={{ pipeline: filters.pipeline, location: filters.locationId }}><div data-testid={`pl-tab-${tab}`}>{content}</div></PickContext.Provider>
         <p className="ap-fine mt-6">Keys: / search, 1 to 9 switch section, up and down move in a list, Enter opens, Esc closes. Nothing is ever deleted from a key.</p>
         {deal && <DealPanel deal={deal} onClose={() => setDeal(null)} onChanged={() => setVersion((v) => v + 1)} filters={filters} />}
       </Page>

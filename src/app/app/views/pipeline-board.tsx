@@ -4,6 +4,8 @@ import { Settings2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LeadDrawer, type LeadSeed } from "../ds";
 import { useData } from "../session";
+import { pickPath } from "@/lib/design/pipeline-pick-link";
+import { usePick } from "./pl3/pick-context";
 import { Empty, ErrorBox, fmtInt, fmtMoney, Loading, Sparkline } from "../ui";
 import { StageRulesCard, type StageControls } from "./stage-rules-card";
 
@@ -85,7 +87,7 @@ function StageColumn({ s, pipe, onOpen }: { s: Stage; pipe: Pipe; onOpen: (c: Ca
 }
 
 export function PipelineBoard() {
-  const { data, error, loading, reload } = useData<BoardData>("pipeline-intel?view=board");
+  const { data, error, loading, reload } = useData<BoardData>(pickPath("pipeline-intel?view=board", usePick()));
   const [pipeKey, setPipeKey] = useState<string | null>(null);
   const [client, setClient] = useState<string | null>(null);
   const [gear, setGear] = useState(false);

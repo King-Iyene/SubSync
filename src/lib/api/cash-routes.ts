@@ -4,6 +4,7 @@ import { contactFacts, assignedBatch, logActions, type ActionLogRow } from "../a
 import { BATCH_CAPS, dryRunWords, planAssign } from "../analytics/unanswered-actions";
 import { CF_FLAGS, CF_PARTS, type CfPart } from "../analytics/cash-types";
 import { RECOVER_KINDS, type RecoverKind } from "../analytics/cash-intel";
+import { pipelineParam } from "../analytics/pipeline-pick";
 import { cashCache, dealsList, dealsSummary, forgetCash, getSettings, muteAccount, recoverList, recoverRowsByKey, recoverSummary, saveBoard, saveSettings, setRowOwner, snoozeRows, unmuteAccount } from "../analytics/cash-queries";
 import type { Scope } from "../analytics/today3-queries";
 import { validZone } from "../analytics/today3-intel";
@@ -69,11 +70,11 @@ export async function handleCash(ctx: Ctx, h: CashHelpers): Promise<Response> {
       if (kindP !== "all" && !KIND_SET.has(kindP)) return json({ error: "Not found" }, 404);
       return done(await recoverList(scope, one, { kind: kindP as RecoverKind | "all", cursor, size, snoozed: sp.get("snoozed") === "1" }, links, now));
     }
-    case "deals": return done(await dealsSummary(scope, one, now));
+    case "deals": return done(await dealsSummary(scope, one, now, 30, pipelineParam(sp)));
     case "deals-list": {
       const k = sp.get("kind") ?? "slipping";
       if (!["slipping", "stale", "soon", "lost"].includes(k)) return json({ error: "Not found" }, 404);
-      return done(await dealsList(scope, one, { kind: k as "slipping" | "stale" | "soon" | "lost", cursor, size }, links));
+      return done(await dealsList(scope, one, { kind: k as "slipping" | "stale" | "soon" | "lost", cursor, size, pipeline: pipelineParam(sp) }, links));
     }
     case "settings": {
       if (level === "self") return json({ error: "Ask your administrator." }, 403);

@@ -98,7 +98,7 @@ export function AppointmentInsights() {
   const overallShow = outcomeHeld + outcomeMiss >= 5 ? outcomeHeld / (outcomeHeld + outcomeMiss) : null;
   const bandTone = d.health.band === "healthy" ? "good" : d.health.band === "watch" ? "caution" : d.health.band ? "bad" : "neutral";
   const headline = d.health.score === null && overallShow === null ? "Not enough marked appointments yet to say much. Mark outcomes and this fills in."
-    : `${d.health.score !== null ? `Calendar health is ${d.health.score} out of 100 (${d.health.band}).` : ""}${overallShow !== null ? ` Show rate is ${Math.round(overallShow * 100)}% (${toneOf(overallShow, SCALES.show) === "good" ? "good" : toneOf(overallShow, SCALES.show) === "caution" ? "worth watching" : "low"}).` : ""}${heat ? ` ${heat.text}` : ""}`.trim();
+    : `${d.health.score !== null ? `Calendar health is ${d.health.score} out of 100 (${d.health.band}).` : ""}${overallShow !== null ? ` Show rate of marked appointments is ${Math.round(overallShow * 100)}% (appointments nobody marked are not counted here; the other tabs show the true rate that counts them) (${toneOf(overallShow, SCALES.show) === "good" ? "good" : toneOf(overallShow, SCALES.show) === "caution" ? "worth watching" : "low"}).` : ""}${heat ? ` ${heat.text}` : ""}`.trim();
 
   // Cards that have not got enough data are one list with their progress, not a row of empty cards.
   const pending: Array<{ id: WidgetId; label: string; have: number; need: number; unit: string }> = [];
@@ -148,7 +148,7 @@ export function AppointmentInsights() {
       <Card title="In short">
         <p className="text-lg font-semibold leading-snug" data-testid="insights-headline">{headline}</p>
         <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="insights-figures">
-          <div><dt className="text-xs text-muted-foreground">Show rate</dt><dd className="text-2xl font-semibold"><RateTag v={overallShow} scale={SCALES.show} strong /></dd></div>
+          <div><dt className="text-xs text-muted-foreground" title="Showed out of showed plus no-show, only appointments someone marked. The other Appointments tabs show the true show rate, which also counts past appointments nobody marked.">Show rate (marked only)</dt><dd className="text-2xl font-semibold"><RateTag v={overallShow} scale={SCALES.show} strong /></dd></div>
           <div><dt className="text-xs text-muted-foreground">Calendar health</dt><dd className={`text-2xl font-semibold tabular-nums ${TONE_TEXT[bandTone]}`}>{d.health.score === null ? "n/a" : d.health.score}</dd></div>
           <div><dt className="text-xs text-muted-foreground">No-shows rebooked</dt><dd className="text-2xl font-semibold tabular-nums">{pct(d.recovery.rebookRate)}</dd></div>
           <div><dt className="text-xs text-muted-foreground">Past, no outcome</dt><dd className={`text-2xl font-semibold tabular-nums ${d.funnel.unmarked > 0 ? "text-warning" : ""}`}>{fmtInt(d.funnel.unmarked)}</dd></div>
