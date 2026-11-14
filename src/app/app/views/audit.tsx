@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useApiClient, useData } from "../session";
 import { EmptyState, ErrorState, InlineAlert, Page, ActionRow, RecordsPanel, Section, SkeletonCards, type MenuItem } from "../ds";
 import { Btn, Card } from "../ui";
+import { PrintPdfButton } from "../ds/share-report";
 import type { Finding, FindingKey, Grade, Verdict } from "@/lib/analytics/audit-v2";
 import type { ClientPage, ProgressLine, Reading } from "@/lib/analytics/audit-clients";
 import { itemsSpec, type RecordsSpec } from "@/lib/analytics/today-records";
@@ -125,6 +126,7 @@ export function AuditView() {
       title="Account audit"
       subtitle={data.focus ? `Only ${data.focus.name}.` : data.scope === "all" ? "What is leaking across your client accounts, and what to fix first." : "What is leaking in your account, and what to fix first."}
       actions={<div className="flex flex-wrap items-center gap-2">
+        <PrintPdfButton />
         {data.canShare && <Btn variant="primary" onClick={() => { void share(); }} disabled={sharing} testId="audit-send-client" title="Share a link with a client">{sharing ? "Creating link..." : "Send this audit to a client"}</Btn>}
         <ActionRow items={menu} testId="audit-more" />
       </div>}
@@ -133,7 +135,7 @@ export function AuditView() {
       <div className="audit-print">
         <style dangerouslySetInnerHTML={{ __html: printCss(data.brand.color) }} />
         {/* The printed page opens with the sender's own name and colour. Nothing else carries a product name. */}
-        <div className="mb-4 hidden border-b-2 pb-3 print:block" data-testid="audit-print-header" style={{ borderColor: accent ?? "var(--primary)" }}>
+        <div className="mb-4 hidden border-b-2 pb-3 print:block" data-testid="audit-print-header" data-own-print-heading style={{ borderColor: accent ?? "var(--primary)" }}>
           {data.brand.logoUrl && <BrandLogo url={data.brand.logoUrl} name={data.brand.name} height={40} className="mb-2" fallback={null} />}
           <p className="text-xl font-semibold" style={{ color: accent ?? "var(--primary)" }}>{data.brand.name ?? "Account audit"}</p>
           <p className="text-sm text-muted-foreground">{data.brand.name ? "Account audit" : "Prepared"} for {data.totals.accounts} {accountWord}, {longDate(data.generatedAt)}</p>

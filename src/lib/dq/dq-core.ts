@@ -172,18 +172,26 @@ export const ZERO: SrcCounts = { leads: 0, dups: 0, junk: 0, answered: 0, qualit
 export const add = (a: SrcCounts, b: SrcCounts): SrcCounts => ({ leads: a.leads + b.leads, dups: a.dups + b.dups, junk: a.junk + b.junk, answered: a.answered + b.answered, quality: a.quality + b.quality, booked: a.booked + b.booked, showed: a.showed + b.showed, won: a.won + b.won, wonValue: a.wonValue + b.wonValue, touchSecs: a.touchSecs + b.touchSecs, touched: a.touched + b.touched });
 /** A rate, or null when the sample is too small to say anything. */
 export const rate = (part: number, whole: number, min = MIN_LEADS): number | null => (whole >= min ? part / whole : null);
-export const pctOf = (r: number | null): string => (r === null ? "not enough data" : `${Math.round(r * 100)}%`);
+export const pctOf = (r: number | null): string => (r === null ? "not enough leads" : `${Math.round(r * 100)}%`);
 /** Average minutes from a new lead to the first person's touch, among leads that got one. */
 export const avgTouchMin = (c: SrcCounts): number | null => (c.touched >= 5 ? Math.round(c.touchSecs / c.touched / 60) : null);
 
 export type SourceRow = { key: string; label: string } & SrcCounts;
 export type Best = { best: SourceRow | null; worst: SourceRow | null; note: string | null };
-/** The share of leads that are good: not a duplicate, not junk, and a person touched them. */
-export const goodRate = (c: SrcCounts): number | null => rate(c.quality, c.leads);
+export const MIN_SOURCE_LEADS = 10; // a source needs this many leads in the window before a percentage or a best/weakest verdict is shown
+/** Clean leads: not a duplicate and not junk. duplicates + junk + clean = leads, always (junk never counts a duplicate twice). */
+export const cleanOf = (c: Pick<SrcCounts, "leads" | "dups" | "junk">): number => Math.max(0, c.leads - c.dups - c.junk);
+/** The share of leads that are good = the clean share, or null under MIN_SOURCE_LEADS. The same leads the "Clean leads" list opens. */
+export const goodRate = (c: SrcCounts): number | null => rate(cleanOf(c), c.leads, MIN_SOURCE_LEADS);
+/** The tally of a set of sources must add up: duplicates + junk + clean = leads. Returns the first problem in words, or null. */
+export const tallyProblem = (rows: ReadonlyArray<Pick<SrcCounts, "leads" | "dups" | "junk">>): string | null => {
+  for (const r of rows) if (r.dups < 0 || r.junk < 0 || r.dups + r.junk > r.leads) return `A source has ${r.dups} duplicates and ${r.junk} junk but only ${r.leads} leads.`;
+  return null;
+};
 /** The best and the worst source: only sources with at least MIN_LEADS leads count, and at least two of them, or there is nothing to compare. */
 export function bestWorst(rows: readonly SourceRow[]): Best {
-  const ok = rows.filter((r) => r.leads >= MIN_LEADS);
-  if (ok.length < 2) return { best: null, worst: null, note: `Not enough leads per source yet: a source needs ${MIN_LEADS} leads, and two sources are needed to compare.` };
+  const ok = rows.filter((r) => r.leads >= MIN_SOURCE_LEADS);
+  if (ok.length < 2) return { best: null, worst: null, note: `Not enough leads: a source needs ${MIN_SOURCE_LEADS} leads to be compared, and two sources are needed.` };
   const score = (r: SourceRow) => (goodRate(r) ?? 0) + (r.wonValue > 0 ? 0.0000001 * r.wonValue : 0);
   const sorted = [...ok].sort((a, b) => score(b) - score(a) || b.leads - a.leads);
   return { best: sorted[0], worst: sorted[sorted.length - 1], note: null };
@@ -191,7 +199,7 @@ export function bestWorst(rows: readonly SourceRow[]): Best {
 const money = (v: number) => `$${Math.round(v).toLocaleString("en-US")}`;
 export function bestWorstLine(b: Best): string {
   if (!b.best || !b.worst) return b.note ?? "";
-  const one = (r: SourceRow) => `${r.label} (${pctOf(goodRate(r))} good leads${r.wonValue > 0 ? `, ${money(r.wonValue)} won` : ""}${rate(r.dups, r.leads) !== null && (r.dups / r.leads) >= 0.2 ? `, ${Math.round((r.dups / r.leads) * 100)}% duplicates` : ""})`;
+  const one = (r: SourceRow) => `${r.label} (${pctOf(goodRate(r))} good leads${r.wonValue > 0 ? `, ${money(r.wonValue)} won` : ""}${r.dups > 0 && rate(r.dups, r.leads, MIN_SOURCE_LEADS) !== null ? `, ${Math.round((r.dups / r.leads) * 100)}% duplicates` : ""})`;
   return `Best: ${one(b.best)}. Weakest: ${one(b.worst)}.`;
 }
 

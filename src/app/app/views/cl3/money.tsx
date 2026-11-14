@@ -15,6 +15,7 @@ type Props = { onOpen: (id: string) => void; onPayments: (id?: string) => void; 
 const FILTERS: Array<[Cl3Bucket, string, string]> = [
   ["all", "All accounts", "Every client account."], ["unpaid", "Not paid", "Past due, cancelled, paused, or a status to check."], ["failing", "Payment failing", "The platform reports the plan as past due or unpaid."],
   ["no_plan", "No plan", "Not on a paid plan from you."], ["paid", "Paid up", "Plan is active."], ["empty_wallet", "Empty credit balance", "Texts and calls can stop at zero."], ["app_missing", "SubSync missing", "SubSync is not installed on this account."],
+  ["trial", "On a trial", "The platform reports the plan as trialing."], ["app_trial", "SubSync on a trial", "The platform reports SubSync on this account as on its free trial."],
 ];
 const cash = (c: string | null, n: number) => `${!c || c === "USD" ? "$" : `${c} `}${Math.round(n).toLocaleString("en-US")}`;
 export const cl3fxOn = () => { try { return typeof window !== "undefined" && /[?&]cl3fx\b/.test(window.location.search + window.location.hash); } catch { return false; } };
@@ -22,10 +23,10 @@ export const cl3fxOn = () => { try { return typeof window !== "undefined" && /[?
 function sampleMoney(): Cl3Money {
   const mk = (i: number, pay: string, label: string, name: string, monthly: number | null, bal: number | null, sub: Cl3MoneyRow["subsync"]): Cl3MoneyRow => ({
     locationId: `sample${i}`, name, email: null, plan: { name: monthly ? "Growth plan" : null, pay, payLabel: label, statusRaw: pay, monthly, currency: "USD", interval: "month", daysInStatus: pay === "past_due" ? 9 : 40, since: null, state: "ok", explain: "Sample data." },
-    level: i % 2 ? "ok" : "watch", summary: null, wallet: { balance: bal, state: bal === null ? null : "ok" }, subsync: sub, nextChargeAt: null, failureReason: null, url: null,
+    level: i % 2 ? "ok" : "watch", summary: null, wallet: { balance: bal, state: bal === null ? null : "ok" }, subsync: sub, install: sub === "installed" ? { installedAt: "2026-10-30T00:00:00.000Z", versionId: null, planLabel: "Growth plan", onTrial: i === 2, trialEndsAt: null, endingSoon: false, line: "Installed, 2026-10-30, Growth plan" } : null, nextChargeAt: null, failureReason: null, url: null,
   });
   const rows = [mk(1, "past_due", "Past due", "Sample Roofing Co", 297, 12, "installed"), mk(2, "paid", "Paid up", "Sample Dental", 297, 40, "installed"), mk(3, "none", "Not on a paid plan from you", "Sample Realty", null, 0, "missing")];
-  return { rows, total: 3, next: null, size: 20, summary: { accounts: 3, counts: { all: 3, unpaid: 1, failing: 1, no_plan: 1, paid: 1, empty_wallet: 1, app_missing: 1 }, expectedMonthly: [{ currency: "USD", monthly: 297, accounts: 1 }], atRisk: [{ currency: "USD", monthly: 297, accounts: 1 }], plans: [{ key: "Growth plan", label: "Growth plan", count: 2 }], apps: { state: "ok", installed: 2, missing: 1, unknown: 0 }, needsPermission: [], today: { headline: "1 client has a payment that did not go through (about $297 a month at the plan price). Ask them to update their card.", bucket: "failing" }, historyStarts: null } };
+  return { rows, total: 3, next: null, size: 20, summary: { accounts: 3, counts: { all: 3, unpaid: 1, failing: 1, no_plan: 1, paid: 1, empty_wallet: 1, app_missing: 1, trial: 0, app_trial: 1 }, expectedMonthly: [{ currency: "USD", monthly: 297, accounts: 1 }], atRisk: [{ currency: "USD", monthly: 297, accounts: 1 }], plans: [{ key: "Growth plan", label: "Growth plan", count: 2 }], apps: { state: "ok", installed: 2, missing: 1, unknown: 0, onTrial: 1, endingSoon: 0 }, planRead: "ok", needsPermission: [], today: { headline: "1 client has a payment that did not go through (about $297 a month at the plan price). Ask them to update their card.", bucket: "failing" }, historyStarts: null } };
 }
 
 export function MoneyTab({ onOpen, onPayments, showApps, showHistory }: Props) {
@@ -53,7 +54,20 @@ export function MoneyTab({ onOpen, onPayments, showApps, showHistory }: Props) {
                 <p className="cl-sentence" data-testid="cl3-today">{s.today.headline}</p>
                 {s.today.bucket && <button type="button" className="s6-btn" data-kind="primary" onClick={() => setBucket(s.today.bucket as Cl3Bucket)}>Show these {s.counts[s.today.bucket].toLocaleString("en-US")}</button>}
               </section>
-              {perm.length > 0 && <p className="ap-fine" role="status" data-testid="cl3-needs-permission">Needs permission: reconnect to let SubSync {scopeList(perm)}. Until then the plan or balance columns stay empty.</p>}
+              {perm.length > 0 && <p className="ap-fine" role="status" data-testid="cl3-needs-permission">Needs permission: reconnect to let SubSync {scopeList(perm)}. Until then the matching columns stay empty.</p>}
+              <section className="cl-drill" aria-label="Plans and payments" data-testid="cl3-plans">
+                <h3 className="mb-1 text-base font-semibold">Plans and payments</h3>
+                {s.planRead === "ok" ? (
+                  <p className="cl-sentence" data-testid="cl3-plans-counts">
+                    <button type="button" className="ap-link" onClick={() => setBucket("failing")} data-testid="cl3-plans-failing">{s.counts.failing.toLocaleString("en-US")} past due</button>{", "}
+                    <button type="button" className="ap-link" onClick={() => setBucket("unpaid")}>{Math.max(0, s.counts.unpaid - s.counts.failing).toLocaleString("en-US")} cancelled, paused or to check</button>{", "}
+                    <button type="button" className="ap-link" onClick={() => setBucket("trial")} data-testid="cl3-plans-trial">{s.counts.trial.toLocaleString("en-US")} on a trial</button>.
+                  </p>
+                ) : s.planRead === "needs_permission" ? <p className="cl-sentence" data-testid="cl3-plans-state">Needs permission: reconnect and allow SubSync to {scopeList(["saas/company.read"])}. Until then SubSync cannot say who is past due.</p>
+                  : s.planRead === "not_available" ? <p className="cl-sentence" data-testid="cl3-plans-state">Not available from the platform for these accounts: it does not give plan details to this kind of app. Check billing in your CRM.</p>
+                  : <p className="cl-sentence" data-testid="cl3-plans-state">Not read yet. The next hourly read fills this in.</p>}
+                <p className="ap-fine">Source: from your platform billing (the plan list). Payments due in the next 7 days and the next payment date: {NOT_FROM_PLATFORM}, so they are not counted or guessed. Defaulters are listed first below.</p>
+              </section>
               <div className="cl-tiles" aria-label="Money headline">
                 <div className="cl-tile" style={{ cursor: "default" }} title="Estimate: the plan price per month of every paid-up account. A yearly price is divided by 12. It is the price, not what was charged."><b>{s.expectedMonthly.length ? s.expectedMonthly.map((e) => cash(e.currency, e.monthly)).join(" + ") : "Not enough data"}</b><span>Expected each month (estimate)</span></div>
                 <button type="button" className="cl-tile" onClick={() => setBucket("unpaid")} title="Estimate: the monthly plan price of accounts that are not paid up."><b>{s.atRisk.length ? s.atRisk.map((e) => cash(e.currency, e.monthly)).join(" + ") : "$0"}</b><span>At risk each month (estimate)</span></button>
@@ -77,7 +91,7 @@ export function MoneyTab({ onOpen, onPayments, showApps, showHistory }: Props) {
                         <td>{x.plan.name ?? (x.plan.pay === "none" ? "No plan" : "Plan name not given")}</td>
                         <td title={x.plan.explain}>{x.plan.payLabel}{x.plan.daysInStatus !== null && x.plan.pay !== "paid" && x.plan.pay !== "none" ? <span className="ap-fine"> {x.plan.daysInStatus} {x.plan.daysInStatus === 1 ? "day" : "days"} since we saw it change</span> : null}</td>
                         <td data-num>{x.plan.monthly !== null ? `${cash(x.plan.currency, x.plan.monthly)}/mo` : ""}</td>
-                        {showApps && <td>{x.subsync === "installed" ? "Installed" : x.subsync === "missing" ? "Not installed" : "Not read yet"}</td>}
+                        {showApps && <td title={x.install?.line}>{x.install ? x.install.line : x.subsync === "installed" ? "Installed" : x.subsync === "missing" ? "Not installed" : s.apps.state === "needs_permission" ? "Needs permission: reconnect" : "Not read yet"}{x.install?.endingSoon ? <span className="ap-fine"> trial ends soon</span> : null}</td>}
                         <td>{x.wallet.balance !== null ? (x.wallet.balance <= 0 ? "Empty" : x.wallet.balance.toLocaleString("en-US")) : x.wallet.state === "needs_permission" ? "Needs permission: reconnect" : ""}</td>
                         <td><LevelChip level={x.level} /></td>
                         <td className="text-right"><span className="inline-flex flex-wrap items-center justify-end gap-2">
@@ -97,7 +111,20 @@ export function MoneyTab({ onOpen, onPayments, showApps, showHistory }: Props) {
                 <h3 className="mb-1 text-base font-semibold">Upcoming charges and apps</h3>
                 <p className="ap-fine">Next charge date, failed-payment reasons, other marketplace apps in each account, buying an app for every account and bulk install: {NOT_FROM_PLATFORM}. They stay in your CRM.
                   {home && <a className="ap-link" href={home} target="_blank" rel="noreferrer" data-testid="cl3-crm-home">Open your CRM (billing and apps)</a>}</p>
-                {showApps && <p className="ap-fine" data-testid="cl3-apps">SubSync: {s.apps.state === "ok" ? `${s.apps.installed} installed, ${s.apps.missing} not installed${s.apps.unknown ? `, ${s.apps.unknown} not read yet` : ""}.` : "not read yet. If this stays empty after the next hourly read, reconnect to let SubSync read which apps are installed."}</p>}
+                {showApps && (
+                  <div data-testid="cl3-apps">
+                    <h3 className="mb-1 mt-2 text-base font-semibold">Marketplace installs (SubSync)</h3>
+                    {s.apps.state === "ok" ? (
+                      <p className="ap-fine">
+                        <button type="button" className="ap-link" onClick={() => setBucket("all")}>{s.apps.installed} installed</button>{", "}
+                        <button type="button" className="ap-link" onClick={() => setBucket("app_missing")}>{s.apps.missing} not installed</button>{", "}
+                        <button type="button" className="ap-link" onClick={() => setBucket("app_trial")} data-testid="cl3-apps-trial">{s.apps.onTrial} on a trial</button>
+                        {s.apps.endingSoon > 0 ? `, ${s.apps.endingSoon} trial ending within 3 days` : ""}{s.apps.unknown ? `, ${s.apps.unknown} not read yet` : ""}. Source: the list the platform gives of accounts where SubSync is installed. The platform gives the trial flag but no trial end date{s.apps.endingSoon === 0 ? ", so a trial ending soon shows only when the install event recorded one" : ""}.
+                      </p>
+                    ) : s.apps.state === "needs_permission" ? <p className="ap-fine">Needs permission: reconnect and allow SubSync to {scopeList(["oauth.readonly"])}.</p>
+                      : <p className="ap-fine">Not read yet. The next hourly read fills this in. If it stays empty, reconnect to let SubSync see where it is installed.</p>}
+                  </div>
+                )}
               </section>
               {showHistory && !sample && <History onOpen={onOpen} />}
             </>

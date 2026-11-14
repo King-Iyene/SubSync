@@ -1044,3 +1044,21 @@ One definition per label; the basis is written in words wherever a rate appears.
 - **True show rate** (shown as "true show rate", the default on the Appointments tabs and their result line) = showed / (showed + no-show + past appointments nobody marked). Past appointments with no outcome count against it, because staff forgot to mark them. Needs 5 in the denominator.
 - **Show rate of marked appointments** (Insights, "Show rate (marked only)") = showed / (showed + no-show), only appointments someone marked. It is what the CRM would report. It is always the higher of the two when some are unmarked.
 - The two can differ a lot (86% against 21% when most past appointments were never marked). That gap is the point of the hygiene lists. A rate is never shown as a bare "show rate" next to the other without the words above.
+
+## Lead flow card ("Where do my leads go?")
+- Counts come LIVE from the contacts with the same WHERE and definitions as the lists behind each number (`leadWhere` + `LEAD_SQL` in `dq-queries.ts`). A scope of more than 5 accounts counts the last 2 days live and older days from the daily record (`dq_source_daily`).
+- duplicates + junk + clean = leads (junk never counts a duplicate twice). Good leads = the clean share. A source under 10 leads shows "not enough leads", never 0
+## Lead flow card ("Where do my leads go?")
+- Counts come LIVE from the contacts with the same WHERE and definitions as the lists behind each number (`leadWhere` + `LEAD_SQL` in `dq-queries.ts`). A scope of more than 5 accounts counts the last 2 days live and older days from the daily record (`dq_source_daily`).
+- duplicates + junk + clean = leads (junk never counts a duplicate twice). Good leads = the clean share. A source under 10 leads shows "not enough leads", never 0%. Best/Weakest needs two sources of 10+ leads.
+- The dots play one pass and rest (Pause/Play, Replay, reduced motion, off-screen and hidden-tab guards).
+
+## Clients, Plans and payments and Marketplace installs (13 Nov 2026; Money tab, code src/lib/analytics/cl3-money-core.ts, clients3-installs.ts, clients3-saas.ts)
+- **Past due**: client accounts whose plan status word from the platform plan list is past due, unpaid, incomplete, failed or overdue. Source line on screen: "from your platform billing". Opens exactly these rows (bucket failing). Defaulters sort first.
+- **On a trial**: plan status word is trialing or trial (bucket trial). No trial end date exists in the plan list, so no "trial ending" count is made from it.
+- **Cancelled, paused or to check**: unpaid minus past due (same rows as bucket unpaid minus bucket failing).
+- **Payments due in 7 days / next payment date / failure reason**: NOT available from the platform. Never counted or guessed; the screen says so.
+- **Three honest states** for the plan list: Needs permission: reconnect (the platform said the token is not authorized for this scope, or the install lacks saas/company.read); Not available from the platform for these accounts (any other refusal); real data. Same words for the installed list (oauth.readonly). Whole-list state = any readable row wins, then a permission refusal, then not available, else not read yet.
+- **SubSync installed / not installed**: from GET /oauth/installedLocations (oauth.readonly): isInstalled true. An account the list no longer holds, after a fully successful read, is recorded as not installed.
+- **SubSync on a trial** (bucket app_trial): the installed list says trial.onTrial is true. **Trial ending within 3 days**: only when the install event recorded a trial start and length (end = start + length) and the end is within 3 days and not past. Otherwise no date is shown or guessed.
+- **App plan label**: Growth plan, Earlier test plan, or Other plan, from the plan id (never guessed). Tests: src/lib/__tests__/clients3-installs.test.ts.

@@ -111,7 +111,7 @@ import { MIN_CLOSED_DEALS as MIN_CLOSED, OUTLIER_MIN_DEALS, OUTLIER_SHARE, outli
 import { parsePickedAccounts } from "../design/filters";
 import { myConnectionRemove, myConnectionsView, myConnectionStart, myConnectionTest, policySave, teamConnectionRevoke, teamConnectionsView } from "./connections-api";
 import { bellAction, bellView, copyPreview, copyReset, copySave, destinationAdvanced, destinationRemove, destinationsView, destinationStart, destinationTest, prefSave, prefsView, prefTest } from "./notifications-api";
-import { meetingConfirm, meetingContactSearch, meetingDismiss, meetingIgnore, meetingInboxView, meetingLink, meetingSettingsSave } from "./meetings-api";
+import { meetingConfirm, meetingContactSearch, meetingDismiss, meetingIgnore, meetingInboxView, meetingLink, meetingRecheck, meetingSettingsSave } from "./meetings-api";
 import { meetingLoggedView } from "./meeting-logged-api";
 import { meetingSetupAccountView, meetingSetupFieldsSave, meetingSetupFieldsView, meetingSetupPreview, meetingSetupSaveMine, meetingSetupView } from "./meeting-setup-api";
 import { can, personFromSession } from "../connections/person";
@@ -154,6 +154,7 @@ import { handleTeamRoles } from "./team-roles-routes";
 import { handleSettings2 } from "./settings2-routes";
 import { handlePayments } from "./payments-routes";
 import { handleToday3, handleToday3Act } from "./today3-routes";
+import { handleReportShare } from "./report-share-routes";
 import { handleCash, handleCashAct } from "./cash-routes";
 import { handleWg, handleWgAct } from "./wg-routes";
 import { handleBr } from "./br-routes";
@@ -168,7 +169,8 @@ import { grantedOf } from "./workflows-api";
 import { handleClientActions } from "./clients-actions-routes";
 import { handlePeopleActions } from "./people-actions-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
-import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
+import { handleOwnerFeedback } from "./owner-feedback";
+import { changedSettingKeys,feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
 import { groupStatus, parseGranted } from "../scope-groups";
 import { NOTE_SCOPE } from "../meeting-wording";
 import { giveFeedback, history as settingsHistoryView, ownSuggestions, reportProblem, suggest, whoOf } from "./f8-routes";
@@ -2245,6 +2247,8 @@ async function dispatch(ctx: Ctx): Promise<Response> {
   if (blocked) return blocked;
 
   try {
+    // The platform owner's Feedback inbox: 404 for everyone else (checked in authenticate and again inside).
+    if (a === "owner") return await handleOwnerFeedback(ctx, request, segments);
     if (a === "data-health") return await handleDataHealth(ctx, { allowed: allowedIds, token: (c, loc) => locationAccessToken(c.session.companyId, loc), links: async () => (await scope(ctx)).links });
     if (a === "workflows") return await handleWorkflows(ctx, { allowed: allowedIds, token: (c, loc) => locationAccessToken(c.session.companyId, loc) });
     if (a === "people") {
@@ -2295,6 +2299,8 @@ async function dispatch(ctx: Ctx): Promise<Response> {
     if (a === "clients2" && ((method === "GET" && !b && ctx.url.searchParams.has("part")) || (method === "POST" && b && ctx.segments.length === 2))) {
       return await handleClients2(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
+    // Share a report: /api/app/report-share (list, make a link) and /api/app/report-share/revoke. Owners and administrators only (checked inside); the company is the signed session's.
+    if (a === "report-share" && ((method === "GET" && !b) || (method === "POST" && (!b || (b === "revoke" && ctx.segments.length === 2))))) return await handleReportShare(ctx);
     // Today (front page): /api/app/today3?part=... (today, list, proof, numbers, settings, export; read only) and /api/app/today3/act/... (SubSync-only notes).
     if (a === "today3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleToday3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
@@ -2523,6 +2529,7 @@ async function dispatch(ctx: Ctx): Promise<Response> {
       if (a === "my-connections" && b && c === "start") return await myConnectionStart(ctx, b);
       if (a === "my-connections" && b && c === "test") return await myConnectionTest(ctx, b);
       if (a === "meeting-inbox" && b === "confirm") return await meetingConfirm(ctx);
+      if (a === "meeting-inbox" && b === "recheck") return await meetingRecheck(ctx);
       if (a === "meeting-setup" && b === "preview" && !c) return await meetingSetupPreview(ctx);
       if (a === "meeting-inbox" && b && c === "link") return await meetingLink(ctx, b);
       if (a === "meeting-inbox" && b && c === "dismiss") return await meetingDismiss(ctx, b);

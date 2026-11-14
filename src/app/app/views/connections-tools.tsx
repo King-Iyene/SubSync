@@ -1,5 +1,6 @@
 "use client";
 
+import { guideDocHref } from "@/lib/site/doc-map";
 import { useState, type ReactNode } from "react";
 import type { BrandId } from "@/lib/brand-marks";
 import { CALENDAR_FIX, CALENDAR_KEY, calendarLine, calendarStatus, type CalendarItem, SLACK_CHAT_NOTE, slackChatLine, slackChatState, type Chip, type SlackChatFacts } from "@/lib/connections/tools-status";
@@ -33,7 +34,7 @@ export function ToolRow({ id, icon, name, tone, status, line, what, owner, guide
         <p className="mt-0.5 text-sm">{line}</p>
         <p className="mt-0.5 text-xs text-muted-foreground">{what}</p>
         {owner && <p className="mt-0.5 text-xs text-muted-foreground">Owned by: {owner}</p>}
-        {guide && <p className="mt-0.5 text-xs"><a href="#help" className="inline-flex min-h-9 items-center font-medium underline underline-offset-4" data-testid={`how-${id}`} onClick={() => remember(GUIDE_REQUEST_KEY, guide)}>How this works</a></p>}
+        {guide && <p className="mt-0.5 text-xs"><a href="#help" className="inline-flex min-h-9 items-center font-medium underline underline-offset-4" data-testid={`how-${id}`} onClick={() => remember(GUIDE_REQUEST_KEY, guide)}>How this works</a>{guideDocHref(guide) && <a className="ml-4 inline-flex min-h-9 items-center underline underline-offset-4" href={guideDocHref(guide) as string} target="_blank" rel="noopener noreferrer">Read the full guide</a>}</p>}
         {children && <div className="mt-2 max-sm:[&_button]:min-h-11">{children}</div>}
       </div>
     </li>

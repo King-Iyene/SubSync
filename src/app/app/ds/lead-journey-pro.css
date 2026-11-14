@@ -9,7 +9,7 @@
   radial-gradient(40% 50% at 20% 30%, color-mix(in srgb, var(--s6-cyan) 22%, transparent), transparent 70%),
   radial-gradient(40% 50% at 70% 60%, color-mix(in srgb, var(--s6-violet) 20%, transparent), transparent 70%),
   radial-gradient(35% 45% at 90% 20%, color-mix(in srgb, var(--s6-amber) 16%, transparent), transparent 70%);
-  animation: ljp-mesh 22s ease-in-out infinite alternate; pointer-events: none; }
+  animation: ljp-mesh 22s ease-in-out 1 forwards; pointer-events: none; }
 @keyframes ljp-mesh { from { transform: translate3d(-3%, -2%, 0) scale(1); } to { transform: translate3d(3%, 2%, 0) scale(1.08); } }
 .ljp-canvas { position: absolute; left: 0; top: 0; pointer-events: none; transition: transform 220ms ease-out; }
 .ljp-leaders { position: absolute; inset: 0; pointer-events: none; }

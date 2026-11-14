@@ -3,11 +3,11 @@ import { GHL_API } from "../ghl/client";
 import { ghlFetch } from "../ghl/http";
 import { failureText, runAction, type Blocker, type RunResult, type Target } from "../ghl/workbench";
 import {
-  BULK_CAP, dndFor, fillMerge, finalText, guardSend, idemKey, parseDnd, smsSegments, textHash, type DndState, type GuardInput, type SendChannel, type SendSettings, type Who,
+  BULK_CAP, TURN_ON_MEANS, composerState, dndFor, dryRunMessage, fillMerge, finalText, guardSend, idemKey, parseDnd, smsSegments, textHash, type DndState, type GuardInput, type SendChannel, type SendSettings, type Who,
 } from "../ghl/send-guard";
 import { deleteTemplate, checkTemplate, listTemplates, loadSettings, loadUsage, parseSettings, recordSend, saveSettings, saveTemplate } from "../analytics/send-store";
 import { installationHasScope } from "../analytics/cleanup-queries";
-import { writeEnabledFor } from "../analytics/cleanup-config";
+import { schemaReady, setWriteEnabled, writeEnabledFor } from "../analytics/cleanup-config";
 import { isLive } from "../live-flags";
 import { json, type AuthContext } from "./auth";
 
@@ -122,16 +122,16 @@ const resultJson = (r: Extract<OneResult, { kind: "ran" }>, name: string) => {
     case "needs_ack": return json({ ok: false, needsAck: true, warnings: res.warnings }, 409);
     case "needs_confirm": return json({ ok: false, message: "Confirm to continue." }, 409);
     case "rate_limited": return json({ ok: false, message: `Slow down a little: try again in ${res.retryInSeconds} seconds.`, retryInSeconds: res.retryInSeconds }, 429);
-    case "needs_permission": return json({ ok: false, needsPermission: true, message: "Needs permission: reconnect SubSync and allow it to send messages. Nothing was sent." }, 403);
+    case "needs_permission": return json({ ok: false, needsPermission: true, message: "Needs permission: reconnect to allow sending. Nothing was sent." }, 403);
     case "failed": return json({ ok: false, message: `${failureText(res.status)} Nothing was recorded as sent. Press Send again to retry.`, retry: true }, 502);
-    case "dry_run": return json({ ok: true, dryRun: true, reason: res.reason, summary: res.summary, message: res.reason === "account" ? "Not allowed for this account yet, so nothing was sent. Here is what would have been sent." : "Sending is switched off on the server, so nothing was sent. Here is what would have been sent." });
+    case "dry_run": return json({ ok: true, dryRun: true, reason: res.reason, summary: res.summary, message: dryRunMessage(res.reason) });
     case "done": return json({ ok: true, done: true, summary: `Sent to ${name}. This cannot be taken back.`, undo: null });
   }
 };
 
 /** A single message from the composer: /api/app/workbench/preview and /do route here when the action is a message. */
 export async function messageRoute(ctx: Ctx, deps: SendDeps, body: Record<string, unknown>, doIt: boolean): Promise<Response> {
-  if (!sendEnabled(ctx)) return json({ error: "Sending from SubSync is not switched on." }, 403);
+  if (!sendEnabled(ctx)) return json({ error: "Texting and emailing from SubSync is not available in this version yet." }, 403);
   const a = (body.action && typeof body.action === "object" ? body.action : {}) as Record<string, unknown>;
   const locationId = typeof body.locationId === "string" && ID.test(body.locationId) ? body.locationId : null;
   const contactId = typeof body.contactId === "string" && ID.test(body.contactId) ? body.contactId : null;
@@ -153,7 +153,7 @@ export async function messageRoute(ctx: Ctx, deps: SendDeps, body: Record<string
 // ---------------- bulk: "Send to selected", a hard cap, one typed confirmation ----------------
 
 export async function bulkRoute(ctx: Ctx, deps: SendDeps, body: Record<string, unknown>, doIt: boolean): Promise<Response> {
-  if (!sendEnabled(ctx)) return json({ error: "Sending from SubSync is not switched on." }, 403);
+  if (!sendEnabled(ctx)) return json({ error: "Texting and emailing from SubSync is not available in this version yet." }, 403);
   const locationId = typeof body.locationId === "string" && ID.test(body.locationId) ? body.locationId : null;
   const channel = body.channel === "SMS" || body.channel === "Email" ? (body.channel as SendChannel) : null;
   const ids = Array.isArray(body.contactIds) ? [...new Set((body.contactIds as unknown[]).filter((x): x is string => typeof x === "string" && ID.test(x)))] : [];
@@ -198,11 +198,14 @@ const mayConfigure = (ctx: AuthContext) => ctx.kind !== "client" && whoOf(ctx).i
 
 /** What the composer needs to know about sending for one account (read-only). */
 export async function sendStateFor(ctx: AuthContext, locationId: string) {
-  const [settings, scope, templates] = await Promise.all([loadSettings(ctx.installationId, locationId), ctx.demo ? Promise.resolve(false) : installationHasScope(ctx.installationId, SCOPE), listTemplates(ctx.installationId, locationId)]);
+  const [settings, scope, templates, mode] = await Promise.all([loadSettings(ctx.installationId, locationId), ctx.demo ? Promise.resolve(false) : installationHasScope(ctx.installationId, SCOPE), listTemplates(ctx.installationId, locationId), modeFor(ctx, locationId)]);
   const who = whoOf(ctx);
+  const roleOk = who.kind !== "agency" || (who.isOwnerOrAdmin && settings.allowAgencySend);
+  const facts = { enabled: sendEnabled(ctx), killed: killed(), paused: settings.paused, needsPermission: !ctx.demo && !scope, roleOk, agencyOff: who.kind === "agency" && who.isOwnerOrAdmin && !settings.allowAgencySend, optedIn: mode.optedIn, masterOn: mode.masterOn };
   return {
-    enabled: sendEnabled(ctx), killed: killed(), paused: settings.paused, needsPermission: !ctx.demo && !scope,
-    roleOk: who.kind !== "agency" || (who.isOwnerOrAdmin && settings.allowAgencySend), footerEnabled: settings.footerEnabled, footerText: settings.footerText,
+    ...facts,
+    /** The one plain state the message box shows: why it is locked, or that it works up to the preview only. */
+    state: composerState(facts), canTurnOn: mayConfigure(ctx) && !ctx.demo, footerEnabled: settings.footerEnabled, footerText: settings.footerText,
     quiet: { start: settings.quietStartHour, end: settings.quietEndHour }, caps: { personHour: settings.perPersonHour, personDay: settings.perPersonDay, accountDay: settings.accountDay }, bulkCap: BULK_CAP,
     templates: templates.map((t) => ({ id: `u:${t.id}`, label: t.name, channel: t.channel, subject: t.subject, text: t.body, mine: true })),
   };
@@ -215,13 +218,57 @@ export async function settingsRoute(ctx: Ctx, deps: Pick<SendDeps, "allowed">): 
   if (!ID.test(loc)) return json({ error: "Send the account" }, 400);
   const allowed = await deps.allowed();
   if (allowed && !allowed.includes(loc)) return json({ error: "Account not found" }, 404);
-  if (!sendEnabled(ctx)) return json({ error: "Sending from SubSync is not switched on." }, 403);
-  if (ctx.request.method === "GET") return json({ settings: await loadSettings(ctx.installationId, loc), canEdit: mayConfigure(ctx), killed: killed() });
+  if (!sendEnabled(ctx)) return json({ error: "Texting and emailing from SubSync is not available in this version yet." }, 403);
+  if (ctx.request.method === "GET") {
+    const db = sql();
+    const [settings, mode, [row]] = await Promise.all([loadSettings(ctx.installationId, loc), modeFor(ctx, loc), db`select name from locations where installation_id = ${ctx.installationId} and location_id = ${loc} limit 1`]);
+    return json({ settings, canEdit: mayConfigure(ctx), killed: killed(), optedIn: mode.optedIn, masterOn: mode.masterOn, accountName: (row?.name as string | null) ?? "Unnamed account" });
+  }
   if (!mayConfigure(ctx)) return json({ error: "Only an owner or administrator can change these rules." }, 403);
   const s = parseSettings(body?.settings);
   await saveSettings(ctx.installationId, loc, s, actorOf(ctx));
   try { const db = sql(); await db`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${actorOf(ctx)}, 'message.settings', ${db.json({ locationId: loc, paused: s.paused } as never)})`; } catch { /* the settings row holds who and when */ }
   return json({ ok: true, settings: s });
+}
+
+
+const nameOfAccount = async (ctx: AuthContext, loc: string): Promise<string | null> => {
+  const [row] = await sql()`select name from locations where installation_id = ${ctx.installationId} and location_id = ${loc} and not ignored limit 1`;
+  return row ? ((row.name as string | null) ?? "Unnamed account") : null;
+};
+
+/** The accounts and whether sending is turned on for each (owners and administrators). One page of 8, searchable. */
+export async function sendAccountsRoute(ctx: Ctx, deps: Pick<SendDeps, "allowed">): Promise<Response> {
+  if (!sendEnabled(ctx)) return json({ error: "Texting and emailing from SubSync is not available in this version yet." }, 403);
+  const allowed = await deps.allowed();
+  const db = sql();
+  const ready = (await schemaReady()).rules;
+  const q = (ctx.url.searchParams.get("aq") ?? "").trim().toLowerCase().slice(0, 60);
+  const page = Math.max(0, Math.min(1000, Number.parseInt(ctx.url.searchParams.get("ap") ?? "0", 10) || 0));
+  const rows = ready
+    ? await db`select location_id, name, cleanup_write_enabled from locations where installation_id = ${ctx.installationId} and not ignored ${allowed ? db`and location_id = any(${allowed}::text[])` : db``} ${q ? db`and lower(coalesce(name, '')) like ${`%${q.replace(/[%_\\]/g, "")}%`}` : db``} order by name nulls last, location_id limit 9 offset ${page * 8}`
+    : [];
+  return json({ ready, canEdit: mayConfigure(ctx) && !ctx.demo, masterOn: !ctx.demo && isLive("WRITE_GHL_LIVE"), killed: killed(), means: TURN_ON_MEANS, page, hasMore: rows.length > 8, accounts: rows.slice(0, 8).map((r) => ({ locationId: r.location_id as string, name: (r.name as string | null) ?? "Unnamed account", optedIn: r.cleanup_write_enabled === true })) });
+}
+
+/** Turn sending on or off for one account. Turning on needs the account's name typed exactly; turning off needs nothing (the safe direction). Owners and administrators only; every change is in the audit log. Reuses the account's own opt-in (the same switch as other changes). */
+export async function sendOptinRoute(ctx: Ctx, deps: Pick<SendDeps, "allowed">): Promise<Response> {
+  const body = (await ctx.request.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!sendEnabled(ctx)) return json({ error: "Texting and emailing from SubSync is not available in this version yet." }, 403);
+  const loc = typeof body?.locationId === "string" && ID.test(body.locationId) ? body.locationId : null;
+  if (!loc || typeof body?.enabled !== "boolean") return json({ error: "Choose a client account and on or off" }, 400);
+  if (ctx.demo) return json({ error: "This is the demo: nothing can be turned on here." }, 403);
+  if (!mayConfigure(ctx)) return json({ error: "Only an account owner or administrator can turn sending on or off." }, 403);
+  const allowed = await deps.allowed();
+  if (allowed && !allowed.includes(loc)) return json({ error: "Account not found" }, 404);
+  const name = await nameOfAccount(ctx, loc);
+  if (name === null) return json({ error: "Account not found" }, 404);
+  if (body.enabled && String(body.confirmName ?? "").trim().toLowerCase() !== name.trim().toLowerCase()) return json({ error: `Type the account name "${name}" exactly to turn sending on.` }, 409);
+  const r = await setWriteEnabled(ctx.installationId, allowed, actorOf(ctx), loc, body.enabled);
+  if (r === "unavailable") return json({ error: "This switch is not available yet. SubSync is finishing an update, so try again later.", unavailable: true }, 503);
+  if (r === "not_found") return json({ error: "Account not found" }, 404);
+  try { const db = sql(); await db`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, ${actorOf(ctx)}, ${body.enabled ? "message.sending_on" : "message.sending_off"}, ${db.json({ locationId: loc } as never)})`; } catch { /* the opt-in audit line from the switch holds the same facts */ }
+  return json({ ok: true, enabled: body.enabled, masterOn: isLive("WRITE_GHL_LIVE") });
 }
 
 export async function templatesRoute(ctx: Ctx, deps: Pick<SendDeps, "allowed">): Promise<Response> {
@@ -230,7 +277,7 @@ export async function templatesRoute(ctx: Ctx, deps: Pick<SendDeps, "allowed">):
   if (!ID.test(loc)) return json({ error: "Send the account" }, 400);
   const allowed = await deps.allowed();
   if (allowed && !allowed.includes(loc)) return json({ error: "Account not found" }, 404);
-  if (!sendEnabled(ctx)) return json({ error: "Sending from SubSync is not switched on." }, 403);
+  if (!sendEnabled(ctx)) return json({ error: "Texting and emailing from SubSync is not available in this version yet." }, 403);
   if (ctx.request.method === "GET") return json({ templates: await listTemplates(ctx.installationId, loc), canEdit: mayConfigure(ctx) });
   if (!mayConfigure(ctx)) return json({ error: "Only an owner or administrator can change templates." }, 403);
   if (body?.delete === true) {

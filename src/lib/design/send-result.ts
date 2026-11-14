@@ -3,6 +3,8 @@ export function resultText(kind: string, dry: boolean, message?: string, summary
   const rest = (summary ?? "").trim();
   if (kind === "message") {
     if (dry) {
+      // The server's own "Preview only: ..." sentence already says everything: show it as it is.
+      if (/^preview only/i.test(message?.trim() ?? "")) return (message as string).trim();
       const why = message?.trim() ? message.trim().replace(/^not sent:?\s*/i, "").replace(/^nothing was sent\.?\s*/i, "sending is switched off. ") : "sending is switched off.";
       return `Not sent: ${why} ${rest}`.replace(/\s+/g, " ").trim();
     }

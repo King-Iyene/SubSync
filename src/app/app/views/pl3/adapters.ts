@@ -64,6 +64,7 @@ export function flowOf(m: Pl3MoneyFlow | null, replay: Pl3Replay | null): PlMone
         ...arr<NonNullable<typeof f.closed>[number]>(f.closed).map((m) => ({ from: m.from === null ? null : index.get(m.from) ?? null, to: null, status: m.status, count: m.count, valueCents: c(m.value) })),
       ],
     })) : null,
+    replayInfo: replay?.enough && replay.frames.length ? { source: replay.source ?? "history", since: replay.historySince ?? null } : null,
     minDeals: 15,
     excluded: { zeroValue: lo?.noValue ?? 0, noOwner: lo?.noOwner ?? 0, test: lo?.test ?? 0, outlier: lo?.outlier ?? 0, outlierCents: c(lo?.outlierValue), ownerCounted: lo?.ownerCounted === true, testsCounted: lo?.testsCounted === true },
     outlier: big ? { name: big.name ?? "One deal", share: big.sharePct / 100 } : null,

@@ -267,7 +267,7 @@ details.ap-sec > summary.ap-sec-h::-webkit-details-marker { display: none; }
 .ap-canvas { position: relative; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--s6-line) 80%, transparent); background: color-mix(in srgb, var(--s6-sunk) 55%, transparent); overflow: hidden; }
 .ap-canvas-inline { height: clamp(560px, calc(100vh - 150px), 1000px); }
 .ap-canvas-ph { display: grid; place-items: center; color: var(--muted-foreground); font-size: 0.875rem; }
-.ap-canvas-view { position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab; outline: none; }
+.ap-canvas-view { position: absolute; inset: 0; overflow: hidden; touch-action: none; overscroll-behavior: contain; cursor: grab; outline: none; }
 .ap-canvas[data-dragging] .ap-canvas-view { cursor: grabbing; }
 .ap-canvas-view:focus-visible { box-shadow: inset 0 0 0 2px var(--ring); }
 .ap-canvas-content { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
@@ -291,3 +291,5 @@ details.ap-sec > summary.ap-sec-h::-webkit-details-marker { display: none; }
 .ap-full-foot p { margin: 4px 0; }
 @media (max-width: 640px) { .ap-full-head .ap-legend { display: none; } .ap-canvas-hint { display: none; } .ap-full-foot { max-height: 40vh; } }
 @media (prefers-reduced-motion: reduce) { .ap-canvas-content { transition: none !important; } }
+.ap-canvas-inline .ap-canvas-view { right: 12px; }
+.ap-canvas-inline::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 12px; background: color-mix(in srgb, var(--s6-line) 55%, transparent); }

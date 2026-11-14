@@ -57,7 +57,7 @@ export function FeedbackBox({ page }: { page: string }) {
       </div>
       {done && (
         <p className="mt-3 border-l-2 border-primary py-1 pl-3" role="status" data-testid="feedback-done">
-          Thank you. {done.kind === "feedback" ? "We read every note." : "We will look into it."} Your reference is <strong className="font-mono">{done.reference}</strong>.
+          Thanks, we read every one. Your reference is <strong className="font-mono">{done.reference}</strong>.
         </p>
       )}
       {mode && (

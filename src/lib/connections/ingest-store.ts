@@ -4,7 +4,8 @@ import { writeToCrm } from "../ghl/crm-writes";
 import { installationHasScope } from "../analytics/cleanup-queries";
 import { locationAccessToken } from "../sync/engine";
 import type { DeliveryStore, HookConnection } from "./fathom-hook";
-import type { IngestStore, MeetingRow, PersonalConnection, PersonSettings, Writer } from "./ingest";
+import type { IngestStore, MeetingRow, PersonalConnection, PersonSettings, SimilarHit, Writer } from "./ingest";
+import { isEmail, normEmail, plusSearch, usableNames } from "./match-suggest";
 import type { Candidate } from "./meeting-plan";
 import type { Role } from "../identity";
 import { recordCrmWrite } from "./write-log";
@@ -33,7 +34,7 @@ export function pgIngestStore(): IngestStore {
       if (locationIds.length === 0 || emails.length === 0) return [];
       const rows = await sql()`
         select location_id, contact_id, lower(email) email from cached_contacts
-        where installation_id = ${installationId} and location_id = any(${locationIds}::text[]) and lower(email) = any(${emails}::text[]) limit 500`;
+        where installation_id = ${installationId} and location_id = any(${locationIds}::text[]) and lower(email) = any(${emails.map(normEmail)}::text[]) limit 500`;
       return rows.map((r) => ({ locationId: r.location_id as string, contactId: r.contact_id as string, email: r.email as string }));
     },
     async policies(installationId) {
@@ -81,6 +82,33 @@ export function pgIngestStore(): IngestStore {
     async noteDetails(id, d) {
       // Best effort and additive: until the update with these columns is applied this simply keeps nothing.
       await sql()`update meetings set duration_minutes = coalesce(${d.durationMinutes}::int, duration_minutes), talk_pct = coalesce(${d.talkPct}::smallint, talk_pct), matched_location_id = coalesce(${d.matched?.locationId ?? null}, matched_location_id), matched_contact_id = coalesce(${d.matched?.contactId ?? null}, matched_contact_id), matched_at = coalesce(${d.matched ? new Date() : null}::timestamptz, matched_at) where id = ${id}`.catch(() => undefined);
+    },
+    async saveHints(id, h) {
+      // Best effort and additive: until the update with these columns is applied this simply keeps nothing.
+      await sql()`update meetings set attendee_names = ${sql().json(h.names.slice(0, 12) as never)}, invitee_stats = ${h.stats ? sql().json(h.stats as never) : null} where id = ${id}`.catch(() => undefined);
+    },
+    async similarContacts(installationId, locationIds, q): Promise<SimilarHit[]> {
+      if (locationIds.length === 0) return [];
+      const emails = [...new Set(q.emails.map(normEmail).filter(isEmail))];
+      const { bases, patterns } = plusSearch(emails);
+      const names = usableNames(q.names);
+      const db = sql();
+      const cols = db`location_id, contact_id, lower(btrim(email)) email, full_name, phone, last_activity_at`;
+      // Each look-up uses an index (the email and name trigram indexes, the lower(email) index) and stays inside the given accounts of this installation.
+      const [exact, plus, named] = await Promise.all([
+        emails.length ? db`select ${cols} from cached_contacts where installation_id = ${installationId} and location_id = any(${locationIds}::text[]) and lower(email) = any(${emails}::text[]) limit 200` : Promise.resolve([]),
+        bases.length || patterns.length ? db`select ${cols} from cached_contacts where installation_id = ${installationId} and location_id = any(${locationIds}::text[]) and (lower(email) = any(${bases}::text[]) or lower(email) like any(${patterns}::text[])) limit 100` : Promise.resolve([]),
+        names.length ? db`select ${cols} from cached_contacts where installation_id = ${installationId} and location_id = any(${locationIds}::text[]) and full_name ilike any(${names}::text[]) limit 60` : Promise.resolve([]),
+      ]);
+      const hit = (r: Record<string, unknown>, via: SimilarHit["via"]): SimilarHit => ({
+        locationId: r.location_id as string, contactId: r.contact_id as string, email: (r.email as string | null) ?? null, name: (r.full_name as string | null) || null,
+        phone: (r.phone as string | null) ?? null, lastActivityAt: r.last_activity_at instanceof Date ? r.last_activity_at.toISOString() : null, via,
+      });
+      return [...exact.map((r) => hit(r, "exact")), ...plus.map((r) => hit(r, "plus")), ...named.map((r) => hit(r, "name"))];
+    },
+    async claimWaiting(installationId, userId, id, fromReason) {
+      const rows = await sql()`update meetings set reason = 'rematching' where id = ${id} and installation_id = ${installationId} and owner_ghl_user_id = ${userId} and status = 'needs_contact' and reason is not distinct from ${fromReason} returning id`;
+      return rows.length === 1;
     },
     async ignoredEmails(installationId, userId) {
       const rows = await sql()`select email from meeting_ignored_emails where installation_id = ${installationId} and ghl_user_id = ${userId}`;

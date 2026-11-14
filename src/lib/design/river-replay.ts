@@ -68,6 +68,26 @@ export function buildReplayFrames(days: PlReplayDay[], base: PlStage[], counts: 
 /** Milliseconds per day for each speed. */
 export const REPLAY_SPEEDS = [{ id: "1", label: "1x", ms: 900 }, { id: "2", label: "2x", ms: 450 }, { id: "4", label: "4x", ms: 225 }] as const;
 
+export type ReplayState = { frame: number | null; playing: boolean };
+
+/**
+ * What pressing the Replay / Play / Pause button does. Never a no-op when there are frames: from "today" (frame null) or the last day it starts at the FIRST day and plays;
+ * mid-way it resumes; while playing it pauses. With reduced motion it never auto-plays: each press shows the next day.
+ */
+export function pressPlay(st: ReplayState, total: number, reduced: boolean): ReplayState {
+  if (total <= 0) return st;
+  if (st.playing) return { frame: st.frame, playing: false };
+  if (reduced) return { frame: st.frame === null ? 0 : Math.min(total - 1, st.frame + 1), playing: false };
+  return { frame: st.frame === null || st.frame >= total - 1 ? 0 : st.frame, playing: true };
+}
+
+/** One timer tick while playing: the next day, and playing stops on the last day. */
+export function tickReplay(st: ReplayState, total: number): ReplayState {
+  if (!st.playing) return st;
+  const nx = nextFrame(st.frame ?? 0, total);
+  return { frame: nx.index, playing: !nx.done };
+}
+
 /** The next frame index when playing: moves forward one day and stops (done = true) on the last. */
 export function nextFrame(index: number, length: number): { index: number; done: boolean } {
   if (length <= 0) return { index: 0, done: true };

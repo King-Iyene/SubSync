@@ -1,8 +1,9 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Delta, Pp3Person, Pp3Role, Rate } from "@/lib/analytics/people3-types";
+import { noPeopleReason, ROLE_CHIPS, type UsersState } from "@/lib/people/team-empty";
 import { EmptyState, ErrorState, SkeletonRows } from "../../ds";
 import { notSwitchedOn } from "./data";
 
@@ -44,15 +45,40 @@ export function Spark({ values, label }: { values: number[]; label: string }) {
   return <svg className="pp-spark" viewBox="0 0 80 24" role="img" aria-label={label}><polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" /></svg>;
 }
 
+/** What every Team section needs to know about the whole screen: whether the CRM let us read the people, and how to open the Roles page. */
+export const TeamCtx = createContext<{ usersState: UsersState; toRoles: (() => void) | null; anySetterCloser: boolean }>({ usersState: "unknown", toRoles: null, anySetterCloser: false });
+
+/** A plain button that opens the Roles page (nothing when the page is not available to this person). */
+export function RolesLink({ text = "Set roles" }: { text?: string }) {
+  const { toRoles } = useContext(TeamCtx);
+  return toRoles ? <button type="button" className="ap-link" onClick={toRoles} data-testid="pp-set-roles">{text}</button> : null;
+}
+
+/** Show only the people given one role label. The words come from the Roles page; "Set roles" opens it. */
+export function RoleChips({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="pp-sub print:hidden" role="group" aria-label="Show people by role" data-testid="pp-role-chips">
+      {ROLE_CHIPS.map(([k, l]) => <button key={k} type="button" className="s6-btn" aria-pressed={value === k} onClick={() => onChange(k)} data-testid={`pp-role-chip-${k}`}>{l}</button>)}
+      <span className="ap-fine"><RolesLink text="Set roles" /></span>
+    </div>
+  );
+}
+
 type Loaded<T> = { data: T | null; error: unknown; loading: boolean; reload: () => void };
-/** Loading, error ("not switched on" and "needs permission" are their own plain notes) and empty states in one place. */
-export function Load<T>({ r, children, empty }: { r: Loaded<T>; children: (d: T) => ReactNode; empty: (d: T) => boolean | string }) {
+/** Loading, error ("not switched on" and "needs permission" are their own plain notes) and empty states in one place.
+ *  `people` marks a list of team members: when it is empty it says WHY (a failed read, no permission to read the team, nobody with an owner) and links to Roles, never a bare "nothing yet". */
+export function Load<T>({ r, children, empty, people = false }: { r: Loaded<T>; children: (d: T) => ReactNode; empty: (d: T) => boolean | string; people?: boolean }) {
+  const ctx = useContext(TeamCtx);
   if (r.loading && !r.data) return <SkeletonRows rows={6} label="Loading the team..." />;
   if (r.error && notSwitchedOn(r.error)) return <EmptyState title="Not switched on yet" body="This part of Team is not switched on for your account yet." />;
   if (r.error) return <ErrorState error={r.error as Error} onRetry={r.reload} />;
   if (!r.data) return null;
   const e = empty(r.data);
-  return e ? <EmptyState title="Nothing to show yet" body={typeof e === "string" ? e : "People appear here once their first messages and calls have synced."} /> : <>{children(r.data)}</>;
+  if (!e) return <>{children(r.data)}</>;
+  const problem = (r.data as { problem?: string | null }).problem;
+  if (people && problem) return <EmptyState title="The team could not be read just now" body={problem} action={<button type="button" className="s6-btn" onClick={r.reload}>Try again</button>} />;
+  if (people && e === true) { const why = noPeopleReason({ usersState: ctx.usersState, people: 0 }); if (why) return <EmptyState title={why.title} body={why.body} action={<RolesLink text="Set roles for your team" />} />; }
+  return <EmptyState title="Nothing to show yet" body={typeof e === "string" ? e : "People appear here once their first messages and calls have synced."} action={people ? <RolesLink /> : undefined} />;
 }
 
 /** Keyset paging: the server answers with the cursor of the next page. Previous goes back through the cursors already seen. */

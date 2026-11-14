@@ -508,6 +508,42 @@ async function main() {
       await call("/api/app/audit/revoke", tokenA, { method: "POST", body: JSON.stringify({ id: idC }) });
     }
 
+    // Share a report (shared_reports): a link holds only the one frozen report its owner made, hides names unless asked, opens without a sign-in, shows nothing of the other company, can be switched
+    // off only by its owner, and an account user cannot make, list or switch off any link.
+    {
+      // These sessions carry the role that sign-in works out (agency owner or staff), as real ones do; the shared helper above carries none, so it counts as ordinary staff.
+      const ownerOf = (side: Side) => signSession({ companyId: side.company, userId: "u-owner", role: "admin", userName: "Owner", demo: false, kind: "agency", locationId: null, personRole: "agency_owner" });
+      const ownerA = ownerOf(A), ownerB = ownerOf(B);
+      const staffA = signSession({ companyId: A.company, userId: "u-staff", role: "user", userName: "Staff", demo: false, kind: "agency", locationId: null, personRole: "agency_staff" });
+      const nameA = `${A.marker} Location 1`;
+      const doc = { title: "Weekly proof", scope: { pii: nameA, as: "account" }, period: "week of 2026-11-02", sections: [{ heading: "Found", stats: [{ label: "Found", value: "7" }], table: { columns: ["Client account", "Found"], rows: [[{ pii: nameA, as: "account" }, "7"]] } }] };
+      const made = await call("/api/app/report-share", ownerA, { method: "POST", body: JSON.stringify({ kind: "weekly", doc, days: 7 }) });
+      assert.equal(made.status, 200, made.text.slice(0, 200));
+      const idR = JSON.parse(made.text).id as string;
+      assert.match(idR, /^[A-Za-z0-9_-]{32}$/, "the report link id is 192 random bits");
+      const pageR = await fetch(`${BASE}/r/${idR}`);
+      const htmlR = await pageR.text();
+      assert.equal(pageR.status, 200);
+      assert.ok(htmlR.includes("Weekly proof") && htmlR.includes("Client account 1"), "the shared report shows its figures with the name replaced");
+      for (const marker of [A.marker, B.marker]) assert.ok(!htmlR.includes(marker), "no company or account name anywhere on the shared report");
+      assert.match(htmlR, /<meta name="robots" content="[^"]*noindex/i, "the report page asks not to be indexed");
+      const readableR = htmlR.replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ");
+      assert.ok(!/gohighlevel|highlevel|leadconnector|\bghl\b/i.test(htmlR.replace(/<script[\s\S]*?<\/script>/g, " ")), "the shared report does not name the platform");
+      assert.ok(!/\b(agenc(y|ies)|sub-?accounts?|locations?)\b/i.test(readableR), "the shared report does not use our internal words");
+      assert.ok(!(await (await call("/api/app/report-share", ownerB)).text).includes(idR), "another company's list never shows this link");
+      assert.equal((await call("/api/app/report-share/revoke", ownerB, { method: "POST", body: JSON.stringify({ id: idR }) })).status, 404, "another company cannot switch it off");
+      for (const [method, path, body] of [["POST", "/api/app/report-share", { kind: "weekly", doc }], ["GET", "/api/app/report-share", undefined], ["POST", "/api/app/report-share/revoke", { id: idR }]] as Array<[string, string, unknown]>) {
+        assert.equal((await call(path, session(A, "client", A.locs[0]), { method, body: body === undefined ? undefined : JSON.stringify(body) })).status, 403, `an account user must be refused ${method} ${path}`);
+      }
+      for (const [method, path, body] of [["POST", "/api/app/report-share", { kind: "weekly", doc }], ["GET", "/api/app/report-share", undefined], ["POST", "/api/app/report-share/revoke", { id: idR }]] as Array<[string, string, unknown]>) {
+        assert.equal((await call(path, staffA, { method, body: body === undefined ? undefined : JSON.stringify(body) })).status, 403, `agency staff must be refused ${method} ${path}`);
+      }
+      assert.ok((await (await fetch(`${BASE}/r/${idR}`)).text()).includes("Weekly proof"), "still works after the failed attempts");
+      assert.equal((await call("/api/app/report-share/revoke", ownerA, { method: "POST", body: JSON.stringify({ id: idR }) })).status, 200);
+      assert.ok(!(await (await fetch(`${BASE}/r/${idR}`)).text()).includes("Weekly proof"), "a switched-off report link shows nothing");
+      assert.ok(!(await (await fetch(`${BASE}/r/${"Z".repeat(32)}`)).text()).includes("Weekly proof"), "an unknown id shows nothing");
+    }
+
     // The branded client Proof page (stage PR): each company prepares and shares a report only for its own accounts; the public page is opened by the token alone, shows that one account and nothing of
     // the other company, never names the product or the platform, and a forged, malformed, replaced or switched-off token finds nothing.
     {

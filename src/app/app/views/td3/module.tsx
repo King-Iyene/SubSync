@@ -15,6 +15,8 @@ import { OpenLeadButton } from "../../ds/open-lead-button";
 import { InfoTip } from "../../ds/info-tip";
 import { SlowRetry } from "../../ds/slow-retry";
 import { Btn } from "../../ui";
+import { PrintPdfButton, ShareReport } from "../../ds/share-report";
+import { proofDoc } from "../../ds/report-docs";
 import { cardLink, setDeepLink } from "@/lib/design/deep-link";
 import type { GoFn, ViewId } from "../../nav";
 import { TodayView } from "../today";
@@ -334,7 +336,8 @@ function ProofTab({ location, accounts, open }: { location: string; accounts: bo
             <div className="ap-head print:hidden" role="group" aria-label="Choose a week">
               <select className="ap-field" aria-label="Week" value={week || p.weekStart} onChange={(e) => setWeek(e.target.value)}>{p.weeks.map((w) => <option key={w} value={w}>Week starting {w}</option>)}</select>
               {!sample && <Btn onClick={() => api.download(queryOf("export", { week: p.weekStart, location: location || undefined }), "proof.csv")}>Download CSV</Btn>}
-              <Btn onClick={() => window.print()}>Print</Btn>
+              <PrintPdfButton />
+              <ShareReport kind="weekly" canShare={accounts && !sample} build={() => proofDoc({ ...p, rows: p.rows.rows, accountName: p.accountName ?? null }, null, accounts)} />
             </div>
             <section className="td-receipt" aria-label="Weekly receipt" data-testid="td-receipt">
               <h2 className="td-h2">Weekly receipt: week of {p.weekStart}{p.accountName ? `, ${p.accountName}` : ""}</h2>

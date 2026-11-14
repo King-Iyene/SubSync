@@ -21,7 +21,8 @@ test("every search entry points at a real section and finds itself", () => {
 });
 test("every guide belongs to a real page and every hideable page is in the menu", () => {
   const navIds = new Set(NAV.map((n) => n.id as string));
-  for (const g of GUIDES) assert.ok(navIds.has(g.view), g.view);
+  // A guide for an idea (view "concept") belongs to no menu page: its Try it now button opens a real page instead.
+  for (const g of GUIDES) assert.ok(g.view === "concept" ? !!g.tryView && navIds.has(g.tryView) : navIds.has(g.view), g.view);
   for (const m of HIDEABLE_MODULES) assert.ok(navIds.has(m.id), m.id);
   assert.equal(guideForView("duplicates")?.id, "cleanup");
   assert.equal(guideForView("nothing"), null);

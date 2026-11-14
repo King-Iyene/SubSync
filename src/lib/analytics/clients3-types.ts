@@ -120,7 +120,7 @@ export type Cl3Billing = {
 export type Cl3BillingList = Page<Cl3Billing> & { needPermission: number; notActive: number };
 
 // ---- Clients v3: money control center (parts money, money-history). Real synced data only; what the platform cannot give is null and the screen says "Not available from the platform yet". ----
-export const CL3_BUCKETS = ["all", "unpaid", "failing", "no_plan", "paid", "empty_wallet", "app_missing"] as const;
+export const CL3_BUCKETS = ["all", "unpaid", "failing", "no_plan", "paid", "empty_wallet", "app_missing", "trial", "app_trial"] as const;
 export type Cl3Bucket = (typeof CL3_BUCKETS)[number];
 export const CL3_MONEY_FLAGS = ["cl3_money", "cl3_apps", "cl3_history", "pr_report", "pr_page", "pr_auto"] as const;
 
@@ -132,6 +132,8 @@ export type Cl3MoneyRow = {
   wallet: { balance: number | null; state: string | null };
   /** Whether SubSync is installed on this account, from the platform's installed list. Other apps cannot be read. */
   subsync: "installed" | "missing" | "unknown";
+  /** What the platform's installed list says about SubSync on this account (install date, app plan, trial flag, version id). Null when not read. The platform gives no trial end date: `trialEndsAt` is set only when the install event gave a start and a length. */
+  install: { installedAt: string | null; versionId: string | null; planLabel: string | null; onTrial: boolean | null; trialEndsAt: string | null; endingSoon: boolean; line: string } | null;
   /** ALWAYS null today: the platform API does not give a next charge date or a failure reason. */
   nextChargeAt: null; failureReason: null;
   url: string | null;
@@ -145,7 +147,9 @@ export type Cl3Money = {
     /** Monthly price of plans that are past due, cancelled, paused or in an unknown state. Same estimate. */
     atRisk: Array<{ currency: string; monthly: number; accounts: number }>;
     plans: Array<{ key: string; label: string; count: number }>;
-    apps: { state: "ok" | "not_read"; installed: number; missing: number; unknown: number };
+    apps: { state: "ok" | "needs_permission" | "not_read"; installed: number; missing: number; unknown: number; onTrial: number; endingSoon: number };
+    /** Whether the plan list could be read: ok, needs_permission (reconnect), not_available (the platform does not give it to this app or account), not_checked (never read). */
+    planRead: "ok" | "needs_permission" | "not_available" | "not_checked";
     /** Exact permissions to allow, when a read was refused. Empty when none. */
     needsPermission: string[];
     today: { headline: string; bucket: Cl3Bucket | null };

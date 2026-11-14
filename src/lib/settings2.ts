@@ -56,6 +56,7 @@ export const SEARCH_INDEX: readonly SearchEntry[] = [
   { id: "ai", label: "AI assistant connector", section: "data", words: "ai assistant key mcp claude" },
   { id: "menu", label: "Pages in my menu", section: "modules", words: "modules menu hide show pages sidebar" },
   { id: "write", label: "Allow changes in a client account", section: "safety", words: "write live changes dry run allow cleanup safety" },
+  { id: "sending", label: "Sending rules", section: "safety", words: "send text sms email message turn on preview quiet hours limits pause opt out" },
   { id: "support", label: "Contact support", section: "help", words: "support help email contact" },
   { id: "guides", label: "Getting started and guides", section: "help", words: "guide getting started how to learn" },
 ];

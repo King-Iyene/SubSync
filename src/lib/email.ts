@@ -17,7 +17,8 @@ export type EmailResult = { ok: true } | { ok: false; status: number; permanent:
 
 export async function sendEmailResult(to: string, m: Mail, deps: { fetch?: FetchLike; wait?: (ms: number) => Promise<void> } = {}): Promise<EmailResult> {
   if (!emailConfigured()) return { ok: false, status: 0, permanent: false };
-  const doFetch: FetchLike = deps.fetch ?? ((url, init) => fetch(url, init));
+  // A hard limit on each call: a mail service that never answers must not hold the function until the platform cuts it off (a 502).
+  const doFetch: FetchLike = deps.fetch ?? ((url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(4000) }));
   const wait = deps.wait ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const init: RequestInit = {
     method: "POST",

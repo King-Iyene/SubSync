@@ -61,14 +61,14 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { scope: "campaigns.readonly", kind: "read", required: false, why: "The list of campaigns in each client account (name, state, last change), to find stuck or failed ones. Read only: SubSync never starts or sends a campaign." },
     { scope: "emails/campaigns.readonly", kind: "read", required: false, why: "The email, bulk and workflow campaigns of each client account, read only, for the same list." },
     { scope: "emails/stats.readonly", kind: "read", required: false, why: "How many messages of each campaign were sent, delivered, opened, clicked, bounced or are still waiting, to find campaigns that looked sent but did not arrive. Totals only: SubSync never sees who received what." },
-    { scope: "saas/location.read", kind: "read", required: false, why: "Optional. The platform only gives client plan details to company-level apps, so no screen depends on it today." },
+    { scope: "saas/location.read", kind: "read", required: false, why: "Optional. Requested for the Plans and payments block on the Clients screen. Honest status: the platform's public API description lists no read that this permission unlocks (the plan reads ask for saas/company.read, company level), so the block shows Needs permission or Not available until the platform confirms what it unlocks." },
   ] },
   { id: "payments", title: "Payments and credit", summary: "Failed and late payments, so you can chase the money, and the credit balance of each client account.", scopes: [
     { scope: "payments/transactions.readonly", kind: "read", required: false, why: "Each payment's status, amount and who paid, to list failed payments and refunds. Read only: SubSync cannot charge, refund or retry anything. Without it Payments says: Needs permission, reconnect." },
     { scope: "payments/subscriptions.readonly", kind: "read", required: false, why: "Whether a customer's repeat payment is active or past due, to list failed repeat payments. Read only." },
     { scope: "invoices.readonly", kind: "read", required: false, why: "Which invoices are sent, partly paid or paid and when they are due, to list late invoices. Read only: SubSync never sends or changes an invoice." },
     { scope: "wallet.readonly", kind: "read", required: false, why: "The credit balance of each client account, to warn you before it runs out. Read only." },
-    { scope: "marketplace-installer-details.readonly", kind: "read", required: false, why: "Which plan each install is on, to double-check billing against our own records. Read only." },
+    { scope: "marketplace-installer-details.readonly", kind: "read", required: false, why: "One record for the token that asks: the installer, the company and the plan id (no dates, no trial). Used only to cross-check the Marketplace installs block, whose dates, plan and trial flag come from the installed list. Read only." },
   ] },
   { id: "intake", title: "Lead intake", summary: "Which form, survey or funnel each lead came from, so you can see which one brings good leads and which one goes quiet.", scopes: [
     { scope: "forms.readonly", kind: "read", required: false, why: "The names of your forms and when each was submitted, to count submissions per form and warn you when one goes quiet. SubSync never reads the answers. Without it Lead intake says: Needs permission, reconnect." },

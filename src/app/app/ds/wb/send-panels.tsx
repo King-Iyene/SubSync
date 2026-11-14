@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BULK_CAP } from "@/lib/ghl/send-guard";
+import { BULK_CAP, TURN_ON_MEANS } from "@/lib/ghl/send-guard";
 import { useApiClient, useData } from "../../session";
 import { INPUT, wbButtons } from "./runner";
 
@@ -10,11 +10,48 @@ import { INPUT, wbButtons } from "./runner";
 
 type Settings = { paused: boolean; quietStartHour: number; quietEndHour: number; perPersonHour: number; perPersonDay: number; accountDay: number; dupMinutes: number; footerEnabled: boolean; footerText: string; linkAllowlist: string[]; allowAgencySend: boolean };
 type Tpl = { id: string; name: string; channel: "SMS" | "Email"; subject: string | null; body: string };
+/** The per-account switch for sending, with what it means shown first and the account name typed to turn it on (turning it off needs no typing). Owners and administrators only; the server checks it again and writes the audit line. */
+export function TurnOnSending({ locationId, name, optedIn, masterOn, onChanged }: { locationId: string; name: string; optedIn: boolean; masterOn: boolean; onChanged: () => void }) {
+  const api = useApiClient();
+  const [asking, setAsking] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const post = async (enabled: boolean) => { setBusy(true); setErr(null); try { await api.post("workbench/send-optin", { locationId, enabled, ...(enabled ? { confirmName: typed } : {}) }); setAsking(false); setTyped(""); onChanged(); } catch (e) { setErr((e as Error).message || "That did not save. Try again."); } setBusy(false); };
+  const nameOk = typed.trim().toLowerCase() === name.trim().toLowerCase();
+  return (
+    <div className="rounded-lg border p-3" data-testid="turn-on-sending" data-on={optedIn ? "1" : "0"}>
+      {optedIn ? (
+        <>
+          <p className="font-medium">Sending is turned on for {name}.</p>
+          {!masterOn && <p className="text-muted-foreground">SubSync&apos;s own live switch is still off, so a send is only recorded as a preview for now.</p>}
+          <button type="button" className={`${wbButtons.BTN} mt-2`} disabled={busy} onClick={() => void post(false)} data-testid="turn-off-sending">Turn off sending for this account</button>
+        </>
+      ) : (
+        <>
+          <p className="font-medium">Sending is turned off for {name}.</p>
+          <p className="text-muted-foreground">Until you turn it on, pressing Send only records a preview and nothing is sent.</p>
+          {!asking && <button type="button" className={`${wbButtons.PRIMARY} mt-2`} onClick={() => setAsking(true)} data-testid="turn-on-sending-open">Turn on sending for this account</button>}
+          {asking && (
+            <div className="mt-2 space-y-2" role="group" aria-label={`Turn on sending for ${name}`} data-testid="turn-on-sending-confirm">
+              <p className="font-medium">Turning this on means:</p>
+              <ul className="list-disc space-y-1 pl-5">{TURN_ON_MEANS.map((m) => <li key={m}>{m}</li>)}{!masterOn && <li>SubSync&apos;s own live switch is still off, so nothing is really sent until that is on too.</li>}</ul>
+              <label className="block"><span className="text-muted-foreground">Type <b className="text-foreground">{name}</b> to turn it on.</span><input className={INPUT} value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" aria-label="Type the account name" data-testid="turn-on-sending-typed" /></label>
+              <div className="flex flex-wrap gap-2"><button type="button" className={wbButtons.PRIMARY} disabled={busy || !nameOk} onClick={() => void post(true)} data-testid="turn-on-sending-go">Turn on sending</button><button type="button" className={wbButtons.BTN} onClick={() => { setAsking(false); setTyped(""); setErr(null); }}>Cancel</button></div>
+            </div>
+          )}
+        </>
+      )}
+      {err && <p className="mt-2 text-destructive" role="alert">{err}</p>}
+    </div>
+  );
+}
+
 const num = (v: string, d: number) => (Number.isFinite(Number(v)) && v !== "" ? Number(v) : d);
 
-export function SendRules({ locationId }: { locationId: string }) {
+export function SendRules({ locationId, onChanged, startOpen = false }: { locationId: string; /** Called after the account switch changed, so the message box above can re-read its state. */ onChanged?: () => void; startOpen?: boolean }) {
   const api = useApiClient();
-  const s = useData<{ settings: Settings; canEdit: boolean; killed: boolean }>(`workbench/send-settings?locationId=${encodeURIComponent(locationId)}`);
+  const s = useData<{ settings: Settings; canEdit: boolean; killed: boolean; optedIn: boolean; masterOn: boolean; accountName: string }>(`workbench/send-settings?locationId=${encodeURIComponent(locationId)}`);
   const t = useData<{ templates: Tpl[]; canEdit: boolean }>(`workbench/send-templates?locationId=${encodeURIComponent(locationId)}`);
   const [draft, setDraft] = useState<Settings | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -27,9 +64,10 @@ export function SendRules({ locationId }: { locationId: string }) {
   const addTpl = async () => { setMsg(null); try { await api.post("workbench/send-templates", { locationId, ...tpl }); setTpl({ name: "", channel: "SMS", subject: "", body: "" }); void t.reload(); setMsg("Template saved."); } catch (e) { setMsg((e as Error).message || "That template was not accepted. Use plain text."); } };
   const rmTpl = async () => { if (!del) return; try { await api.post("workbench/send-templates", { locationId, delete: true, id: del.id, confirmName: del.typed }); setDel(null); void t.reload(); } catch { setMsg(`Type the name "${del.name}" exactly to delete it.`); } };
   return (
-    <details className="mt-3 rounded-xl border bg-card p-3 text-sm" data-testid="send-rules">
+    <details open={startOpen || undefined} className="mt-3 rounded-xl border bg-card p-3 text-sm" data-testid="send-rules">
       <summary className="cursor-pointer font-medium">Sending rules for this account</summary>
       <div className="mt-3 space-y-3">
+        <TurnOnSending locationId={locationId} name={s.data.accountName} optedIn={s.data.optedIn} masterOn={s.data.masterOn} onChanged={() => { void s.reload(); onChanged?.(); }} />
         {s.data.killed && <p className="text-destructive" role="alert">Sending is paused for everyone by SubSync right now.</p>}
         <label className="flex min-h-10 items-center gap-2"><input type="checkbox" checked={v.paused} onChange={(e) => set({ paused: e.target.checked })} />Pause sending for this account</label>
         <div className="flex flex-wrap items-center gap-2">Quiet hours for texts, in the lead&apos;s time: from <input type="number" min={0} max={23} className={`${INPUT} !w-20`} value={v.quietStartHour} onChange={(e) => set({ quietStartHour: num(e.target.value, 21) })} aria-label="Quiet hours start" /> to <input type="number" min={0} max={23} className={`${INPUT} !w-20`} value={v.quietEndHour} onChange={(e) => set({ quietEndHour: num(e.target.value, 8) })} aria-label="Quiet hours end" /> o&apos;clock</div>

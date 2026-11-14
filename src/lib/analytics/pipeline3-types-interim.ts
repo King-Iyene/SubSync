@@ -27,6 +27,8 @@ export type PlMoneyFlow = {
   won: { count: number; valueCents: number; previousValueCents: number | null };
   leak: { fromStage: string; toStage: string; lostCents: number } | null; // biggest drop between stages
   people: PlPersonFlow[]; replay: PlReplayDay[] | null; minDeals: number;
+  /** Where the replay frames come from: the moves SubSync recorded, or a rebuild from the deals' own dates. `since` = when recorded step history starts. */
+  replayInfo?: { source: "history" | "deals"; since: string | null } | null;
   excluded: { zeroValue: number; noOwner: number; test: number; outlier?: number; outlierCents?: number; ownerCounted?: boolean; testsCounted?: boolean };
   outlier: { name: string; share: number } | null; // one deal over 40% of the total, shown separately
 };

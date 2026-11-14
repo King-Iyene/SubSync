@@ -12,7 +12,7 @@ import { deleteMyDataText, SHARE_LINK_DAYS, storeLines, uninstallText } from "./
 import { GHL_SCOPES } from "./ghl/scopes.ts";
 import { NO_PERMISSION_GROUPS, NOT_REQUESTED, SCOPE_GROUPS } from "./scope-groups.ts";
 
-export const TRUST_UPDATED = "1 November 2026";
+export const TRUST_UPDATED = "13 November 2026";
 
 export type Claim = { id: string; text: string };
 

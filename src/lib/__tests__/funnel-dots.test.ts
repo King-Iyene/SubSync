@@ -187,7 +187,7 @@ test("depth and time on the screen: layered bands, parallax with motion only, a 
   assert.ok(view.includes("e.pointerType === \"touch\"") && view.includes("if (reduced") && view.includes("--fv-tx"), "no tilt for touch or reduced motion");
   assert.match(css, /prefers-reduced-motion: reduce[\s\S]*\.fv-svg \{ animation: none !important; transform: none !important/);
   assert.ok(css.includes('[data-motion="1"][data-hover="1"] .fv-svg') && css.includes("@keyframes fv-sway"));
-  assert.ok(mf.includes("pathsAtFrame") && mf.includes("replayLabel") && mf.includes("nothing is replayed"), "the time bar drives the funnel, and says when nothing is replayed");
+  assert.ok(mf.includes("pathsAtFrame") && mf.includes("replayLabel") && mf.includes("Replay is off: "), "the time bar drives the funnel, and says why when nothing is replayed");
   assert.ok(!mf.includes('{flowView === "river" && <div className="pl-replay"'), "the time bar is on both views");
   assert.ok(!/deals\.map|rows\.map\(\(d\b/.test(view), "aggregates only: the screen never maps over deals");
 });

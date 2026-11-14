@@ -229,12 +229,16 @@ export type Pp3Today = {
   button: { label: string; userId: string | null; locationId: string | null; reason: Pp3Reason | null; count: number } | null;
   people: number; accounts: number; waitingOld: number; idleCount: number; overCount: number;
   headline: string; historyStarts: string | null;
+  /** Whether the CRM would let us read the list of people (so an empty team can say why). */
+  usersState?: "ok" | "needs_permission" | "unknown";
 };
 
 export type Pp3Options = {
   viewer: { level: "all" | "account" | "self"; userId: string | null; canSeeEmail: boolean; canRankAll: boolean };
   accounts: Pp3AccountRef[]; minLeads: number; minDays: number; idleHours: number;
   usersState: "ok" | "needs_permission" | "unknown";
+  /** The role labels the agency gave (Setter, Closer...): how many people, how many have none, and whether any Setter or Closer exists. Null when not read. */
+  roles?: { total: number; none: number; anySetterCloser: boolean } | null;
 };
 
 /** One row of part=list: the exact item a count was made from. url opens it in the CRM (the account's own domain). */
