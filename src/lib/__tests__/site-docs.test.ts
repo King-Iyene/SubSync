@@ -126,7 +126,7 @@ test("the web video script, captions, poster and logo files exist and the video 
 test("the home page: install is the main call to action, no audit or calculator calls to action remain, the price is read from the pricing source", () => {
   const home = readFileSync(join(ROOT, "src/app/page.tsx"), "utf8");
   assert.match(home, /Install SubSync/);
-  assert.match(home, /Watch the 4-minute tour/);
+  assert.match(home, /Watch the 6-minute tour/);
   assert.doesNotMatch(home, /free audit|what you could earn|LeadCostCalculator|ProfitCalculator/i);
   assert.doesNotMatch(home, /11\.50/, "the price is not typed on the page");
   assert.equal(PRICING.price, "$11.50");

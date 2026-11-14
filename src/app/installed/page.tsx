@@ -126,8 +126,8 @@ async function InstalledBody({ searchParams }: { searchParams: Promise<Record<st
 
       <section className="block alt" aria-labelledby="tour-h">
         <div className="wrap" style={{ maxWidth: 980 }}>
-          <h2 className="h2" id="tour-h" style={{ textAlign: "center", marginBottom: 20 }}>Watch the 4-minute tour</h2>
-          <VideoPlayer />
+          <h2 className="h2" id="tour-h" style={{ textAlign: "center", marginBottom: 20 }}>Start here: a short welcome</h2>
+          <VideoPlayer which="welcome" />
         </div>
       </section>
 

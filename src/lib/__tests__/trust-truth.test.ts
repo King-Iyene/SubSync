@@ -149,7 +149,7 @@ test("the outside services on the page are the ones in the code and config, and 
   // No service is used by the code without being listed: the hosts the source talks to, other than the CRM's own and the listed ones, are none.
   const hosts = new Set<string>();
   for (const f of walk("src")) for (const m of read(f).matchAll(/https:\/\/([a-z0-9.-]+\.[a-z]{2,})/gi)) hosts.add(m[1].toLowerCase());
-  const known = /(^|\.)(resend\.com|slack\.com|fathom\.(video|ai)|leadconnectorhq\.com|gohighlevel\.com|zoom\.us|googleapis\.com|google\.com|kdsquares\.com|vercel\.app|vercel\.com|supabase\.(co|com)|w3\.org|schema\.org|openapi\.vercel\.sh|example\.com|youragency\.com|fonts\.g(oogleapis|static)\.com|github\.com|nextjs\.org|ui\.shadcn\.com|developer\.mozilla\.org|openrouter.ai|api.openai.com|auth.openai.com|api.anthropic.com)$/;
+  const known = /(^|\.)(resend\.com|youtube-nocookie\.com|youtube\.com|slack\.com|fathom\.(video|ai)|leadconnectorhq\.com|gohighlevel\.com|zoom\.us|googleapis\.com|google\.com|kdsquares\.com|vercel\.app|vercel\.com|supabase\.(co|com)|w3\.org|schema\.org|openapi\.vercel\.sh|example\.com|youragency\.com|fonts\.g(oogleapis|static)\.com|github\.com|nextjs\.org|ui\.shadcn\.com|developer\.mozilla\.org|openrouter.ai|api.openai.com|auth.openai.com|api.anthropic.com)$/;
   const unknown = [...hosts].filter((h) => !known.test(h));
   assert.deepEqual(unknown, [], "a web host the code talks to that the Trust page does not account for");
 });

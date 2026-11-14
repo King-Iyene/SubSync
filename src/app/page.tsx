@@ -58,7 +58,7 @@ const FAQ: Array<[string, string]> = [
 const ld = [
   {
     "@context": "https://schema.org", "@type": "VideoObject", name: VIDEO.title, description: VIDEO.description,
-    thumbnailUrl: `${SITE.url}${VIDEO.poster}`, uploadDate: VIDEO.uploadDate, duration: VIDEO.durationIso, contentUrl: `${SITE.url}${VIDEO.src720}`,
+    thumbnailUrl: `${SITE.url}${VIDEO.poster}`, uploadDate: VIDEO.uploadDate, duration: VIDEO.durationIso, embedUrl: `https://www.youtube-nocookie.com/embed/${VIDEO.tour.youtubeId}`,
   },
   {
     "@context": "https://schema.org", "@type": "SoftwareApplication", name: "SubSync", applicationCategory: "BusinessApplication", operatingSystem: "Web", description: SITE.description,
@@ -77,7 +77,7 @@ export default function Home() {
           <p className="lede">Whether you run one account or a hundred, SubSync watches them and tells you what needs attention first: leads nobody answered, appointments nobody marked, no-shows nobody called back and deals that went quiet.</p>
           <div className="cta-row">
             <a className="btn btn-primary" href={INSTALL_HREF}>Install SubSync</a>
-            <a className="btn btn-ghost" href="#tour">Watch the 4-minute tour</a>
+            <a className="btn btn-ghost" href="#tour">Watch the 6-minute tour</a>
           </div>
           <p className="fine">{PRICING.trialDays} days free, then {PRICING.price} {PRICING.unit}.</p>
         </div>
