@@ -1,0 +1,10 @@
+[
+ { "id": "V1", "shot": "w_open", "text": "SubSync is installed. Open it from the menu in your CRM, and you land on Today." },
+ { "id": "V2", "shot": "w_sync", "text": "The first sync runs in the background. It takes a few minutes, and the numbers appear as it finishes. The top bar tells you when it last updated." },
+ { "id": "V3", "shot": "w_today", "text": "Read Today first. It shows the money at risk, and the accounts to save first." },
+ { "id": "V4", "shot": "w_range", "text": "Pick your date range at the top, and the numbers follow it." },
+ { "id": "V5", "shot": "w_setup", "text": "Then do the five-minute setup. Connect your own AI, if you want one. Save your alert email. And give your team roles: setter, closer, or both." },
+ { "id": "V6", "shot": "w_check", "text": "The Getting started checklist ticks itself off as you go, so you always know what is next." },
+ { "id": "V7", "shot": "w_help", "text": "Need help? Every page has a sixty-second guide, and the Help and support section is in Settings." },
+ { "id": "V8", "shot": "w_end", "text": "You are set. Open Today and start with the first account to save." }
+]

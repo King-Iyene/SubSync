@@ -24,7 +24,7 @@ export const CHAPTERS = {
   ] },
   speed: { img: "02-speed-to-lead.png", mv: [
     [0.0, "z", 1.13, 420, 520, 5], [0.03, "g", 400, 480, 1500],
-    ["Thirteen new", "h", 264, 455, 330, 85, "13 past the target"], 
+    ["Thirteen new", "h", 264, 455, 330, 85, "13 past the target"],
     ["Each one", "h", 1326, 560, 250, 100, "24 min typical reply, target 15"], ["Each one", "z", 1.18, 1450, 600, 3],
     ["so you know", "s", "p-race2.png"], ["so you know", "z", 1.2, 560, 400, 3], ["so you know", "h", 264, k(380), 150, 75, "Longest waits"],
     ["longest wait on top", "g", k(1806), k(422), 1400], ["longest wait on top", "h", k(317), k(370), k(1560), k(250), "Call from the top down"],
@@ -35,17 +35,20 @@ export const CHAPTERS = {
     ["so your real show rate", "h", 920, 715, 305, 72, "True show rate"], ["so your real show rate", "g", 957, 750, 1000],
     ["Eight no-shows", "h", 602, 715, 305, 72, "8 no-shows to win back"], ["Eight no-shows", "g", 700, 750, 800],
     ["with a list to call", "s", "p-noshow.png"], ["with a list to call", "z", 1.15, 700, 700, 3], ["with a list to call", "h", 264, k(840), k(1560), k(250), "Call these today"],
-    ["And the flow tree", "s", "17-appointments-flow-tree.png"], ["And the flow tree", "h", 264, 572, 1300, 56, "Biggest leak, found for you"],
-    ["which person", "z", 1.9, 1280, 800, 4], ["which person", "h", 985, 745, 590, 150, "Who took it: show and no-show rate"], ["which person", "g", 1150, 790, 1500],
-    ["or which calendar", "h", 1370, 758, 200, 138, "What happened to each booking"],
+    ["And the flow tree", "s", "19-flow-tree-new.png"], ["And the flow tree", "z", 1.25, 900, 480, 5],
+    ["from who booked it", "h", 738, 170, 110, 640, "Who booked"], ["to who took it", "h", 930, 110, 110, 740, "Who took it"], ["to what happened", "h", 1075, 110, 160, 740, "What happened"],
+    ["Expand it", "s", "20-flow-tree-expanded.png"], ["Expand it", "z", 1.3, 800, 480, 6], ["every branch", "g", 1000, 420, 1600],
   ] },
-  funnel: { img: "11-pipeline-funnel.png", mv: [
-    [0.0, "z", 1.1, 870, 420, 6], [0.02, "g", 360, 289, 1500],
-    ["step by step", "h", 440, 250, 870, 390, "Every deal, step by step"],
-    ["biggest leak", "h", 264, 255, 1300, 78, "Biggest leak: New Lead"], ["biggest leak", "g", 424, 291, 1000],
-    ["Replay it", "h", 264, 187, 590, 38, "Replay day by day"], ["Replay it", "c", 308, 205, 1300],
-    ["Click any step", "h", 1312, 332, 235, 80, "Click a step: its deals open"], ["Click any step", "c", 1324, 343, 1300],
-    ["And deals with no value", "s", "12-pipeline-river.png"], ["And deals with no value", "h", 264, 366, 1000, 24, "Deals with no value still show"], ["And deals with no value", "z", 1.5, 700, 380, 4],
+  clients: { img: "04-clients.png", mv: [
+    [0.0, "z", 1.12, 700, 330, 5], [0.02, "g", 350, 95, 1300],
+    ["all your connected", "h", 272, 77, 165, 36, "All connected accounts"],
+    ["Five need you now", "h", 264, 608, 950, 78, "Past due, need you now"], ["Five need you now", "z", 1.12, 800, 640, 3], ["Five need you now", "g", 640, 640, 1200],
+  ] },
+  money: { img: "05-money.png", mv: [
+    [0.0, "z", 1.1, 600, 560, 5], [0.02, "g", 400, 560, 1300],
+    ["failed payments", "h", 264, 625, 1300, 110, "Failed payments and late invoices"],
+    ["with the money at risk", "h", 264, 790, 1300, 60, "Money at risk (estimate)"], ["with the money at risk", "g", 700, 800, 1200],
+    ["so you chase", "h", 264, 505, 600, 56, "Payments that need action"],
   ] },
   find: { img: "06-find-a-lead.png", mv: [
     [0.0, "z", 1.14, 560, 360, 5], [0.02, "g", 420, 358, 1200],
@@ -53,6 +56,13 @@ export const CHAPTERS = {
     ["never had a reply", "h", 264, 462, 430, 66, "62 leads never had a reply"], ["never had a reply", "n", 270, 478, 0, 62, "", 1.4],
     ["leads going cold", "s", "22-find-a-lead-going-cold.png"], ["leads going cold", "h", 275, 450, 620, 210, "Leads going cold"], ["leads going cold", "z", 1.25, 700, 520, 4],
     ["call lists", "h", 264, 300, 640, 26, "Call lists, tags, going cold"], ["call lists", "g", 560, 313, 1200],
+  ] },
+  audit: { img: "07-account-audit.png", mv: [
+    [0.0, "z", 1.14, 640, 400, 5], [0.02, "g", 360, 360, 1300],
+    ["It estimates", "h", 264, 322, 830, 108, "Estimate: leaking about $258,064 a month"],
+    ["with the working", "h", 262, 494, 170, 24, "How this is worked out"], ["with the working", "g", 330, 506, 1200],
+    ["lists what to fix", "z", 1.12, 700, 700, 3], ["lists what to fix", "h", 264, 640, 1300, 240, "What to fix first"],
+    ["You can copy", "z", 1.0, 960, 450, 2], ["You can copy", "h", 1085, 205, 480, 40, "Copy, print, or a sample to send"], ["You can copy", "g", 1480, 226, 1500],
   ] },
   clean: { img: "09-cleanup-duplicates.png", mv: [
     [0.0, "z", 1.15, 420, 420, 6], [0.02, "g", 340, 420, 1300],
@@ -62,25 +72,112 @@ export const CHAPTERS = {
     ["bigger changes", "il", "safe"],
     ["You stay in control", "il", "none"], ["You stay in control", "h", 1200, 486, 350, 40, "You choose, every time"], ["You stay in control", "g", 1290, 505, 1300],
   ] },
-  clients: { img: "04-clients.png", mv: [
-    [0.0, "z", 1.12, 700, 330, 5], [0.02, "g", 350, 95, 1300],
-    ["all your connected", "h", 272, 77, 165, 36, "All connected accounts"],
-    ["Five need you now", "h", 264, 608, 950, 78, "Past due, need you now"], ["Five need you now", "z", 1.12, 800, 640, 3], ["Five need you now", "g", 640, 640, 1200],
-    ["Payments are right there", "s", "05-money.png"], ["Payments are right there", "z", 1.12, 600, 640, 3], ["Payments are right there", "h", 264, 625, 1300, 110, "Failed payments and late invoices"],
-    ["with the money at risk", "h", 264, 790, 1300, 60, "Money at risk (estimate)"],
-  ] },
-  audit: { img: "07-account-audit.png", mv: [
-    [0.0, "z", 1.14, 640, 400, 5], [0.02, "g", 360, 360, 1300],
-    ["It estimates", "h", 264, 322, 830, 108, "Estimate: leaking about $258,064 a month"],
-    ["with the working", "h", 262, 494, 170, 24, "How this is worked out"], ["with the working", "g", 330, 506, 1200],
-    ["lists what to fix", "z", 1.12, 700, 700, 3], ["lists what to fix", "h", 264, 640, 1300, 240, "What to fix first"],
-    ["You can copy", "z", 1.0, 960, 450, 2], ["You can copy", "h", 1085, 205, 480, 40, "Copy, print, or a sample to send"], ["You can copy", "g", 1480, 226, 1500],
-  ] },
-  team: { img: "08-team.png", mv: [
+  team: { img: "m-08.png", mv: [
     [0.0, "z", 1.14, 560, 440, 5], [0.02, "g", 400, 360, 1300],
     ["who follows up", "h", 264, 340, 700, 38, "Scorecards, leaderboard, workload"],
-    ["three things", "h", 264, 452, 600, 124, "3 things need you today"], 
+    ["three things", "h", 264, 452, 600, 124, "3 things need you today"],
     ["four leads", "h", 264, 559, 760, 24, "4 leads waiting over 2 hours"], ["four leads", "g", 560, 571, 1200],
+    ["In settings", "s", "40-settings-team.png"], ["In settings", "z", 1.12, 900, 420, 3],
+    ["setter, closer", "h", 498, 330, 800, 92, "Roles: setter, closer, both"], ["setter, closer", "g", 560, 402, 1000],
+    ["how fast a reply", "s", "41-settings-targets.png"], ["how fast a reply", "h", 498, 250, 900, 56, "Targets: how fast a lead should hear back"],
+  ] },
+  funnel: { img: "11-pipeline-funnel.png", mv: [
+    [0.0, "z", 1.1, 870, 420, 6], [0.02, "g", 360, 289, 1500],
+    ["step by step", "h", 440, 250, 870, 390, "Every deal, step by step"],
+    ["biggest leak", "h", 264, 255, 1300, 78, "Biggest leak: New Lead"], ["biggest leak", "g", 424, 291, 1000],
+    ["Replay it", "h", 264, 187, 590, 38, "Replay day by day"], ["Replay it", "c", 308, 205, 1300],
+    ["Click any step", "h", 1312, 332, 235, 80, "Click a step: its deals open"], ["Click any step", "c", 1324, 343, 1300],
+    ["And deals with no value", "s", "12-pipeline-river.png"], ["And deals with no value", "h", 264, 366, 1000, 24, "Deals with no value still show"], ["And deals with no value", "z", 1.5, 700, 380, 4],
+  ] },
+  meet: { img: "m-28.png", mv: [
+    [0.0, "z", 1.1, 700, 600, 6], [0.02, "g", 700, 560, 1300],
+    ["Meeting notes brings in", "h", 264, 440, 1000, 38, "Your own recorded calls, in one place"],
+    ["matches each one", "h", 270, 604, 1290, 68, "Matched to the contact by email, when certain"], ["matches each one", "g", 1480, 640, 1200],
+    ["If it is not certain", "h", 270, 676, 1290, 62, "Not certain: it waits for you"],
+    ["private inbox", "h", 536, 440, 130, 38, "Your private inbox"], ["private inbox", "g", 600, 458, 1200],
+    ["Each person connects", "x"],
+  ] },
+  workflows: { img: "33-workflows.png", mv: [
+    [0.0, "z", 1.1, 600, 520, 6], [0.02, "g", 400, 440, 1300],
+    ["Ninety-five", "h", 264, 584, 320, 66, "95 in total"], ["Ninety-five", "n", 280, 604, 0, 95, "", 1.4],
+    ["seventeen failing", "h", 596, 584, 316, 66, "17 failing"],
+    ["nine that never ran", "h", 924, 584, 312, 66, "9 never ran (estimate)"],
+    ["A health check", "h", 264, 415, 520, 168, "26 need fixing, biggest first"], ["A health check", "g", 400, 480, 1100],
+  ] },
+  overview: { img: "34-overview.png", mv: [
+    [0.0, "z", 1.1, 700, 440, 6], [0.02, "g", 500, 400, 1300],
+    ["new contacts", "h", 264, 360, 1300, 80, "New contacts, revenue won, open pipeline"],
+    ["stale deals", "h", 264, 520, 480, 90, "Stale deal value"],
+    ["which accounts need attention", "h", 264, 690, 880, 190, "Accounts that need attention"], ["which accounts need attention", "z", 1.15, 700, 740, 3],
+    ["account health", "h", 1136, 684, 430, 50, "Account health"],
+  ] },
+  settings: { img: "m-37.png", mv: [
+    [0.0, "z", 1.08, 700, 460, 6], [0.02, "g", 340, 380, 1300],
+    ["in one place", "h", 266, 250, 220, 420, "Ten sections"],
+    ["Choose when alerts", "s", "23-alert-settings.png"], ["Choose when alerts", "h", 500, 478, 900, 52, "Quiet hours"], ["Choose when alerts", "g", 520, 500, 1000],
+    ["Choose when alerts", "z", 1.12, 900, 560, 3], ["daily brief", "h", 500, 638, 520, 36, "Daily brief in Slack"],
+    ["See every permission", "s", "38-settings-permissions.png"], ["See every permission", "h", 498, 395, 800, 480, "Each one says why it is needed"],
+    ["Give your team roles", "s", "40-settings-team.png"], ["Give your team roles", "h", 498, 330, 800, 92, "Roles"],
+    ["switch off the pages", "s", "43-settings-modules.png"], ["switch off the pages", "h", 498, 350, 800, 520, "Switch pages on or off"],
+    ["Nothing changes", "x"], ["Nothing changes", "g", 900, 600, 1200],
+  ] },
+  started: { img: "29-getting-started-checklist.png", mv: [
+    [0.0, "z", 1.12, 700, 330, 6], [0.02, "g", 400, 300, 1300],
+    ["ticks itself off", "h", 264, 190, 720, 28, "A bar that fills as you go"],
+    ["fourteen of twenty", "h", 862, 92, 130, 34, "14 of 20 done"], ["fourteen of twenty", "n", 864, 94, 0, 14, "", 1.2],
+    ["let the first sync finish", "h", 264, 225, 700, 150, "First sync"],
+    ["see what needs you today", "h", 264, 380, 700, 76, "What needs you today"],
+    ["find the leads still waiting", "h", 264, 486, 700, 140, "Leads still waiting"],
+    ["Every step has a button", "h", 300, 430, 110, 38, "A button takes you there"], ["Every step has a button", "g", 350, 448, 1200],
+  ] },
+  news: { img: "30-whats-new.png", mv: [
+    [0.0, "z", 1.1, 600, 460, 6], [0.02, "g", 500, 120, 1200],
+    ["What is new lists", "h", 264, 60, 1000, 160, "What went live, newest first"],
+    ["like the funnel that moves", "h", 264, 398, 800, 130, "A funnel that moves"], ["like the funnel that moves", "g", 360, 470, 1200],
+  ] },
+  guides: { img: "31-guide-how-today-works.png", mv: [
+    [0.0, "z", 1.12, 700, 260, 6], [0.02, "g", 500, 200, 1300],
+    ["sixty-second guide", "h", 264, 70, 380, 40, "A 60-second guide"],
+    ["what it shows", "h", 264, 118, 700, 30, "What it shows"],
+    ["how to read it", "h", 264, 162, 700, 88, "How to read it"],
+    ["what to do next", "h", 264, 252, 700, 52, "Do next, with a button"], ["what to do next", "g", 330, 290, 1100],
+  ] },
+  w_open: { img: "01-today.png", mv: [
+    [0.0, "z", 1.06, 360, 300, 6], [0.02, "g", 64, 72, 1400],
+    ["Open it", "h", 14, 20, 196, 430, "Every page, in one menu"],
+    ["you land on Today", "h", 262, 58, 130, 34, "Today opens first"], ["you land on Today", "g", 300, 76, 900],
+  ] },
+  w_sync: { img: "29-getting-started-checklist.png", mv: [
+    [0.0, "z", 1.12, 700, 330, 6], [0.02, "g", 400, 300, 1300],
+    ["The first sync runs", "h", 264, 225, 700, 150, "First sync, in the background"],
+    ["the numbers appear", "s", "02-speed-to-lead.png"], ["the numbers appear", "z", 1.1, 900, 200, 4],
+    ["when it last updated", "h", 1078, 30, 150, 30, "Updated just now"], ["when it last updated", "g", 1150, 44, 1100],
+  ] },
+  w_today: { img: "01-today.png", mv: [
+    [0.0, "z", 1.1, 420, 300, 6], [0.02, "g", 420, 290, 1500],
+    ["the money at risk", "h", 264, 183, 318, 165, "Money at risk"], ["the money at risk", "n", 276, 212, 0, 751385, "$", 2.2],
+    ["accounts to save", "h", 264, 632, 1300, 262, "Accounts to save first"], ["accounts to save", "z", 1.12, 700, 760, 3],
+  ] },
+  w_range: { img: "01-today.png", mv: [
+    [0.0, "z", 1.2, 1160, 40, 4], [0.02, "g", 900, 22, 1200],
+    ["Pick your date range", "h", 755, 8, 810, 34, "Pick your dates"], ["Pick your date range", "c", 968, 22, 1200],
+    ["follow it", "g", 1200, 22, 1400],
+  ] },
+  w_setup: { img: "m-37.png", mv: [
+    [0.0, "z", 1.08, 700, 460, 6], [0.02, "g", 340, 380, 1300],
+    ["Connect your own AI", "h", 498, 425, 800, 160, "Your own AI, if you want one"], ["Connect your own AI", "g", 598, 552, 1200],
+    ["Save your alert email", "s", "23-alert-settings.png"], ["Save your alert email", "h", 500, 696, 900, 42, "Your alert email"], ["Save your alert email", "g", 700, 712, 1100],
+    ["give your team roles", "s", "40-settings-team.png"], ["give your team roles", "h", 498, 330, 800, 92, "Roles: setter, closer, both"],
+  ] },
+  w_check: { img: "29-getting-started-checklist.png", mv: [
+    [0.0, "z", 1.12, 700, 330, 6], [0.02, "g", 400, 300, 1300],
+    ["ticks itself off", "h", 264, 190, 720, 28, "A bar that fills as you go"], ["ticks itself off", "h", 862, 92, 130, 34, "14 of 20 done"],
+    ["what is next", "h", 264, 486, 700, 140, "Always the next step"], ["what is next", "g", 350, 448, 1200],
+  ] },
+  w_help: { img: "31-guide-how-today-works.png", mv: [
+    [0.0, "z", 1.12, 700, 260, 6], [0.02, "g", 500, 200, 1300],
+    ["sixty-second guide", "h", 264, 70, 380, 40, "A 60-second guide"], ["sixty-second guide", "h", 264, 118, 700, 140, "What it shows, how to read it"],
+    ["Help and support", "s", "m-37.png"], ["Help and support", "h", 266, 640, 220, 34, "Help and support"], ["Help and support", "g", 330, 656, 1100],
   ] },
 };
 
@@ -150,12 +247,15 @@ export async function alertsHtml() {
   const slack = "data:image/png;base64," + buf.toString("base64");
   const bellBuf = await sharp(path.join(STILLS, "01-today.png")).extract({ left: 1020, top: 22, width: 544, height: 44 }).resize({ width: 1632, kernel: "lanczos3" }).png().toBuffer();
   const bell = "data:image/png;base64," + bellBuf.toString("base64");
+  const bobuf = await sharp(path.join(STILLS, "21-bell-open.png")).extract({ left: 570, top: 30, width: 460, height: 830 }).resize({ height: 760, kernel: "lanczos3" }).png().toBuffer();
+  const bellopen = "data:image/png;base64," + bobuf.toString("base64");
   const kk = 1500 / 600;
   return `<!doctype html><meta charset="utf-8"><style>
 *{box-sizing:border-box}body{margin:0;width:1920px;height:1080px;background:radial-gradient(1200px 700px at 30% 20%,#162620 0%,#0d1210 55%,#0a0d0c 100%);font-family:"Segoe UI",Arial,sans-serif;color:#e8efec;overflow:hidden;position:relative}
 #vd-cursor{display:none!important}
 .ttl{position:absolute;left:210px;top:56px;font-size:30px;letter-spacing:.14em;text-transform:uppercase;color:#7fb79e;font-weight:600}
 .ph{position:absolute;inset:0;opacity:0;transition:opacity .8s ease}.ph.show{opacity:1}
+#bopen{position:absolute;left:250px;top:110px;border-radius:18px;overflow:hidden;border:2px solid #34493f;box-shadow:0 40px 100px rgba(0,0,0,.6)}#bopen img{display:block;height:760px}
 #bellcard{position:absolute;left:144px;top:300px;width:1632px;border-radius:22px;overflow:hidden;border:2px solid #34493f;box-shadow:0 40px 100px rgba(0,0,0,.6)}
 #bellcard img{display:block;width:1632px}
 .bhl{position:absolute;left:1560px;top:296px;width:0;height:60px;border-radius:12px;border:4px solid #e0a23a;box-shadow:0 0 30px rgba(224,162,58,.8);opacity:0;transition:opacity .5s}
@@ -179,6 +279,7 @@ export async function alertsHtml() {
 .row.hi{background:#fff7e0;box-shadow:inset 6px 0 0 #e0a23a}
 </style><div class="ttl" id="ttl">In the app</div>
 <div class="ph" id="p0"><div id="bellcard"><img src="${bell}"></div><div class="bhl" id="bh"></div><div class="cap2" id="bc">A bell, with the number waiting</div></div>
+<div class="ph" id="pb"><div id="bopen"><img src="${bellopen}"></div><div class="tag" id="bt1" style="left:760px;top:360px;font-size:44px;padding:14px 26px">Open it, snooze it, or dismiss it</div></div>
 <div class="ph" id="p1"><div id="slackcard"><img src="${slack}"></div>
  <div class="hl" id="h1" style="left:${180 + 30 + 40 * kk / 2.5}px;top:${250 + 30 + 22 * kk}px;height:${Math.round(20 * kk)}px"></div>
  <div class="ul" id="u1" style="left:${180 + 30 + 30 * kk}px;top:${250 + 30 + 150 * kk}px"></div>
@@ -200,13 +301,14 @@ export async function alertsRun(page, T, sleep, moveTo, tfp) {
   const ttl = (t) => page.evaluate((x) => { document.getElementById("ttl").textContent = x; }, t);
   const set = (id, css) => page.evaluate(([i, c]) => Object.assign(document.getElementById(i).style, c), [id, css]);
   const kk = 2.5;
-  await show("p0"); await set("bh", { opacity: 1, width: "70px" }); await set("bc", { opacity: 1 });
-  await T.at(tfp.p("in Slack")); await hide("p0"); await sleep(500); await ttl("In Slack"); await show("p1");
+  await ttl("In the app"); await show("pb"); await set("bt1", { opacity: 1 });
+
+  await T.at(tfp.p("In Slack and by email")); await hide("pb"); await sleep(500); await ttl("In Slack"); await show("p1");
   await set("h1", { width: Math.round(560 * kk) + "px" }); await set("g1", { opacity: 1 });
   await T.at(tfp.p("what to do next")); await set("u1", { width: Math.round(160 * kk) + "px" }); await set("g1", { opacity: 0 }); await set("g2", { opacity: 1 });
-  await moveTo(page, 180 + 30 + 120 * kk, 250 + 30 + 152 * kk, 900);
-  await T.at(tfp.p("or by email")); await hide("p1"); await sleep(500); await ttl("By email"); await show("p2");
-  await T.at(tfp.p("links straight")); const b = await page.locator("#ml").boundingBox(); await moveTo(page, b.x + b.width / 2, b.y + b.height / 2, 1000);
+  await moveTo(page, 180 + 30 + 120 * kk, 250 + 30 + 152 * kk, 800);
+  await sleep(500); await hide("p1"); await sleep(500); await ttl("By email"); await show("p2");
+  await T.at(tfp.p("links straight")); const b = await page.locator("#ml").boundingBox(); await moveTo(page, b.x + b.width / 2, b.y + b.height / 2, 900);
   await sleep(200); await page.mouse.down(); await sleep(70); await page.mouse.up();
   await sleep(250); await hide("p2"); await sleep(500); await ttl("It opens the right account in your CRM"); await show("p3");
   await moveTo(page, 700, 520, 1400);
@@ -232,4 +334,20 @@ export async function closeRun(page, T, tfp) {
   await T.at(tfp.p("Know what's")); await on("c2");
   await T.at(tfp.p("Install once")); await on("c3");
   await T.at(tfp.p("Free for") + 0.4); await on("c4");
+}
+
+export const welcomeEndHtml = () => `<!doctype html><meta charset="utf-8"><style>
+*{box-sizing:border-box}body{margin:0;width:1920px;height:1080px;background:radial-gradient(1300px 800px at 35% 40%,#1a3a30 0%,#0e1613 58%,#090c0b 100%);font-family:"Segoe UI",Arial,sans-serif;color:#fff;overflow:hidden;position:relative}
+#vd-cursor{display:none!important}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.t{position:absolute;left:900px;width:900px;opacity:0;transform:translateY(14px);transition:opacity .9s ease,transform 1s ease}.t.show{opacity:1;transform:none}
+.big{font-size:84px;font-weight:800;letter-spacing:-.02em;line-height:1.08}.sm{font-size:50px;font-weight:600;color:#d3e6dc;line-height:1.25}
+</style>${logoCss(0.2, 580, 290, 150)}
+<img class="lg" src="data:image/png;base64,${logoData()}"><div class="wm" style="left:220px;top:760px;width:560px;text-align:center;animation-delay:.9s">SubSync</div>
+<div class="t big" id="c1" style="top:300px">You are set.</div>
+<div class="t sm" id="c2" style="top:470px">Open Today and start with the first account to save.</div>`;
+export async function welcomeEndRun(page, T, tfp) {
+  const on = (id) => page.evaluate((i) => document.getElementById(i).classList.add("show"), id);
+  await T.at(tfp.p("You are set")); await on("c1");
+  await T.at(tfp.p("Open Today")); await on("c2");
 }
