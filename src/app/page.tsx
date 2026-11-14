@@ -73,7 +73,7 @@ export default function Home() {
       <section className="hero">
         <div className="wrap">
           <p className="eyebrow">For agencies, multi-location businesses and single businesses</p>
-          <h1>Know what is happening in every account you manage before a customer tells you.</h1>
+          <h1>Know which accounts need you today, before a customer tells you.</h1>
           <p className="lede">Whether you run one account or a hundred, SubSync watches them and tells you what needs attention first: leads nobody answered, appointments nobody marked, no-shows nobody called back and deals that went quiet.</p>
           <div className="cta-row">
             <a className="btn btn-primary" href={INSTALL_HREF}>Install SubSync</a>
