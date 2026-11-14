@@ -32,7 +32,6 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { scope: "conversations.readonly", kind: "read", required: true, why: "The conversation list: last message, direction, channel and unread count, for unanswered messages. Message text is never copied." },
     { scope: "conversations/message.readonly", kind: "read", required: false, why: "The messages inside a conversation, only to see who sent each one and when (a person or an automation, a call or a text). This is the only way to measure true speed to lead. The text of a message is never stored." },
     { scope: "conversations/message.write", kind: "change", required: false, why: "Only to send a text or an email to one lead when a person presses Send, after a preview. Optional. SubSync never sends on its own and never to a contact who asked not to be contacted. Without it the message box says: Needs permission, reconnect." },
-    { scope: "conversations/reports.readonly", kind: "read", required: false, why: "For coming, richer response-time numbers (conversation reports). Not used yet: nothing in SubSync uses it today, and skipping it changes nothing." },
   ] },
   { id: "appointments", title: "Appointments", summary: "Bookings and what happened to them.", scopes: [
     { scope: "calendars.readonly", kind: "read", required: true, why: "Calendars, for the setup checklist and to know which calendars exist." },
@@ -47,10 +46,6 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
   { id: "tags", title: "Tags, fields and tasks", summary: "How your accounts label and follow up on contacts.", scopes: [
     { scope: "locations/tags.readonly", kind: "read", required: false, why: "Tag names, for hot-lead and cold-list rules." },
     { scope: "locations/customFields.readonly", kind: "read", required: false, why: "Reserved for lead-source detail. Not used yet." },
-    { scope: "locations/tasks.readonly", kind: "read", required: false, why: "For coming follow-up checks on your team's tasks. Not used yet: nothing in SubSync uses it today, and skipping it changes nothing." },
-    { scope: "locations/customFields.write", kind: "change", required: false, why: "For coming data cleaning that fixes custom field values, always after a preview. Not used yet: nothing in SubSync uses it today, and skipping it changes nothing." },
-    { scope: "locations/tags.write", kind: "change", required: false, why: "For coming tagging help, always after a preview. Not used yet: nothing in SubSync uses it today, and skipping it changes nothing." },
-    { scope: "locations/tasks.write", kind: "change", required: false, why: "For coming follow-up tasks created for your team, always after a preview. Not used yet: nothing in SubSync uses it today, and skipping it changes nothing." },
   ] },
   { id: "workflows", title: "Workflows and campaigns", summary: "The automations and campaigns in your client accounts, and how they are doing.", scopes: [
     { scope: "workflows.readonly", kind: "read", required: false, why: "The list of workflows in each client account (name, state, last edited), for the Workflows page. Without it the page says: Needs permission, reconnect." },
