@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { bucketsOf, historyText, todayLine } from "../analytics/cl3-money-core.ts";
 
 const base = { plan: { name: "Pro", pay: "paid", payLabel: "Paid up", statusRaw: "active", monthly: 100, currency: "USD", interval: "month", daysInStatus: 3, since: null, state: "ok", explain: "" }, wallet: { balance: 5, state: "ok" }, subsync: "installed" as const };
-const counts = (o: Record<string, number> = {}) => ({ all: 0, unpaid: 0, failing: 0, no_plan: 0, paid: 0, empty_wallet: 0, app_missing: 0, ...o });
+const counts = (o: Record<string, number> = {}) => ({ all: 0, unpaid: 0, failing: 0, no_plan: 0, paid: 0, empty_wallet: 0, app_missing: 0, trial: 0, app_trial: 0, ...o });
 
 test("a paid account with SubSync is only paid", () => {
   assert.deepEqual(bucketsOf(base), ["all", "paid"]);

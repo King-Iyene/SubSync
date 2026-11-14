@@ -92,7 +92,7 @@ The automations and campaigns in your client accounts, and how they are doing.
 | `campaigns.readonly` | read | optional | The list of campaigns in each client account (name, state, last change), to find stuck or failed ones. Read only: SubSync never starts or sends a campaign. |
 | `emails/campaigns.readonly` | read | optional | The email, bulk and workflow campaigns of each client account, read only, for the same list. |
 | `emails/stats.readonly` | read | optional | How many messages of each campaign were sent, delivered, opened, clicked, bounced or are still waiting, to find campaigns that looked sent but did not arrive. Totals only: SubSync never sees who received what. |
-| `saas/location.read` | read | optional | Optional. Requested for the Plans and payments block on the Clients screen. Honest status: the platform's public API description lists no read that this permission unlocks (the plan reads ask for saas/company.read, agency level), so the block shows Needs permission or Not available until the platform confirms what it unlocks. |
+| `saas/location.read` | read | optional | Optional. Requested for the Plans and payments block on the Clients screen. Honest status: the platform's public API description lists no read that this permission unlocks (the plan reads ask for saas/company.read, company level), so the block shows Needs permission or Not available until the platform confirms what it unlocks. |
 
 ## Payments and credit
 
