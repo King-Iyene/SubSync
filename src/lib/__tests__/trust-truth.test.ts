@@ -161,7 +161,7 @@ test("the disabled Zoom integration is not mentioned, while the Meeting notes mo
   assert.doesNotMatch(text, /zoom|google meet/i);
   assert.doesNotMatch(text, /\b(GoHighLevel|HighLevel|GHL)\b/);
   // The permission names themselves (for example "locations.readonly") are machine names, not wording.
-  const words = text.replace(/[a-z]+(\/[a-zA-Z]+)?\.(readonly|write|read)/g, "");
+  const words = text.replace(/[a-z-]+(\/[a-zA-Z-]+)?(\.[a-z]+)*\.(readonly|write|read)/g, "");
   assert.doesNotMatch(words, /\bsub-?accounts?\b|\blocations?\b/i, "public wording: client accounts, not sub-accounts or locations");
 });
 
