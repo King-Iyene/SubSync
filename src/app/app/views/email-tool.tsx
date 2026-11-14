@@ -8,7 +8,7 @@ import { Badge, Btn, inputClass, timeAgo } from "../ui";
 
 export type EmailCheck = { status: "ok" | "warning" | "critical" | "error"; checkedAt: string; domain: string | null; findings: Array<{ severity: "critical" | "warning" | "info" | "good"; area: string; message: string; fix?: string }> };
 export type EmailData = { address: string | null; hasAddress: boolean; canManage: boolean; sendingLive: boolean; mailReady: boolean; check: EmailCheck | null };
-type Sent = { text: string; dryRun: boolean; preview: { to: string; subject: string; body: string } | null };
+type Sent = { text: string; dryRun: boolean; state?: string; tone?: "info" | "success" | "danger"; errorId?: string | null; preview: { to: string; subject: string; body: string } | null };
 
 export const emailFactsOf = (e: EmailData, check: EmailCheck | null): EmailFacts => ({ address: e.address ?? (e.hasAddress ? "your saved address" : null), check: check ? { status: check.status, checkedAt: check.checkedAt } : null, sendingLive: e.sendingLive });
 
@@ -73,7 +73,7 @@ export function EmailTool({ email, check, onCheck, reload }: { email: EmailData;
         </div>
       )}
       {sent && (
-        <div className="rounded-lg border p-3 text-sm" role="status" data-testid="email-sent" data-dry-run={sent.dryRun ? "yes" : "no"}>
+        <div className={`rounded-lg border p-3 text-sm ${sent.tone === "danger" ? "border-destructive/50" : ""}`} role="status" data-testid="email-sent" data-state={sent.state ?? ""} data-dry-run={sent.dryRun ? "yes" : "no"}>
           <p className="font-medium">{sent.text}</p>
           {sent.preview && <p className="mt-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">{sent.preview.subject}</span><br />{sent.preview.body}</p>}
         </div>

@@ -7,7 +7,8 @@ import { checkDomain, extractDomain, type DomainReport } from "../dns/email-auth
 import { emailConfigured } from "../email";
 import { sendConnectionsTest } from "../notifications/transports";
 import { isLive } from "../live-flags";
-import { calendarAccounts, calendarItems, testResultText } from "../connections/tools-status";
+import { calendarAccounts, calendarItems } from "../connections/tools-status";
+import { runEmailTest } from "../connections/email-test";
 import { GUIDE_IDS } from "../guides";
 import { HIDEABLE_IDS, STATE_KINDS, type StateKind } from "../settings2";
 import { NEWS_IDS } from "../whats-new";
@@ -155,10 +156,18 @@ async function emailTest(ctx: Ctx) {
     html: "<p>This is a test from SubSync. If you can read this, alert and summary emails can reach this address. You do not need to do anything.</p>",
   };
   // Through the one switch: with SEND_EMAIL_LIVE off nothing leaves the server and only a "WOULD SEND" line is recorded.
-  const r = await sendConnectionsTest(ctx.installationId, address, mail);
-  if (!r.ok) return json({ ok: false, text: `The test email could not be sent. If it happens again, send us this code: ${r.code}.` }, 502);
-  const dryRun = r.dryRun === true;
-  return json({ ok: true, dryRun, text: testResultText({ dryRun, to: address }), preview: dryRun ? { to: address, subject: mail.subject, body: mail.text } : null });
+  // Always a handled answer (HTTP 200 with a state), within a few seconds: a "not switched on yet" or a provider refusal is not a server fault, and a
+  // real fault is logged with a code the person can quote. The platform's 502 can never come from here.
+  const answer = await runEmailTest({
+    to: address, mail,
+    send: () => sendConnectionsTest(ctx.installationId, address, mail),
+    logError: async (errorId, detail) => {
+      console.error("email test failed", { errorId, detail });
+      const db = sql();
+      await db`insert into audit_log (installation_id, actor, action, detail) values (${ctx.installationId}, null, 'email_test.error', ${db.json({ errorId, detail } as never)})`;
+    },
+  });
+  return json(answer);
 }
 
 async function progress(ctx: Ctx) {
