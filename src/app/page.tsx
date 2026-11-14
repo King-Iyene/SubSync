@@ -1,89 +1,190 @@
+import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import { LeadCostCalculator } from "@/components/lead-cost-calculator";
-import { ProfitCalculator } from "@/components/profit-calculator";
+import { SiteShell } from "@/components/site/shell";
+import { VideoPlayer } from "@/components/site/video-player";
+import { INSTALL_HREF, PRICING, SITE, VIDEO } from "@/lib/site/config";
 
-const outcomes = [
-  { title: "Speed to lead", body: "See how long every new lead waits for a first reply from a person, per client account and per team member. Get an alert the moment leads start going cold." },
-  { title: "True show rate", body: "Find every appointment nobody marked as showed or no-show, so your reports stop lying. Get a list of no-shows still waiting to be rebooked." },
-  { title: "Setter performance", body: "Compare first-reply time, show rate and deals won across your team and across every client account, in one place." },
+export const metadata: Metadata = {
+  title: "SubSync: know what is happening in every account you manage",
+  description: SITE.description,
+  alternates: { canonical: "/" },
+  openGraph: { title: "SubSync", description: SITE.tagline, url: "/", type: "website", images: [{ url: "/og.png", width: 1200, height: 630, alt: "SubSync" }] },
+  twitter: { card: "summary_large_image", title: "SubSync", description: SITE.tagline, images: ["/og.png"] },
+};
+
+const PAIN: Array<[string, string]> = [
+  ["Leads nobody answers", "A new lead writes in and waits. An hour later they are far less likely to reply. A week later they are gone."],
+  ["Appointments nobody marks", "The time passes and nobody records showed or no-show, so your show rate is a guess."],
+  ["No-shows nobody calls back", "People who missed sit in the calendar and slip away, with the money they were worth."],
+  ["Deals that go quiet", "Good deals stop moving and fall out of the pipeline without anyone deciding to let them go."],
+  ["Contacts that repeat", "The same person turns up again and again, and every report counts them twice."],
+  ["Reports built by hand", "Every month you copy numbers into a document to prove the work, instead of doing it."],
+  ["The customer finds out first", "Someone says they never heard back, and that is how you learn something was wrong."],
 ];
 
-const trust = [
-  "SubSync can change things in your CRM (book appointments, add tags, update deals, fix contact data) and send texts and emails, always through a preview and a confirm, with an audit log, only when a person presses the button (or a schedule they set), and never to contacts who asked not to be contacted. The only thing it writes on its own is a meeting note on a matched contact, and you can switch that off.",
-  "A client account can only ever see its own data. Another agency's data is never reachable, and this is tested on every release.",
-  "A small, clearly listed set of permissions, not hundreds.",
-  "Your data is deleted when you uninstall.",
+const MODULES: Array<{ slug: string; shot: string; name: string; line: string; bullets: string[] }> = [
+  { slug: "today", shot: "today", name: "Today", line: "Start every morning with what needs you first, ranked, with the reason and a link to the person or deal.", bullets: ["The top row is the most urgent", "Proof lists what you cleared", "A 7 am brief by email"] },
+  { slug: "speed-to-lead", shot: "speed-to-lead", name: "Speed to lead", line: "See how long every new lead waits for a first reply from a person, and which accounts are leaving leads unanswered.", bullets: ["Typical wait, not a flattering average", "Customer messages still waiting", "Hand waiting leads to your CRM's call queue"] },
+  { slug: "appointments", shot: "appointments", name: "Appointments", line: "Find every booking nobody marked, get an honest show rate, and win back the no-shows.", bullets: ["Needs outcome list", "True show rate", "No-show recovery"] },
+  { slug: "funnel-and-pipeline", shot: "pipeline-funnel", name: "Pipeline and deals", line: "A funnel that shows where deals leak, a river of money by step, and a replay of how deals moved.", bullets: ["Stale and stuck deals", "Deals without a value flagged", "Forecast only when there is enough data"] },
+  { slug: "clients", shot: "clients", name: "Clients", line: "Every client account with its health, plan and what needs attention, plus monthly reports you can share.", bullets: ["Health score with reasons", "Notes and next steps", "Reports you can print or share"] },
+  { slug: "money-and-wallet", shot: "money", name: "Money", line: "Failed, late and disputed payments in one place, and a watchlist of credit balances before they run out.", bullets: ["Chase the oldest failed payment", "Days of credit left", "Payout lines per setter and closer"] },
+  { slug: "find-a-lead", shot: "find-a-lead", name: "Find a lead", line: "Search every contact in every account, save the lists you use, and open a person's whole story in one panel.", bullets: ["Filters and smart lists", "Timeline, deals and recorded calls", "Nothing sent without a preview"] },
+  { slug: "account-audit", shot: "account-audit", name: "Account audit", line: "Problems found in each account and the money at risk, with counted facts kept apart from estimates.", bullets: ["History since the first audit", "A share link that hides client names", "Every estimate shows its formula"] },
+  { slug: "clean-up", shot: "clean-up", name: "Clean-up", line: "Duplicate contacts and data problems, sorted by how sure SubSync is, always with a preview first.", bullets: ["Certain, likely, possible", "Protects people who asked not to be contacted", "Every change in History"] },
+  { slug: "team", shot: "team", name: "Team", line: "Who replies fast, who is overloaded, and how each person compares with their own recent past.", bullets: ["Roles for setters and closers", "Scorecards per person", "Private coaching notes"] },
 ];
 
-const faq = [
-  ["How much does it cost?", "Try it free for 14 days, then $11.50 per client account per month. You can resell it to your clients at your own price."],
-  ["Does it work under my own brand?", "Yes. Add your agency name and colour in Settings and SubSync shows as yours."],
-  ["Will it message my clients' customers?", "Only when a person on your team presses Send, after a preview. SubSync never sends on its own and never to a contact who asked not to be contacted. It also reads your CRM, alerts you and tells you what to do."],
-  ["How fast do I see something useful?", "The audit runs as soon as your accounts finish their first read, usually within minutes."],
+const STEPS: Array<[string, string]> = [
+  ["Install once", "Press Install SubSync, approve the permissions you are comfortable with, and wait a few minutes for the first read."],
+  ["Connect nothing else", "SubSync reads your CRM directly. Slack, your own AI and Fathom are optional extras, not setup."],
+  ["See what needs attention", "Open Today. The most urgent thing is at the top, with the reason and a link."],
+];
+
+const FAQ: Array<[string, string]> = [
+  ["Who is SubSync for?", "Agencies that manage many client accounts and single businesses that manage one. If leads, appointments and deals live in your CRM, SubSync watches them for you."],
+  ["Does it change anything in my CRM?", "Only after a preview and a confirm, with a log, and an undo where the page says one exists. Reading is the default, and every permission has a reason you can read."],
+  ["Will it message my customers?", "Never on its own. Replying by text or email from SubSync exists behind a switch that is off until an owner turns it on for an account, and it checks do-not-contact again before each send. People who asked not to be contacted are never messaged."],
+  ["What does it cost?", `${PRICING.trialDays} days free, then ${PRICING.price} ${PRICING.unit} on the ${PRICING.plan} plan. It is billed through the marketplace where you install it, never inside SubSync.`],
+  ["Can a client account see another client's data?", "No. A client account can only see its own data, another company's data is never reachable, and automatic tests try to break this on every release."],
+  ["Do I need an AI account?", "No. AI features are optional and use your own AI account, so SubSync never pays for AI and you control the spend. SubSync works out every number itself."],
+  ["What happens to my data if I leave?", "Uninstalling cuts the connection at once and deletes what SubSync copied from your CRM. The Trust page lists exactly what is stored and what is deleted."],
+  ["Do I have to connect Fathom or Slack?", "No. Fathom is connected by each person for their own calls, and Slack by an administrator for the team. Both are optional."],
+  ["Does it work under my own brand?", "Yes. Add your name, colour and logo in Settings and they show on screens, reports and share links."],
+  ["How do I get help?", `Read the Support pages, or email ${SITE.supportEmail}. We reply within ${SITE.supportReply}.`],
+];
+
+const ld = [
+  {
+    "@context": "https://schema.org", "@type": "VideoObject", name: VIDEO.title, description: VIDEO.description,
+    thumbnailUrl: `${SITE.url}${VIDEO.poster}`, uploadDate: VIDEO.uploadDate, duration: VIDEO.durationIso, contentUrl: `${SITE.url}${VIDEO.src720}`,
+  },
+  {
+    "@context": "https://schema.org", "@type": "SoftwareApplication", name: "SubSync", applicationCategory: "BusinessApplication", operatingSystem: "Web", description: SITE.description,
+    offers: { "@type": "Offer", price: PRICING.amount, priceCurrency: "USD", description: `${PRICING.price} ${PRICING.unit}, ${PRICING.trialDays}-day free trial` },
+  },
 ];
 
 export default function Home() {
   return (
-    <div className="dark min-h-screen bg-[oklch(0.15_0.025_220)] text-white">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-        <span className="text-lg font-semibold tracking-tight">SubSync</span>
-        <nav className="flex gap-5 text-sm text-white/60">
-          <Link href="/support" className="hover:text-white">Support</Link>
-          <Link href="/privacy" className="hover:text-white">Privacy</Link>
-          <Link href="/terms" className="hover:text-white">Terms</Link>
-        </nav>
-      </header>
-
-      <main className="mx-auto max-w-5xl space-y-24 px-6 pb-24 pt-12">
-        <section className="space-y-6">
-          <p className="text-sm font-medium uppercase tracking-widest text-teal-300">For agencies that book appointments</p>
-          <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-6xl">Know what is happening in every client account before your client does.</h1>
-          <p className="max-w-2xl text-lg leading-8 text-white/70">SubSync watches every account for slow replies, unmarked appointments and stale deals, puts a dollar figure on what is being lost, and tells you what to do first. It runs inside your CRM and you can resell it under your own name.</p>
-          <div className="flex flex-wrap gap-3">
-            <Link href="/support" className="rounded-xl bg-teal-400 px-6 py-3 font-semibold text-slate-950 hover:bg-teal-300">Run your free audit</Link>
-            <a href="#calculator" className="rounded-xl border border-white/20 px-6 py-3 font-medium hover:bg-white/5">See what you could earn</a>
+    <SiteShell>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld).replace(/</g, "\\u003c") }} />
+      <section className="hero">
+        <div className="wrap">
+          <p className="eyebrow">For agencies and single businesses</p>
+          <h1>Know what is happening in every account you manage before a customer tells you.</h1>
+          <p className="lede">SubSync watches your connected accounts and tells you what needs attention first: leads nobody answered, appointments nobody marked, no-shows nobody called back and deals that went quiet.</p>
+          <div className="cta-row">
+            <a className="btn btn-primary" href={INSTALL_HREF}>Install SubSync</a>
+            <a className="btn btn-ghost" href="#tour">Watch the 4-minute tour</a>
           </div>
-        </section>
+          <p className="fine">{PRICING.trialDays} days free, then {PRICING.price} {PRICING.unit}.</p>
+        </div>
+      </section>
 
-        <section className="grid gap-5 sm:grid-cols-3">
-          {outcomes.map((o) => (
-            <div key={o.title} className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-              <h2 className="text-lg font-semibold">{o.title}</h2>
-              <p className="mt-2 text-sm leading-6 text-white/70">{o.body}</p>
+      <section className="video" aria-label="Product tour video">
+        <div className="wrap" style={{ maxWidth: 980 }}>
+          <VideoPlayer />
+        </div>
+      </section>
+
+      <section className="block" aria-labelledby="pain">
+        <div className="wrap">
+          <h2 className="h2" id="pain">The problems nobody sees until it is late</h2>
+          <p className="sub">Workflows fail quietly, leads have no owner and people forget to mark what happened. SubSync is the independent check.</p>
+          <div className="grid g3 pain">
+            {PAIN.map(([t, b], i) => (
+              <div className="card" key={t}><span className="n">0{i + 1}</span><h3>{t}</h3><p>{b}</p></div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="block alt" id="modules" aria-labelledby="mods">
+        <div className="wrap">
+          <h2 className="h2" id="mods">Ten pages, each one answers a question you ask every day</h2>
+          <p className="sub">Real screens from a demo account. Every page has a short guide in the app and a full one on the Support pages.</p>
+          {MODULES.map((m, i) => (
+            <div className={`mod${i % 2 ? " flip" : ""}`} key={m.slug}>
+              <div>
+                <p className="eyebrow">{String(i + 1).padStart(2, "0")}</p>
+                <h3>{m.name}</h3>
+                <p>{m.line}</p>
+                <ul>{m.bullets.map((b) => <li key={b}>{b}</li>)}</ul>
+                <Link className="more" href={`/support/${m.slug}`}>Read the guide to {m.name}</Link>
+              </div>
+              <div className="shot">
+                <Image src={`/site/${m.shot}-1600.webp`} alt={`The ${m.name} page of SubSync, shown with demo data`} width={1600} height={900} sizes="(min-width: 900px) 58vw, 100vw" priority={i === 0} />
+              </div>
             </div>
           ))}
-        </section>
+        </div>
+      </section>
 
-        <section id="lead-cost" className="space-y-5">
-          <h2 className="text-3xl font-semibold tracking-tight">What slow replies cost you</h2>
-          <p className="max-w-2xl text-white/70">A lead that waits cools fast. Put in your own numbers.</p>
-          <LeadCostCalculator />
-        </section>
+      <section className="block" aria-labelledby="how">
+        <div className="wrap">
+          <h2 className="h2" id="how">How it works</h2>
+          <div className="grid g3 steps">
+            {STEPS.map(([t, b]) => <div className="card" key={t}><h3>{t}</h3><p>{b}</p></div>)}
+          </div>
+        </div>
+      </section>
 
-        <section id="calculator" className="space-y-5">
-          <h2 className="text-3xl font-semibold tracking-tight">What it earns you</h2>
-          <p className="max-w-2xl text-white/70">One price per client account. Add your own markup and keep the difference.</p>
-          <ProfitCalculator />
-        </section>
+      <section className="block alt" id="pricing" aria-labelledby="price">
+        <div className="wrap">
+          <h2 className="h2" id="price" style={{ textAlign: "center" }}>One plan, one price</h2>
+          <div className="card price">
+            <p className="eyebrow">{PRICING.plan}</p>
+            <p className="amt">{PRICING.price}</p>
+            <p className="muted" style={{ color: "var(--s-muted)" }}>{PRICING.unit}</p>
+            <ul>
+              <li>{PRICING.trialDays}-day free trial</li>
+              <li>Every page and alert, for every client account you connect</li>
+              <li>{PRICING.billing}</li>
+              <li>Resell it to your own clients at your own price</li>
+            </ul>
+            <a className="btn btn-primary" href={INSTALL_HREF}>Install SubSync</a>
+            <p style={{ marginTop: 14 }}><Link href="/pricing">See the pricing details and the calculator</Link></p>
+          </div>
+        </div>
+      </section>
 
-        <section className="space-y-5">
-          <h2 className="text-3xl font-semibold tracking-tight">Built to be trusted with client data</h2>
-          <ul className="grid gap-4 sm:grid-cols-2">
-            {trust.map((t) => <li key={t} className="rounded-xl border border-white/10 p-5 text-sm leading-6 text-white/80">{t}</li>)}
-          </ul>
-        </section>
+      <section className="block" aria-labelledby="trust">
+        <div className="wrap">
+          <h2 className="h2" id="trust">What we read, what we keep, who can see it</h2>
+          <div className="grid g3">
+            <div className="card"><h3>A short, listed set of permissions</h3><p>Each has a plain reason. Optional ones can be left off and the feature that needs one says so.</p></div>
+            <div className="card"><h3>Nothing changes without a preview</h3><p>Changes to your CRM show a preview, ask you to confirm, are logged, and can be undone where the page says so.</p></div>
+            <div className="card"><h3>One account never sees another</h3><p>Tested automatically on every release. A client account sees only its own data.</p></div>
+            <div className="card"><h3>We never copy message words</h3><p>SubSync keeps who wrote, which way, when. Not what they said.</p></div>
+            <div className="card"><h3>Your data is deleted when you leave</h3><p>Uninstall cuts the connection at once and deletes what SubSync copied.</p></div>
+            <div className="card"><h3>Your tools stay yours</h3><p>Your AI uses your own key. Fathom is connected by each person for their own calls.</p></div>
+          </div>
+          <p style={{ marginTop: 20 }}><Link href="/trust">Read the full Trust page</Link></p>
+        </div>
+      </section>
 
-        <section className="space-y-5">
-          <h2 className="text-3xl font-semibold tracking-tight">Questions</h2>
-          <dl className="space-y-5">
-            {faq.map(([q, a]) => <div key={q}><dt className="font-medium">{q}</dt><dd className="mt-1 text-sm leading-6 text-white/70">{a}</dd></div>)}
-          </dl>
-        </section>
-      </main>
+      <section className="block alt" aria-labelledby="faq">
+        <div className="wrap narrow">
+          <h2 className="h2" id="faq">Questions people ask</h2>
+          <div style={{ marginTop: 20 }}>
+            {FAQ.map(([q, a]) => (
+              <details className="faq" key={q}><summary>{q}</summary><p>{a}</p></details>
+            ))}
+          </div>
+        </div>
+      </section>
 
-      <footer className="border-t border-white/10">
-        <div className="mx-auto max-w-5xl px-6 py-6 text-sm text-white/50">&copy; 2026 KD Squares Ltd. All rights reserved.</div>
-      </footer>
-    </div>
+      <section className="block" aria-labelledby="final">
+        <div className="wrap" style={{ textAlign: "center" }}>
+          <h2 className="h2" id="final">Find out what is happening before your customers do</h2>
+          <div className="cta-row">
+            <a className="btn btn-primary" href={INSTALL_HREF}>Install SubSync</a>
+            <Link className="btn btn-ghost" href="/support">Read the Support pages</Link>
+          </div>
+        </div>
+      </section>
+    </SiteShell>
   );
 }
