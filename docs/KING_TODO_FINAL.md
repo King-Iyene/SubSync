@@ -6,7 +6,7 @@ Live version in the portal is **v2.1.0**. The next release is **2.2.0** (not 1.1
 ## A. Release 2.2.0: permissions  ~15 min
 1. Developer portal > My Apps > SubSync > Versions > **Clone as Draft**.
 2. Advanced Settings > Auth > Scopes. Clear the old 166. Tick the **40** listed in `docs/RELEASE_1_1_0.md` (7 required, 33 optional): the 7 required are locations.readonly, contacts.readonly, opportunities.readonly, conversations.readonly, calendars.readonly, oauth.readonly, oauth.write. Tick only the ones the picker lists; if `workflows.publish`, `workflows.delete` or `locations/customFields.write` is missing, tell me and I remove it from the code (an unlisted scope can break the install).
-3. NEVER tick: `invoices.write`, `conversations.write` (SubSync does not delete conversations or resend invoices). Tick `conversations/message.write` as OPTIONAL in release 2.3.0 (King, 13 Nov: SubSync sends a text or email only when a person presses Send).
+3. (Superseded 14 Nov 2026: the portal draft now holds all 80 scopes, `invoices.write` and `conversations.write` included, all optional. Nothing uses invoices.write yet.) Tick `conversations/message.write` as OPTIONAL in release 2.3.0 (King, 13 Nov: SubSync sends a text or email only when a person presses Send).
 4. Release notes: paste section 2 of `docs/RELEASE_1_1_0.md`. Choose **Major**. Publish. Do NOT change prices or plans in this release.
 
 ## B. Listing (portal > Profile)  ~15 min
