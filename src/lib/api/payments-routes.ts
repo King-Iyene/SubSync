@@ -1,6 +1,12 @@
 import { addNote, createDispute, diffDispute, getDispute, planResend, readDispute, removeDispute, resendInvoice, updateDispute } from "../analytics/payments-actions";
 import { disputes, exportCsv, forgetPayments, history, item, options, paymentsCache, queue, setup, today, upcoming, type Filters, type Links, type Scope } from "../analytics/payments-queries";
+import { readChecks, sampleChecks, UNITS_NOTE, type McChecks, type Resp } from "../analytics/money-checks";
+import { accountsOf } from "../analytics/payments-queries";
 import { PM_FLAGS, PM_PARTS, type PmPart } from "../analytics/payments-types";
+import { GHL_API } from "../ghl/client";
+import { ghlFetch } from "../ghl/http";
+import { sql } from "../db";
+import { parseGranted } from "../scope-groups";
 import type { Feature } from "../entitlements";
 import { resolveEntitlements } from "../flags";
 import type { deepLinks } from "../links";
@@ -15,7 +21,7 @@ import { ownedLocation } from "./tenant-guard";
 type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
 export type PaymentsHelpers = { allowed: () => Promise<string[] | null>; links: () => Promise<ReturnType<typeof deepLinks>>; brand: () => Promise<string | null>; locationToken: (locationId: string) => Promise<string> };
 
-const PART_FLAG: Record<PmPart, string> = { today: "pm_module", queue: "pm_recovery", item: "pm_recovery", disputes: "pm_disputes", upcoming: "pm_upcoming", history: "pm_recovery", options: "pm_module", setup: "pm_module", export: "pm_recovery" };
+const PART_FLAG: Record<PmPart, string> = { today: "pm_module", queue: "pm_recovery", item: "pm_recovery", disputes: "pm_disputes", upcoming: "pm_upcoming", history: "pm_recovery", options: "pm_module", setup: "pm_module", export: "pm_recovery", checks: "pm_checks" };
 const int = (v: string | null, d: number) => { const x = Number(v); return v !== null && Number.isFinite(x) ? Math.floor(x) : d; };
 const numOrNull = (v: string | null) => { if (v === null || v.trim() === "") return null; const x = Number(v); return Number.isFinite(x) ? x : null; };
 const text = (v: string | null, max: number) => (v ?? "").trim().slice(0, max) || null;
@@ -49,6 +55,7 @@ export async function handlePayments(ctx: Ctx, h: PaymentsHelpers): Promise<Resp
   if (hit) return wrap(hit, true);
   const done = (body: object) => { paymentsCache.set(key, body); return wrap(body); };
   switch (part) {
+    case "checks": return done(await moneyChecks(ctx, h, scope, one));
     case "today": return done(await today(scope, f));
     case "queue": return done(await queue(scope, f, text(sp.get("cursor"), 400), size, links));
     case "item": {
@@ -69,6 +76,30 @@ export async function handlePayments(ctx: Ctx, h: PaymentsHelpers): Promise<Resp
     }
   }
   return json({ error: "Not found" }, 404);
+}
+
+/** Money checks: ONE account at a time (the one asked for, or the first this person may see), read live from the platform with that account's own key. Nothing is stored. The demo company shows labelled sample data. */
+export async function moneyChecks(ctx: Pick<Ctx, "installationId" | "demo">, h: Pick<PaymentsHelpers, "locationToken">, scope: Scope, one: string | null, get?: (token: string) => (path: string, version: string) => Promise<Resp>): Promise<McChecks> {
+  const accts = await accountsOf(scope, one);
+  const acct = accts[0] ?? null;
+  if (!acct) return { account: null, sections: [], sample: false, unitsNote: "" };
+  if (ctx.demo) return { ...sampleChecks(), account: { id: acct.id, name: acct.name } };
+  const [row] = await sql()`select scope from installations where id = ${ctx.installationId}`;
+  // An install with no recorded permission list is not guessed about: the platform is asked and says yes or no.
+  const granted = typeof row?.scope === "string" && row.scope.trim() ? parseGranted(row.scope as string) : null;
+  const mk = get ?? ((token: string) => async (path: string, version: string): Promise<Resp> => {
+    const res = await ghlFetch(`${GHL_API}${path}`, { headers: { Authorization: `Bearer ${token}`, Version: version, Accept: "application/json" }, cache: "no-store" });
+    let body: unknown = null;
+    try { body = await res.json(); } catch { /* empty */ }
+    return { status: res.status, body };
+  });
+  let token: string;
+  try { token = await h.locationToken(acct.id); } catch {
+    // No key for this account right now: the sections that need a permission we know is missing still say so; the rest say the CRM could not be reached.
+    const sections = (await readChecks(async () => ({ status: 0, body: null }), acct.id, granted)).map((s) => (s.state === "needs_permission" ? s : { ...s, state: "error" as const, message: "Your CRM did not answer. Try again in a minute." }));
+    return { account: { id: acct.id, name: acct.name }, sections, sample: false, unitsNote: UNITS_NOTE };
+  }
+  return { account: { id: acct.id, name: acct.name }, sections: await readChecks(mk(token), acct.id, granted), sample: false, unitsNote: UNITS_NOTE };
 }
 
 async function readBody(ctx: Ctx): Promise<Record<string, unknown> | null> {

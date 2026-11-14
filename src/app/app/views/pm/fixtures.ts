@@ -1,3 +1,4 @@
+import { sampleChecks } from "@/lib/analytics/money-checks";
 import type { PmDisputes, PmHistory, PmItem, PmMeta, PmOptions, PmPart, PmQueue, PmRow, PmSetup, PmSource, PmToday, PmUpcoming } from "@/lib/analytics/payments-types";
 
 // Typed SAMPLE data, used only behind ?pmfx=1 and always labelled "Sample data". Never mixed with real rows.
@@ -69,6 +70,7 @@ export function sample(part: PmPart, p: FxParams, empty: boolean): object {
     case "history": return { ...META, ...(e ? { ...HISTORY, days: [], repeat: [], recovered: [], flagged: 0, fixed: 0, avgDaysToRecover: null, recoveryRate: null, historyStarts: null } : HISTORY) };
     case "options": return { ...META, ...OPTIONS };
     case "setup": return { ...META, ...SETUP };
+    case "checks": return { ...META, ...(e ? { account: null, sections: [], sample: true, unitsNote: "" } : sampleChecks()) };
     default: return META;
   }
 }

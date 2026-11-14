@@ -10,6 +10,7 @@ import { json, type AuthContext } from "./auth";
 import { ghlFetch } from "../ghl/http";
 import { GHL_API } from "../ghl/client";
 import { parseGranted } from "../scope-groups";
+import { needsPermissionText } from "../analytics/money-checks";
 import { buildOwnerOptions } from "../ghl/owner-list";
 import { installationHasScope } from "../analytics/cleanup-queries";
 import { isOurNote } from "../people/writeback";
@@ -310,7 +311,7 @@ async function actRoute(ctx: Ctx, h: WorkbenchHelpers, doIt: boolean): Promise<R
 // ---------------- the rest of the contact record, read live when a part is opened (nothing here is stored) ----------------
 //   notes  GET /contacts/{id}/notes   scope contacts.readonly (required scope: granted)
 //   tasks  GET /contacts/{id}/tasks   scope contacts.readonly
-//   money  GET /payments/orders?contactId   scope payments/orders.readonly (NOT in SubSync's scope list today: always "Needs permission: reconnect" until it is added as an optional scope)
+//   money  GET /payments/orders?contactId   scope payments/orders.readonly (an optional scope: "Needs permission: reconnect and allow SubSync to read orders" until the install has it)
 // The lead is re-read from SubSync's own copy of THAT account first (tenancy), and the answers carry only what the screen shows.
 const NOTE_BODY = 4000;
 async function recordRoute(ctx: Ctx, h: WorkbenchHelpers): Promise<Response> {
@@ -322,14 +323,15 @@ async function recordRoute(ctx: Ctx, h: WorkbenchHelpers): Promise<Response> {
   if (ctx.demo) return json({ state: "off", note: "The demo does not read your CRM.", items: [] });
   if (part === "money") {
     const [inst] = await sql()`select scope from installations where id = ${ctx.installationId}`;
-    const g = typeof inst?.scope === "string" && inst.scope.trim() ? parseGranted(inst.scope as string) : [];
-    if (!g.includes("payments/orders.readonly")) return json({ state: "needs_permission", note: "Needs permission: reconnect to let SubSync read this person's orders and payments.", items: [] });
+    // No recorded permission list: the platform is asked and decides (a refusal below says "Needs permission").
+    const g = typeof inst?.scope === "string" && inst.scope.trim() ? parseGranted(inst.scope as string) : null;
+    if (g && !g.includes("payments/orders.readonly")) return json({ state: "needs_permission", note: needsPermissionText(["payments/orders.readonly"]), items: [] });
   }
   try {
     const token = await h.locationToken(locationId);
     const path = part === "notes" ? `/contacts/${encodeURIComponent(contactId)}/notes` : part === "tasks" ? `/contacts/${encodeURIComponent(contactId)}/tasks` : `/payments/orders?altId=${encodeURIComponent(locationId)}&altType=location&contactId=${encodeURIComponent(contactId)}&limit=20`;
     const res = await ghlFetch(`${GHL_API}${path}`, { headers: { Authorization: `Bearer ${token}`, Version: "2021-07-28", Accept: "application/json" }, cache: "no-store" });
-    if (res.status === 401 || res.status === 403) return json({ state: "needs_permission", note: "Needs permission: reconnect SubSync to let it read this.", items: [] });
+    if (res.status === 401 || res.status === 403) return json({ state: "needs_permission", note: part === "money" ? needsPermissionText(["payments/orders.readonly"]) : "Needs permission: reconnect SubSync to let it read this.", items: [] });
     if (!res.ok) return json({ state: "unavailable", note: "Your CRM did not answer. Try again later.", items: [] });
     const j = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     const names = await teamNames(ctx.installationId);
@@ -344,7 +346,7 @@ async function recordRoute(ctx: Ctx, h: WorkbenchHelpers): Promise<Response> {
       return json({ state: "ok", note: null, items: list.slice(0, 100).map((t) => ({ id: str(t.id), title: str(t.title) ?? "Task", due: str(t.dueDate), done: t.completed === true, by: who(t.assignedTo) })) });
     }
     const orders = (Array.isArray(j.data) ? j.data : []) as Array<Record<string, unknown>>;
-    return json({ state: "ok", note: null, items: orders.slice(0, 20).map((o) => ({ id: str(o._id) ?? str(o.id), title: str(o.name) ?? str(o.sourceName) ?? "Order", amount: typeof o.amount === "number" ? o.amount : null, currency: str(o.currency), status: str(o.status) ?? str(o.paymentStatus), at: str(o.createdAt) })) });
+    return json({ state: "ok", note: null, total: typeof j.totalCount === "number" ? j.totalCount : null, items: orders.slice(0, 20).map((o) => ({ id: str(o._id) ?? str(o.id), title: str(o.name) ?? str(o.sourceName) ?? "Order", amount: typeof o.amount === "number" ? o.amount : null, currency: str(o.currency), status: str(o.status) ?? str(o.paymentStatus), at: str(o.createdAt) })) });
   } catch {
     return json({ state: "unavailable", note: "Your CRM did not answer. Try again later.", items: [] });
   }
