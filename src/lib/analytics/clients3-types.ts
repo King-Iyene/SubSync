@@ -2,7 +2,7 @@
 // REAL synced data only. Anything under its minimum is { enough: false } (screen says "not enough data"). Trends are from our own timestamps;
 // history-based figures carry `historyStarts` (YYYY-MM-DD). No invented scores or "churn probability". Definitions: docs/METRICS.md "Clients 3".
 
-export const CL3_PARTS = ["overview", "needs-attention", "trends", "compare", "receipt", "people", "setup", "list", "options", "export", "billing", "money", "money-history"] as const;
+export const CL3_PARTS = ["overview", "needs-attention", "trends", "compare", "receipt", "people", "setup", "list", "options", "export", "billing", "money", "money-history", "plan-monitor"] as const;
 export type Cl3Part = (typeof CL3_PARTS)[number];
 
 /** Shared query parameters (all optional): from, to (ISO dates, default last 30 days), location (one account id), q (account name search), sort, dir, page (0-based), size (20|50|100),
@@ -122,7 +122,7 @@ export type Cl3BillingList = Page<Cl3Billing> & { needPermission: number; notAct
 // ---- Clients v3: money control center (parts money, money-history). Real synced data only; what the platform cannot give is null and the screen says "Not available from the platform yet". ----
 export const CL3_BUCKETS = ["all", "unpaid", "failing", "no_plan", "paid", "empty_wallet", "app_missing", "trial", "app_trial"] as const;
 export type Cl3Bucket = (typeof CL3_BUCKETS)[number];
-export const CL3_MONEY_FLAGS = ["cl3_money", "cl3_apps", "cl3_history", "pr_report", "pr_page", "pr_auto"] as const;
+export const CL3_MONEY_FLAGS = ["cl3_money", "cl3_plan_monitor", "cl3_apps", "cl3_history", "pr_report", "pr_page", "pr_auto"] as const;
 
 export type Cl3MoneyRow = {
   locationId: string; name: string; email: string | null;

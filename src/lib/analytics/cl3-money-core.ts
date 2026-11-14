@@ -72,6 +72,7 @@ export function historyText(kind: string, from: string | null, to: string | null
     case "wallet_low": return "Credit balance ran out.";
     case "app_installed": return "SubSync was installed.";
     case "app_removed": return "SubSync was removed.";
+    case "app_plan": return `SubSync plan changed from ${from ?? "none"} to ${to ?? "none"}.`;
     default: return "Changed.";
   }
 }

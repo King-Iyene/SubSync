@@ -1062,3 +1062,13 @@ One definition per label; the basis is written in words wherever a rate appears.
 - **SubSync installed / not installed**: from GET /oauth/installedLocations (oauth.readonly): isInstalled true. An account the list no longer holds, after a fully successful read, is recorded as not installed.
 - **SubSync on a trial** (bucket app_trial): the installed list says trial.onTrial is true. **Trial ending within 3 days**: only when the install event recorded a trial start and length (end = start + length) and the end is within 3 days and not past. Otherwise no date is shown or guessed.
 - **App plan label**: Growth plan, Earlier test plan, or Other plan, from the plan id (never guessed). Tests: src/lib/__tests__/clients3-installs.test.ts.
+
+## Plan monitor (14 Nov 2026; Clients > Money, code src/lib/analytics/plan-monitor-core.ts, plan-monitor.ts; flag cl3_plan_monitor, on by default)
+One row per client account for the SubSync plan. A client account session gets only its own row (decided on the server from the session). Tests: src/lib/__tests__/plan-monitor.test.ts, tests/unit/plan-monitor-db.test.ts.
+- **Plan**: from the installed list plan id (Growth plan, Earlier test plan, Other plan; unknown when the list was not read). **Trial days left**: only when the install event gave a start and a length (end = start + length, rounded up to whole days); otherwise "On a trial (end date not given by the platform)". Never guessed.
+- **Install status**: Installed / Not installed / Not known (installed list not read).
+- **Last charge**: newest non-refund line from GET /marketplace/billing/charges for that account (charges.readonly, sub-account token). "No charge recorded" when the list is empty (expected: SubSync has no billing meters), "Needs permission: reconnect" or "Not available from the platform yet" otherwise.
+- **Status chip** (first match): Not installed, Payment problem (the client plan we already read is past due or unpaid; links to Payments), Trial ends in N days (N 3 or less), Plan changed (our own record shows a plan change in the last 7 days), On a trial, Active.
+- **Plan observation**: every change of the plan id between two reads is written to our change record (cl3_history, kind app_plan). First sight records nothing.
+- **Alerts** (keys pm:): trial ends in 3 days or less, plan changed (kept 7 days), SubSync removed (kept 7 days). Cleared when the condition goes away; only pm: keys are touched.
+- **Pending client payments**: not shown as a number. They need saas/company.read, which only company-level apps can hold; the screen says so in one line.
