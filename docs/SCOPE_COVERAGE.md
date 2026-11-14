@@ -1,6 +1,6 @@
 # Permission coverage: which screen uses each of the 80 permissions
 
-Written 14 Nov 2026 from the code on `main` (each module's reads and writes were checked in the source, not copied from older docs). Reasons in plain words: `docs/SCOPES.md` (generated from `src/lib/scope-groups.ts`).
+Written 14 Nov 2026 from the code on `main` (each module's reads and writes were checked in the source, not copied from older docs). Updated 14 Nov 2026 after the More tools build: nine more permissions have a screen, and `locations/tasks.write` was dropped (79 permissions). Reasons in plain words: `docs/SCOPES.md` (generated from `src/lib/scope-groups.ts`).
 
 How to read the columns
 - **Screen**: the exact menu path where the permission is used.
@@ -12,10 +12,10 @@ How to read the columns
 
 | | Count |
 | --- | --- |
-| Permissions asked for | 80 (7 required, 73 optional) |
-| With a live screen that uses them | 62 |
-| Kept for a later feature, nothing uses them yet | 18 |
-| Tested on a real account | 9 |
+| Permissions asked for | 79 (7 required, 72 optional) |
+| With a live screen that uses them | 70 (files.readonly moved to unused: the file list needs medias.readonly) |
+| Kept for a later feature, nothing uses them yet | 9 (see below: the platform asks for another permission for what each would do) |
+| Tested on a real account | 9 (the new screens above were tested with a recorded fake of the platform, not a real account) |
 
 ## Table
 
@@ -57,7 +57,7 @@ How to read the columns
 | `payments/subscriptions.readonly` | Money > Today, Recovery (failed repeat payments) | read | yes | no |
 | `invoices.readonly` | Money > Upcoming and Recovery (late invoices); Money > Client payments > Money checks (invoices by status) | read | yes | no |
 | `wallet.readonly` | Clients > account page (credit balance); Money | read | yes | no |
-| `marketplace-installer-details.readonly` | Kept for a later feature, nothing calls it yet. It gives the installer, company and plan id for the asking key, which the installed list already gives | read | no | no |
+| `marketplace-installer-details.readonly` | Clients > Money and plans > Install record (GET /marketplace/app/{appId}/installations; plan id and install date, compared with what SubSync recorded; company owners and administrators only) | read | yes | no (not called against a real account yet) |
 | `payments/orders.readonly` | Money > Client payments > Money checks (recent orders); lead panel, Orders and payments | read | yes | no |
 | `payments/coupons.readonly` | Money > Client payments > Money checks (coupons) | read | yes | no |
 | `payments/integration.readonly` | Money > Client payments > Money checks (payment provider connected, live or test) | read | yes | no |
@@ -69,31 +69,30 @@ How to read the columns
 | `invoices/schedule.readonly` | Money > Client payments > Money checks (invoice schedules) | read | yes | no |
 | `invoices/template.readonly` | Money > Client payments > Money checks (invoice templates) | read | yes | no |
 | `invoices/estimate.readonly` | Money > Client payments > Money checks (estimates by status) | read | yes | no |
-| `pipelines.readonly` | Kept for a later feature, nothing uses it yet. Account setup reads pipelines with `opportunities.readonly`, the name the platform's description gives | read | no | no |
+| `pipelines.readonly` | Clients > Health > Account setup > Rename a pipeline stage (GET /opportunities/pipelines/{id}, the one read the platform ties to this permission; the pipeline list stays on opportunities.readonly) | read | yes | no (not called against a real account yet) |
 | `objects/schema.readonly` | Clients > Health > Account setup (custom record types) | read | yes | no |
 | `objects/record.readonly` | Clients > Health > Account setup (records in a custom type, a count) | read | yes | no |
 | `notes.readonly` | Kept for a later feature, nothing uses it yet. The platform has no read for notes across an account, so nothing can be shown | read | no | no |
 | `locations/customValues.readonly` | Clients > Health > Account setup (custom values); Settings > Targets > Call queues (reply target check) | read | yes | no |
 | `locations/templates.readonly` | Clients > Health > Account setup (text and email templates) | read | yes | no |
 | `locations/tasks.readonly` | Clients > Health > Account setup (open and overdue task counts) | read | yes | no |
-| `recurring-tasks.readonly` | Kept for a later feature, nothing uses it yet. The platform has no read that lists repeating tasks | read | no | no |
-| `files.readonly` | Clients > Health > Account setup (file count). The platform's description names this permission `medias.readonly`; the check accepts either name. Which name the portal really grants is not verified | read | yes | no |
+| `recurring-tasks.readonly` | Lead panel > Follow-up and quotes > Repeating follow-up (read back the one just made, GET /locations/{id}/recurring-tasks/{id}; the platform has no list) | read | yes | no (not called against a real account yet) |
+| `files.readonly` | None. The platform documents this permission only for opening one shared file by its link; nothing in SubSync does that. The file count in Clients > Health > Account setup calls the file list, which needs `medias.readonly` (not in the listing), so that row shows Not available | read | no | no |
 | `lc-email.readonly` | Kept for a later feature, nothing uses it yet. The platform's public description has no read it unlocks | read | no | no |
 | `emails/builder.readonly` | Clients > Health > Account setup (saved email designs, a count) | read | yes | no |
 | `emails/schedule.readonly` | Clients > Health > Account setup (scheduled emails, a count) | read | yes | no |
-| `emails/templates.readonly` | Kept for a later feature, nothing uses it yet. Templates are counted with `locations/templates.readonly`, the name the platform's description gives | read | no | no |
+| `emails/templates.readonly` | Clients > Health > Account setup > Email templates (GET /emails/locations/{id}/templates; names and dates only) | read | yes | no (not called against a real account yet) |
 | `phonenumbers.read` | Clients > Health > Account setup (phone numbers, last four digits only) | read | yes | no |
 | `numberpools.read` | Clients > Health > Account setup (number pools) | read | yes | no |
 | `locations/customValues.write` | Settings > Targets > Call queues > Set up your CRM > Save my reply target | change | yes | no |
-| `locations/tasks.write` | Kept for a later feature, nothing uses it yet. Task buttons (Mark done, Delete) use `contacts.write` because the platform lists no endpoint for this permission | change | no | no |
-| `recurring-tasks.write` | Kept for a later feature, nothing uses it yet | change | no | no |
+| `recurring-tasks.write` | Lead panel > Follow-up and quotes > Repeating follow-up (POST /locations/{id}/recurring-tasks; the platform asks for exactly this permission) | change | yes | no (not called against a real account yet) |
 | `notes.write` | Kept for a later feature, nothing uses it yet. Notes are added with `contacts.write` today | change | no | no |
-| `pipelines.write` | Kept for a later feature, nothing uses it yet | change | no | no |
+| `pipelines.write` | Clients > Health > Account setup > Rename a pipeline stage (PUT /opportunities/pipelines/{id}; every stage sent back, only one name changes) | change | yes | no (not called against a real account yet) |
 | `pipelines.create` | Settings > Targets > Call queues > Set up your CRM > Create the standard sales pipeline (only when the account has none) | change | yes | no |
-| `invoices.write` | Kept for a later feature, nothing uses it yet. The invoice resend button is switched off (`pm_resend`) | change | no | no |
+| `invoices.write` | Lead panel > Follow-up and quotes > Quote or invoice > Invoice (unsent draft, POST /invoices/) | change | yes | no (not called against a real account yet) |
 | `invoices/schedule.write` | Kept for a later feature, nothing uses it yet | change | no | no |
-| `invoices/template.write` | Kept for a later feature, nothing uses it yet | change | no | no |
-| `invoices/estimate.write` | Kept for a later feature, nothing uses it yet | change | no | no |
+| `invoices/template.write` | Lead panel > Follow-up and quotes > Quote or invoice > Invoice template (POST /invoices/template) | change | yes | no (not called against a real account yet) |
+| `invoices/estimate.write` | Lead panel > Follow-up and quotes > Quote or invoice > Estimate (unsent, POST /invoices/estimate) | change | yes | no (not called against a real account yet) |
 | `forms.readonly` | Clean-up > Lead intake (Applications this week, submissions per form) | read | yes | no |
 | `surveys.readonly` | Clean-up > Lead intake (Applications this week, submissions per survey) | read | yes | no |
 | `funnels/funnel.readonly` | Clean-up > Lead intake (funnel names and steps) | read | yes | no |
@@ -104,10 +103,9 @@ How to read the columns
 
 ## Things the Account setup check found
 
-- `files.readonly`: the platform's published API description calls the file permission `medias.readonly`. The Account setup check accepts either name.
-- `notes.readonly`, `recurring-tasks.readonly`, `locations.features.read`, `lc-email.readonly`: the published description has no read they unlock, so nothing SubSync can show depends on them.
+- `files.readonly`: guards only GET /files/d/{slug}. The Account setup file count uses GET /medias/files, which needs `medias.readonly`, a permission that is not in the listing.
+- `notes.readonly`, `locations.features.read`, `lc-email.readonly`: the published description has no read they unlock, so nothing SubSync can show depends on them.
 - `saas/location.read`: unlocks no known read.
-- `locations/tasks.write`: unused. The task buttons use `contacts.write`.
 - `pipelines.readonly` and `emails/templates.readonly`: unused. The reads that exist ask for `opportunities.readonly` and `locations/templates.readonly`.
 - `marketplace-installer-details.readonly`: the plan monitor does not call it.
 
@@ -116,3 +114,16 @@ Whether to drop the 18 unused permissions from the listing is King's decision. R
 ## Not asked for
 
 `users.write` (SubSync never manages people), `saas/company.read` (company level only, cannot be granted to this app), invoice sending (the resend button is switched off).
+
+## What the platform really asks for (checked 14 Nov 2026 in the platform's own operation catalogue; no real account was called)
+
+| Permission | Existing screen | Permission the platform asks for | Live call tested on a real account |
+| --- | --- | --- | --- |
+| `notes.readonly` | Lead panel > Notes | `contacts.readonly` (GET /contacts/{id}/notes) | no. Stays unused: not a permission the platform asks for. |
+| `notes.write` | Lead panel notes, meeting summaries | `contacts.write` (POST /contacts/{id}/notes) | no. Stays unused. |
+| `locations.features.read`, `saas/location.read` | Clients > Money and plans | none found: GET /locations/{id} asks for `locations.readonly`; no SaaS read for a location key | no. Recorded in docs/BLOCKED.md. |
+| `lc-email.readonly` | Clients > onboarding checks | none found: no read for sending domains or sending addresses | no. Recorded in docs/BLOCKED.md. |
+| `conversations/reports.readonly` | Speed to lead | none found: no response-time report operation exists | no. SubSync's own measured numbers stay. |
+| `conversations/livechat.write` | Lead panel message box | only a typing indicator for website chat, which needs a visitor id the contact record does not give | no. Recorded in docs/BLOCKED.md. |
+| `invoices/schedule.write` | Money > Client payments | `invoices/schedule.write` exists (create a repeating invoice) but no screen was built: it needs a template and a contact in one step | no. Recorded in docs/BLOCKED.md. |
+| `locations/tasks.write` | none | none: removed from the list at King's decision | not applicable |

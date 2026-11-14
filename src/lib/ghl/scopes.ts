@@ -47,7 +47,6 @@ export const GHL_SCOPES = [
   "locations/customValues.readonly",
   "locations/customValues.write",
   "locations/tasks.readonly",
-  "locations/tasks.write",
   "recurring-tasks.readonly",
   "recurring-tasks.write",
   "locations/tags.readonly",

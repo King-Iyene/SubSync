@@ -17,6 +17,7 @@ const REVIEWED_ALWAYS_ON_BASELINE = new Set([
   "cl3_plan_monitor",
   "pm_checks",
   "safe_writes",
+  "more_tools",
 ]);
 
 describe("new features default off", () => {

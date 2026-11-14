@@ -90,7 +90,7 @@
   {
    "id": "G2C",
    "kind": "card",
-   "title": "2. Contacts, tags and notes",
+   "title": "2. Contacts, tags and follow-ups",
    "badge": "optional",
    "rows": [
     {
@@ -120,9 +120,23 @@
      "scopes": [
       "locations/tags.write"
      ]
+    },
+    {
+     "k": "change",
+     "label": "Add a follow-up task that repeats and ends by itself, after a preview",
+     "scopes": [
+      "recurring-tasks.write"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Read back the follow-up just made, so Saved is true",
+     "scopes": [
+      "recurring-tasks.readonly"
+     ]
     }
    ],
-   "text": "Two. Contacts, tags and notes. We read tag and field names, never the values. We change a contact only after a preview and a confirm.",
+   "text": "Two. Contacts, tags and follow-ups. We read tag and field names, never the values. We change a contact, or add a repeating follow-up, only after a preview and a confirm.",
    "caption": "We read tag names. We change a contact only after you preview and confirm."
   },
   {
@@ -240,9 +254,23 @@
      "scopes": [
       "pipelines.create"
      ]
+    },
+    {
+     "k": "read",
+     "label": "Read one pipeline and its stages just before a stage is renamed",
+     "scopes": [
+      "pipelines.readonly"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "Rename one pipeline stage, after a preview. Order stays, no deal moves",
+     "scopes": [
+      "pipelines.write"
+     ]
     }
    ],
-   "text": "Five. Deals and pipelines. We read deals to find stale ones. We change a deal only after a preview, and a delete needs typing.",
+   "text": "Five. Deals and pipelines. We read deals to find stale ones. We change a deal, or rename a stage, only after a preview. A delete needs typing.",
    "caption": "We read deals to find stale ones. We change a deal only after a preview and a confirm."
   },
   {
@@ -253,6 +281,19 @@
    },
    "text": "Pipeline and deals shows the money in each step, and the deals that stopped moving.",
    "caption": "We read deals and stages to show stale deals."
+  },
+  {
+   "id": "G5U",
+   "kind": "screen",
+   "go": {
+    "hash": "onboarding",
+    "click": [
+     "Account setup"
+    ],
+    "scrollTo": "Rename a pipeline stage"
+   },
+   "text": "Also in Account setup, a stage can be renamed after a preview. The order stays and no deal moves.",
+   "caption": "Rename a stage: preview first, no deal moves."
   },
   {
    "id": "G6C",
@@ -321,7 +362,7 @@
    "id": "G7C",
    "kind": "card",
    "title": "7. Money",
-   "badge": "all read only",
+   "badge": "reads, plus unsent drafts",
    "dense": true,
    "rows": [
     {
@@ -335,7 +376,7 @@
     },
     {
      "k": "read",
-     "label": "Credit balance of each account",
+     "label": "Credit balance of each account (shows only if the platform accepts the permission)",
      "scopes": [
       "wallet.readonly"
      ]
@@ -380,9 +421,30 @@
      "scopes": [
       "charges.readonly"
      ]
+    },
+    {
+     "k": "change",
+     "label": "Save one unsent invoice for a contact, after a preview",
+     "scopes": [
+      "invoices.write"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "Save one unsent estimate for a contact, after a preview",
+     "scopes": [
+      "invoices/estimate.write"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "Save one invoice template, after a preview",
+     "scopes": [
+      "invoices/template.write"
+     ]
     }
    ],
-   "text": "Seven. Money. All read only: payments, invoices, orders, products. SubSync cannot charge, refund or send an invoice.",
+   "text": "Seven. Money. Mostly reads: payments, invoices, orders, products. The only changes save an unsent invoice, estimate or template after a preview. SubSync never sends one and cannot charge or refund.",
    "caption": "Money is read only. SubSync cannot charge, refund or send an invoice."
   },
   {
@@ -470,11 +532,17 @@
     },
     {
      "k": "read",
-     "label": "Files and saved email designs, scheduled emails: counts only",
+     "label": "Saved email designs and scheduled emails: counts only",
      "scopes": [
-      "files.readonly",
       "emails/builder.readonly",
       "emails/schedule.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Email template names and dates, never what is inside",
+     "scopes": [
+      "emails/templates.readonly"
      ]
     },
     {
@@ -518,6 +586,19 @@
    "caption": "We read counts and names to show what is set up and what is missing."
   },
   {
+   "id": "G9U",
+   "kind": "screen",
+   "go": {
+    "hash": "onboarding",
+    "click": [
+     "Account setup"
+    ],
+    "scrollTo": "Email templates"
+   },
+   "text": "In Account setup, the email templates card lists template names and dates, read live. We never copy what is inside.",
+   "caption": "Email templates: names and dates only."
+  },
+  {
    "id": "G9T",
    "kind": "screen",
    "go": {
@@ -552,7 +633,7 @@
     },
     {
      "k": "read",
-     "label": "Installer details: kept for later, not called today",
+     "label": "Install record: the plan and install date the platform holds for your company",
      "scopes": [
       "marketplace-installer-details.readonly"
      ]
@@ -565,7 +646,7 @@
      ]
     }
    ],
-   "text": "Ten. Plan monitor. We read the installed accounts and the last charge. Two permissions here are kept for later.",
+   "text": "Ten. Plan monitor. We read the installed accounts, the last charge, and the platform's install record for your company. One permission here is kept for later.",
    "caption": "We read plans and charges. Two permissions here are kept for later."
   },
   {
@@ -580,6 +661,19 @@
    },
    "text": "Plan monitor warns you when a trial is about to end, or an account leaves.",
    "caption": "We read plan and install status to warn about trials and uninstalls."
+  },
+  {
+   "id": "G10U",
+   "kind": "screen",
+   "go": {
+    "hash": "clients",
+    "click": [
+     "Money and plans"
+    ],
+    "scrollTo": "Install record"
+   },
+   "text": "Below the plan monitor, the install record shows the plan the platform holds for your company, next to what SubSync recorded.",
+   "caption": "Install record, compared with what SubSync recorded."
   },
   {
    "id": "E1",
@@ -616,7 +710,7 @@
    "id": "E2",
    "kind": "card",
    "title": "Kept for upcoming features",
-   "badge": "18 permissions",
+   "badge": "9 permissions",
    "dense": true,
    "keep": true,
    "rows": [
@@ -627,12 +721,9 @@
       "locations.features.read",
       "conversations/reports.readonly",
       "saas/location.read",
-      "marketplace-installer-details.readonly",
-      "pipelines.readonly",
       "notes.readonly",
-      "recurring-tasks.readonly",
       "lc-email.readonly",
-      "emails/templates.readonly"
+      "files.readonly"
      ]
     },
     {
@@ -640,18 +731,12 @@
      "label": "Change permissions with no screen yet",
      "scopes": [
       "conversations/livechat.write",
-      "locations/tasks.write",
-      "recurring-tasks.write",
       "notes.write",
-      "pipelines.write",
-      "invoices.write",
-      "invoices/schedule.write",
-      "invoices/template.write",
-      "invoices/estimate.write"
+      "invoices/schedule.write"
      ]
     }
    ],
-   "text": "Kept for upcoming features: eighteen permissions with no screen yet. Nothing uses them today, and any future use will show a preview first.",
+   "text": "Kept for upcoming features: nine permissions with no screen yet. Nothing uses them today, and any future use will show a preview first.",
    "caption": "Kept for upcoming features. Nothing uses these today."
   },
   {

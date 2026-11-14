@@ -6,7 +6,7 @@ Plain words. Written 11 Nov 2026, scope list updated 12 Nov 2026, from `src/lib/
 
 ## 1. Scopes for this release
 
-The app asks for 80 permissions today (7 required, 73 optional; this is exactly what the developer portal draft saved on 14 Nov 2026 holds, and the full list with a reason for each is `docs/SCOPES.md`. Everything below this paragraph is the older 35-permission history; the 45 added since are all optional and are grouped as Money checks, Account setup check, Lead intake, Clear junk and Reserved in `src/lib/scope-groups.ts`). Older history: the 29-row table, the 3 Lead intake scopes, the 5 coming-feature scopes and 2 still-unused ones below. Against the 21 published in 2.0.0, **19 are new** (marked NEW; 15 in the table, 3 Lead intake, plus `locations/customFields.write`). The installed app has no workflows permission at all today. Anything already granted stays granted; only NEW ones make installs press Update.
+The app asks for 79 permissions today (7 required, 72 optional; this is exactly what the developer portal draft saved on 14 Nov 2026 holds, and the full list with a reason for each is `docs/SCOPES.md`. Everything below this paragraph is the older 35-permission history; the 45 added since are all optional and are grouped as Money checks, Account setup check, Lead intake, Clear junk and Reserved in `src/lib/scope-groups.ts`). Older history: the 29-row table, the 3 Lead intake scopes, the 5 coming-feature scopes and 2 still-unused ones below. Against the 21 published in 2.0.0, **19 are new** (marked NEW; 15 in the table, 3 Lead intake, plus `locations/customFields.write`). The installed app has no workflows permission at all today. Anything already granted stays granted; only NEW ones make installs press Update.
 
 Name check: the official scope page (marketplace.gohighlevel.com/docs/oauth/Scopes) loads with scripts, so it could not be read from here. "VERIFIED" below means a primary-source read recorded in our docs (SCOPE_PLAN, PAYMENTS_BRIEF); "INFERENCE" means not confirmed. Check each in the portal's scope picker: if the picker does not list it, do not tick it.
 
@@ -57,7 +57,6 @@ The table has 30 rows (14 NEW). The six unused scopes are listed separately belo
 | Tick | Scope (exact) | R/O | Name | For (coming) | If not granted |
 |---|---|---|---|---|---|
 | [ ] | `locations/tasks.readonly` | Opt | VERIFIED | AI follow-up tasks: check which leads already have a task | Nothing changes (not used yet) |
-| [ ] | `locations/tasks.write` | Opt | VERIFIED | AI follow-up tasks: create an internal task after a preview | Nothing changes (not used yet) |
 | [ ] | `locations/customFields.write` NEW | Opt | INFERENCE (confirm the picker lists it) | AI data cleaning: fix custom field values after a preview | Nothing changes (not used yet) |
 | [ ] | `locations/tags.write` | Opt | VERIFIED | AI data cleaning: tidy tags after a preview | Nothing changes (not used yet) |
 | [ ] | `conversations/reports.readonly` | Opt | VERIFIED | Richer response-time numbers | Nothing changes (not used yet) |
@@ -78,10 +77,10 @@ Removing needs a small code change first (`scopes.ts`, `scope-groups.ts`, regene
 | Scope | Used by | Rule check |
 |---|---|---|
 | `conversations/message.write` | Inbox composer (send SMS/email), Fathom internal comments (`src/lib/connections/ingest.ts`) | ALLOWED as an OPTIONAL send scope by King on 13 Nov 2026 (supersedes CLAUDE.md sections 1A and 8 and standing rule 7) ("SubSync never replies for the agency"); `scope-groups.ts` lists it as "Never asked for". The internal-comment use is not a message to a lead, but the same scope also allows sending. Leave off. Composer stays preview only. |
-| `conversations.write` | Clear junk: delete a conversation (`unanswered-gateway.ts`, flag `inbox_clear_junk`; request shape NOT VERIFIED LIVE) | NOW REQUESTED (optional, 14 Nov 2026, in the 80). Delete call still NOT VERIFIED LIVE. |
-| `payments/orders.readonly` | Lead panel money tab | NOW REQUESTED (optional, in the 80). Planned for the Money checks screen. |
-| `forms.readonly` | Capabilities probe only | NOW REQUESTED (optional, in the 80). Used by Lead intake. |
-| `invoices.write` | Resend invoice (flag `pm_resend`, off) | NOW REQUESTED (optional, in the 80). Nothing uses it yet; the resend button stays off. |
+| `conversations.write` | Clear junk: delete a conversation (`unanswered-gateway.ts`, flag `inbox_clear_junk`; request shape NOT VERIFIED LIVE) | NOW REQUESTED (optional, 14 Nov 2026, in the 79). Delete call still NOT VERIFIED LIVE. |
+| `payments/orders.readonly` | Lead panel money tab | NOW REQUESTED (optional, in the 79). Planned for the Money checks screen. |
+| `forms.readonly` | Capabilities probe only | NOW REQUESTED (optional, in the 79). Used by Lead intake. |
+| `invoices.write` | Resend invoice (flag `pm_resend`, off) | NOW REQUESTED (optional, in the 79). Nothing uses it yet; the resend button stays off. |
 
 **Count for the portal: tick all 39 scopes (7 required, 32 optional): 29 from the first table, 3 Lead intake, 5 coming-feature, 2 still-unused. Set every one except the first 7 to Optional.** Total in `scopes.ts` today: 40.
 

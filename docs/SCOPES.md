@@ -2,7 +2,7 @@
 
 This file is generated from `src/lib/scope-groups.ts` (run `scripts/gen-scopes-doc.ts`). A test fails when it is stale, when a permission the app asks for is missing from it, or when it lists one the app does not ask for. Do not edit it by hand.
 
-SubSync asks for 80 permissions: 7 required and 73 optional. Fewer permissions is a trust advantage, and every permission added later makes every installed company approve again, so each one below has a reason. An optional permission can be declined: the feature that needs it then says "Needs permission: reconnect" and everything else keeps working.
+SubSync asks for 79 permissions: 7 required and 72 optional. Fewer permissions is a trust advantage, and every permission added later makes every installed company approve again, so each one below has a reason. An optional permission can be declined: the feature that needs it then says "Needs permission: reconnect" and everything else keeps working.
 
 Wording rule: the screen says one of three things. **Needs permission: reconnect** (the app asked and this install declined, or the app has not asked yet), **Not available from the platform yet** (the platform refuses even with the permission, or has no such data), or it simply shows the data. See `docs/CAPABILITIES.md` for which data point is which.
 
@@ -46,7 +46,7 @@ Who wrote to a lead, when, and whether a person or an automation did.
 | `conversations/message.write` | change | optional | Only to send a text or an email to one lead when a person presses Send, after a preview. Optional. SubSync never sends on its own and never to a contact who asked not to be contacted. Without it the message box says: Needs permission, reconnect. |
 | `conversations.write` | change | optional | Only to delete one junk conversation in Clear junk (Unanswered messages), after a preview and a typed count. A deleted conversation cannot be brought back. Optional. SubSync never deletes on its own, and never for a contact who asked not to be contacted or who has an open deal. |
 | `conversations/reports.readonly` | read | optional | Kept for a later feature, nothing uses it yet: response-time totals the platform already calculates, to compare with SubSync's own numbers. Optional. Not used yet. |
-| `conversations/livechat.write` | change | optional | Kept for a later feature, nothing uses it yet: replying to website chat from SubSync, which would always need a person to press Send. Optional. Not used yet. |
+| `conversations/livechat.write` | change | optional | Kept for a later feature, nothing uses it yet: the platform uses it only to show a typing indicator to a website chat visitor, which needs a visitor id the contact record does not give yet. Optional. Not used yet. |
 
 ## Appointments
 
@@ -103,8 +103,8 @@ Failed and late payments, so you can chase the money, and the credit balance of 
 | `payments/transactions.readonly` | read | optional | Each payment's status, amount and who paid, to list failed payments and refunds. Read only: SubSync cannot charge, refund or retry anything. Without it Payments says: Needs permission, reconnect. |
 | `payments/subscriptions.readonly` | read | optional | Whether a customer's repeat payment is active or past due, to list failed repeat payments. Read only. |
 | `invoices.readonly` | read | optional | Which invoices are sent, partly paid or paid and when they are due, to list late invoices. Read only: SubSync never sends or changes an invoice. |
-| `wallet.readonly` | read | optional | The credit balance of each client account, to warn you before it runs out. Read only. |
-| `marketplace-installer-details.readonly` | read | optional | Kept for a later feature, nothing calls it yet: it returns the installer, the company and the plan id for the token that asks, which the installed list already gives (no dates, no trial). Read only. Optional. Not used yet. |
+| `wallet.readonly` | read | optional | The credit balance of each client account, to warn you before it runs out (Clients > account page, Money). Read only. The platform's public API description names no permission for the wallet calls, so whether this one is accepted is not confirmed; if it is refused the screen says Needs permission or Not available. |
+| `marketplace-installer-details.readonly` | read | optional | The platform's install record for your company (plan id and install date), shown as Install record on Clients > Money and plans for company owners and administrators, and compared with the plan SubSync recorded. Optional. |
 
 ## Money checks
 
@@ -130,19 +130,19 @@ What each client account has set up, shown in Clients > Health > Account setup: 
 
 | Permission | Kind | Required | Why we ask |
 | --- | --- | --- | --- |
-| `pipelines.readonly` | read | optional | Kept for a later feature, nothing uses it yet: Account setup reads pipelines with opportunities.readonly, which the platform's description names for that read. Optional. Not used yet. |
+| `pipelines.readonly` | read | optional | Only to read one pipeline and its stages just before a stage is renamed (Clients > Health > Account setup > Rename a pipeline stage). The list of pipelines on every other screen uses opportunities.readonly. Optional. |
 | `objects/schema.readonly` | read | optional | The names of custom record types, for Clients > Health > Account setup. Names only. Optional. |
 | `objects/record.readonly` | read | optional | How many records each custom record type holds, for Clients > Health > Account setup. A count only. Optional. |
-| `notes.readonly` | read | optional | Kept for a later feature, nothing uses it yet: the platform has no read for notes across an account (only per contact), so Account setup cannot show it. Optional. Not used yet. |
+| `notes.readonly` | read | optional | Kept for a later feature: the platform asks for contacts.readonly to read notes on a contact, so the Notes list in the lead panel uses that. Optional. Not used yet. |
 | `locations/customValues.readonly` | read | optional | The names of the custom values (company name, links, hours) set in each client account, for Clients > Health > Account setup and to check the reply target in Settings > Targets > Call queues. Optional. |
 | `locations/templates.readonly` | read | optional | The names of the text and email templates in each client account, for Clients > Health > Account setup. Names only. Optional. |
 | `locations/tasks.readonly` | read | optional | Open and overdue tasks, as counts, for Clients > Health > Account setup, to find tasks nobody is doing. Optional. |
-| `recurring-tasks.readonly` | read | optional | Kept for a later feature, nothing uses it yet: the platform has no read that lists repeating tasks, so Account setup cannot show them. Optional. Not used yet. |
-| `files.readonly` | read | optional | How many files each client account has uploaded, for Clients > Health > Account setup. A count only, files are never opened. The platform's description names this permission medias.readonly, so the check accepts either name. Optional. |
+| `recurring-tasks.readonly` | read | optional | Only to read back the repeating follow-up SubSync has just made, so Saved means the platform really has it. The platform has no list of repeating tasks, so nothing else is read. Optional. |
+| `files.readonly` | read | optional | Kept for a later feature, nothing uses it yet: in the platform's documentation this permission only opens one shared file by its link. The file count in Clients > Health > Account setup uses the file list, which the documentation says needs a different permission (medias.readonly) that is not in the listing, so that row shows Not available until it is added. Optional. Not used yet. |
 | `lc-email.readonly` | read | optional | Kept for a later feature, nothing uses it yet: the platform's public description has no read it unlocks, so Account setup cannot show sending addresses. Optional. Not used yet. |
 | `emails/builder.readonly` | read | optional | How many saved email designs each client account has, for Clients > Health > Account setup. A count only. Optional. |
 | `emails/schedule.readonly` | read | optional | Emails scheduled to go out, as a count, for Clients > Health > Account setup. Read only. Optional. |
-| `emails/templates.readonly` | read | optional | Kept for a later feature, nothing uses it yet: Account setup counts templates with the template permission listed above, the name the platform's description gives. Optional. Not used yet. |
+| `emails/templates.readonly` | read | optional | The names and dates of email templates, for Clients > Health > Account setup > Email templates. Never what is inside a template. Optional. |
 | `phonenumbers.read` | read | optional | The phone numbers of each client account (only the last four digits are shown), for Clients > Health > Account setup, to find an account with no number to call or text from. Optional. |
 | `numberpools.read` | read | optional | Number pools (groups of sending numbers), for Clients > Health > Account setup, to find an empty pool. Optional. |
 
@@ -153,15 +153,14 @@ Permissions for small, one-time set-up changes (a tag, a pipeline, a reply targe
 | Permission | Kind | Required | Why we ask |
 | --- | --- | --- | --- |
 | `locations/customValues.write` | change | optional | Only to save one value, the reply target (subsync_sla_minutes), from Settings > Targets > Call queues (Set up your CRM), after a preview and a confirm. Optional. |
-| `locations/tasks.write` | change | optional | Kept for a later feature, nothing uses it yet: marking a task done or deleting one uses contacts.write, because the platform's description lists no endpoint for this permission. Optional. Not used yet. |
-| `recurring-tasks.write` | change | optional | Kept for a later feature, nothing uses it yet: creating or stopping a repeating task, after a preview. Optional. Not used yet. |
-| `notes.write` | change | optional | Kept for a later feature, nothing uses it yet: adding a note to a contact is done with contacts.write today. Optional. Not used yet. |
-| `pipelines.write` | change | optional | Kept for a later feature, nothing uses it yet: changing a pipeline or its stages, after a preview. Optional. Not used yet. |
+| `recurring-tasks.write` | change | optional | Only to add a repeating follow-up task on one contact, from the lead panel (Follow-up and quotes), after a preview and a confirm. It always ends after a set number of repeats. Optional. Without it the button says: Needs permission, reconnect. |
+| `notes.write` | change | optional | Kept for a later feature: the platform asks for contacts.write to add a note, so notes and meeting summaries use that. Optional. Not used yet. |
+| `pipelines.write` | change | optional | Only to rename one pipeline stage (Clients > Health > Account setup > Rename a pipeline stage), after a preview and a confirm. Stage order stays and no deal moves. Optional. |
 | `pipelines.create` | change | optional | Only to create the standard sales pipeline from Settings > Targets > Call queues (Set up your CRM), and only when the account has no pipeline, after a preview and a confirm. Optional. |
-| `invoices.write` | change | optional | Kept for a later feature, nothing uses it yet: changing an invoice, after a preview and a typed confirmation. SubSync never sends an invoice on its own, and the resend button is switched off. Optional. Not used yet. |
+| `invoices.write` | change | optional | Only to save one unsent invoice for a contact, from the lead panel (Follow-up and quotes), after a preview and a confirm. SubSync never sends an invoice, and the resend button is switched off. Optional. |
 | `invoices/schedule.write` | change | optional | Kept for a later feature, nothing uses it yet: pausing or changing a repeating invoice, after a preview. Optional. Not used yet. |
-| `invoices/template.write` | change | optional | Kept for a later feature, nothing uses it yet: changing an invoice template, after a preview. Optional. Not used yet. |
-| `invoices/estimate.write` | change | optional | Kept for a later feature, nothing uses it yet: changing an estimate, after a preview. Optional. Not used yet. |
+| `invoices/template.write` | change | optional | Only to save one invoice template, from the lead panel (Follow-up and quotes), after a preview and a confirm. Optional. |
+| `invoices/estimate.write` | change | optional | Only to save one unsent estimate for a contact, from the lead panel (Follow-up and quotes), after a preview and a confirm. SubSync never sends it. Optional. |
 
 ## Lead intake
 

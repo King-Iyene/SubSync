@@ -21,7 +21,7 @@ test("every permission the install link asks for has a reason, in exactly one gr
   }
 });
 
-test("required and optional match the marketplace listing (7 required, then 73 optional), and every change permission is optional except the platform's own token one", () => {
+test("required and optional match the marketplace listing (7 required, then 72 optional), and every change permission is optional except the platform's own token one", () => {
   const all = SCOPE_GROUPS.flatMap((g) => g.scopes);
   assert.equal(all.filter((s) => s.required).length, 7);
   assert.equal(all.filter((s) => !s.required).length, GHL_SCOPES.length - 7);

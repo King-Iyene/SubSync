@@ -36,7 +36,7 @@ export type SafeWriteResult =
   | { outcome: "rate_limited"; retryInSeconds: number }
   | { outcome: "failed"; status: number };
 
-type Base = { installationId: string; locationId: string; actor: string | null; optedIn: boolean; token: () => Promise<string> };
+export type Base = { installationId: string; locationId: string; actor: string | null; optedIn: boolean; token: () => Promise<string> };
 
 // ---------------- pure rules (the tests read these) ----------------
 
@@ -104,7 +104,7 @@ async function record(a: Base, w: Audit, deps: GatewayDeps): Promise<void> {
 type Req = { method: "POST" | "PUT" | "DELETE"; path: string; body?: Record<string, unknown> };
 
 /** One guarded call: rate limit, opt-in, switch, spacing, the request, the audit line. `before` runs only on the live path (a last idempotency check) and may end the call early. */
-async function run(a: Base, o: { op: string; what: string; verb: "WRITE" | "DELETE"; ids: Record<string, string | null>; fields: string[]; req: () => Req; before?: () => Promise<SafeWriteResult | null>; answerId?: (j: unknown) => string | null; okStatuses?: number[] }, deps: GatewayDeps): Promise<SafeWriteResult> {
+export async function run(a: Base, o: { op: string; what: string; verb: "WRITE" | "DELETE"; ids: Record<string, string | null>; fields: string[]; req: () => Req; before?: () => Promise<SafeWriteResult | null>; answerId?: (j: unknown) => string | null; okStatuses?: number[] }, deps: GatewayDeps): Promise<SafeWriteResult> {
   const slot = takeSlot(`acct:${a.installationId}`, LIMITS.perAccountPerMinute, 60_000);
   if (slot) return { outcome: "rate_limited", retryInSeconds: slot };
   const env = a.optedIn ? deps.env : {};
@@ -132,7 +132,7 @@ async function run(a: Base, o: { op: string; what: string; verb: "WRITE" | "DELE
   return done.live ? done.result : { outcome: "dry_run", line: done.line, reason: a.optedIn ? "switch" : "account" };
 }
 
-const pick = (j: unknown, ...keys: string[]): string | null => {
+export const pick = (j: unknown, ...keys: string[]): string | null => {
   const o = (j && typeof j === "object" ? j : {}) as Record<string, unknown>;
   for (const k of keys) { const v = o[k]; if (typeof v === "string" && v) return v; if (v && typeof v === "object") { const id = (v as Record<string, unknown>).id; if (typeof id === "string" && id) return id; } }
   return null;
@@ -237,9 +237,9 @@ export async function deleteTask(a: TaskDelete, deps: GatewayDeps = {}): Promise
 
 // ---------------- reads the routes use (read only, never stored) ----------------
 
-const hdr = (token: string) => ({ Authorization: `Bearer ${token}`, Version: VERSION, Accept: "application/json" });
-type ReadDeps = { fetchImpl?: typeof fetch; sleep?: (ms: number) => Promise<void> };
-const opts = (d: ReadDeps) => ({ ...(d.fetchImpl ? { fetchImpl: d.fetchImpl } : {}), ...(d.sleep ? { sleep: d.sleep } : {}) });
+export const hdr = (token: string) => ({ Authorization: `Bearer ${token}`, Version: VERSION, Accept: "application/json" });
+export type ReadDeps = { fetchImpl?: typeof fetch; sleep?: (ms: number) => Promise<void> };
+export const opts = (d: ReadDeps) => ({ ...(d.fetchImpl ? { fetchImpl: d.fetchImpl } : {}), ...(d.sleep ? { sleep: d.sleep } : {}) });
 
 export type ReadResult<T> = { ok: true; value: T } | { ok: false; reason: "needs_permission" | "unavailable" };
 
