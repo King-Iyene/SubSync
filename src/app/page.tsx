@@ -43,7 +43,7 @@ const STEPS: Array<[string, string]> = [
 ];
 
 const FAQ: Array<[string, string]> = [
-  ["Who is SubSync for?", "Agencies that manage many client accounts and single businesses that manage one. If leads, appointments and deals live in your CRM, SubSync watches them for you."],
+  ["Who is SubSync for?", "Agencies that manage many client accounts are our main users. It also fits any business with several accounts or locations, and a single business with one account. If leads, appointments and deals live in your CRM, SubSync watches them for you. Each person sees only the accounts they have access to."],
   ["Does it change anything in my CRM?", "Only after a preview and a confirm, with a log, and an undo where the page says one exists. Reading is the default, and every permission has a reason you can read."],
   ["Will it message my customers?", "Never on its own. Replying by text or email from SubSync exists behind a switch that is off until an owner turns it on for an account, and it checks do-not-contact again before each send. People who asked not to be contacted are never messaged."],
   ["What does it cost?", `${PRICING.trialDays} days free, then ${PRICING.price} ${PRICING.unit} on the ${PRICING.plan} plan. It is billed through the marketplace where you install it, never inside SubSync.`],
@@ -72,9 +72,9 @@ export default function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld).replace(/</g, "\\u003c") }} />
       <section className="hero">
         <div className="wrap">
-          <p className="eyebrow">For agencies and single businesses</p>
+          <p className="eyebrow">For agencies, multi-location businesses and single businesses</p>
           <h1>Know what is happening in every account you manage before a customer tells you.</h1>
-          <p className="lede">SubSync watches your connected accounts and tells you what needs attention first: leads nobody answered, appointments nobody marked, no-shows nobody called back and deals that went quiet.</p>
+          <p className="lede">Whether you run one account or a hundred, SubSync watches them and tells you what needs attention first: leads nobody answered, appointments nobody marked, no-shows nobody called back and deals that went quiet.</p>
           <div className="cta-row">
             <a className="btn btn-primary" href={INSTALL_HREF}>Install SubSync</a>
             <a className="btn btn-ghost" href="#tour">Watch the 4-minute tour</a>
@@ -86,6 +86,18 @@ export default function Home() {
       <section className="video" aria-label="Product tour video">
         <div className="wrap" style={{ maxWidth: 980 }}>
           <VideoPlayer />
+        </div>
+      </section>
+
+      <section className="block" aria-labelledby="who">
+        <div className="wrap">
+          <h2 className="h2" id="who">Made for the way you work</h2>
+          <p className="sub">The same pages for everyone. What you see depends on the accounts you can open.</p>
+          <div className="grid g3">
+            <div className="card"><h3>Agencies</h3><p>See every client account on one screen, find the one that needs you first, and share a report with the client.</p></div>
+            <div className="card"><h3>Businesses with several accounts</h3><p>Several locations, brands or teams? Compare them side by side and see which one is slipping.</p></div>
+            <div className="card"><h3>Single businesses</h3><p>One account is enough. You see only that account, with the same alerts and guides.</p></div>
+          </div>
         </div>
       </section>
 
