@@ -378,6 +378,9 @@ export const INVENTORY: Record<string, TableInfo> = {
     noun: "a short record of who did what and when", line: "records",
     personal: { actor: "the name of the person who did it", detail: "what changed (ids and setting names, never customer data)" },
   },
+  feedback_triage: { noun: "the owner's triage marks on feedback", line: "records", notPersonal: ["changed_by"] },
+  feedback_owner_settings: { noun: "the owner's feedback alert choices", line: "records", notPersonal: ["changed_by"] },
+  feedback_alert_state: { noun: "the owner's feedback alert state", line: "records", notPersonal: ["last_ref"] },
   install_plans: { noun: "plan and billing events", line: "records" },
   identity_log: { noun: "the sign-in role log", line: "records", notPersonal: ["user_type", "is_agency_owner"] },
 

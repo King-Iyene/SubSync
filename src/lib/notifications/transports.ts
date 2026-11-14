@@ -91,3 +91,27 @@ export function testSendDeps(installationId: string, stopUrl: StopUrl, switchOn:
 export async function sendConnectionsTest(installationId: string, to: string, mail: Mail): Promise<SendResult> {
   return sendMail(installationId, to, mail, () => null, "connections.test_email", {});
 }
+
+/**
+ * The two senders for the platform owner's feedback alerts (docs/FEEDBACK.md). Both go through the same switches as every other message (SEND_EMAIL_LIVE, SEND_SLACK_LIVE):
+ * with a switch off nothing leaves. The owner's address and Slack address come from environment variables and are never logged; the Slack address is only called if it is a real
+ * hooks.slack.com address (postSlackWebhook checks).
+ */
+export const feedbackSenders = {
+  async email(to: string, mail: { subject: string; text: string; html: string }): Promise<{ ok: boolean }> {
+    const out = await outward({ flag: "SEND_EMAIL_LIVE", verb: "SEND", what: "feedback.owner_email" }, async () => {
+      if (!emailConfigured()) return { ok: false };
+      // An internal message to the platform owner's own address, not a message to a customer, so it carries no stop link.
+      const r = await sendEmailResult(to, { subject: mail.subject, text: mail.text, html: mail.html });
+      return { ok: r.ok };
+    });
+    return out.live ? out.result : { ok: true };
+  },
+  async slack(url: string, text: string): Promise<{ ok: boolean }> {
+    const out = await outward({ flag: "SEND_SLACK_LIVE", verb: "SEND", what: "feedback.owner_slack" }, async () => {
+      const r = await postSlackWebhook(url, text);
+      return { ok: r.ok };
+    });
+    return out.live ? out.result : { ok: true };
+  },
+};
