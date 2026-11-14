@@ -1,8 +1,8 @@
 // "Give feedback", "Report a problem" and "Suggest something" (N86, N87): the rules for what is accepted, kept pure so they are unit tested.
 //
-// Nothing here is sent anywhere. Tonight the alert to King is a DRY RUN: a "WOULD SEND" line is written to the audit log with ids only (never the message
-// text, never an address), through the same audit table every other record uses. The dispatcher that can really email or post to Slack is stage F9, with
-// its switches (SEND_EMAIL_LIVE, SEND_SLACK_LIVE); this file must not import anything that sends (a test reads the source to be sure).
+// Nothing here is sent anywhere. Each item writes a line to the audit log with ids only (never the message text, never an address). Telling the platform owner is
+// decided by src/lib/feedback-alert.ts and delivered through the gated transports (SEND_EMAIL_LIVE, SEND_SLACK_LIVE): see docs/FEEDBACK.md. This file must not
+// import anything that sends (a test reads the source to be sure).
 
 export const FEEDBACK_MAX = 2000;
 export const SUGGEST_TITLE_MAX = 120;
@@ -78,10 +78,10 @@ export function wouldSendDetail(event: NotifyEvent, ids: Record<string, string |
   const clean: Record<string, string | number | null> = {};
   for (const [k, v] of Object.entries(ids)) clean[k] = typeof v === "string" ? v.slice(0, 64) : v;
   return {
-    outward: "WOULD SEND to King (dry run: no email or Slack message is sent)",
+    outward: "RECORDED for the owner inbox (an alert goes out only by the owner's rules, and only through the live switches)",
     to: "king",
     event,
-    channel: event === "suggestion" || event === "problem" ? "instant: email and Slack" : "daily digest",
+    channel: event === "problem" ? "instant alert (someone is stuck)" : "inbox, and the optional daily summary",
     ...clean,
   };
 }

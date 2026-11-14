@@ -53,7 +53,7 @@ describe.skipIf(!HAS_DB)("feedback, problem reports, suggestions and the setting
     expect(lines.length).toBe(2);
     for (const l of lines) {
       const text = JSON.stringify(l.detail);
-      expect(text).toContain("WOULD SEND to King");
+      expect(text).toContain("RECORDED for the owner inbox");
       expect(text).not.toContain("secret words");
       expect(text).not.toContain("Dana");
       expect(text).not.toContain("never loaded");

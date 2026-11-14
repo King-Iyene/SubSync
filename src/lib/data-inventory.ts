@@ -148,7 +148,7 @@ export const INVENTORY: Record<string, TableInfo> = {
   client_billing: { noun: "which paid plan each client account is on, whether it is paid up, the plan price and the credit balance (no card or bank details)", line: "accounts", personal: {}, notPersonal: ["plan_name", "user_limit"] },
   cl2_notes: { noun: "your own notes, next steps and promises about each client account (only you and your team see them)", line: "yours", personal: { body: "the notes you wrote about a client account", author: "who wrote the note" }, notPersonal: ["kind", "pinned", "done", "due_on"] },
   cl3_history: { noun: "when a client account's paid plan, payment status, credit balance or SubSync install changed, with the day we saw it", line: "accounts", personal: {}, notPersonal: ["kind", "from_value", "to_value"] },
-  cl3_app_installs: { noun: "whether SubSync is installed on each client account, and the version", line: "accounts", personal: { name: "the client account name" }, notPersonal: ["is_installed", "version_id", "installed_at"] },
+  cl3_app_installs: { noun: "whether SubSync is installed on each client account, the version, the app plan and whether it is on a trial", line: "accounts", personal: { name: "the client account name" }, notPersonal: ["is_installed", "version_id", "installed_at", "plan_id", "on_trial"] },
   cl2_plan_events: { noun: "when a client account's paid plan changed status (for example paid up to past due), so you can see how long it lasted", line: "accounts", personal: {}, notPersonal: ["from_status", "to_status", "plan_name"] },
   client_risk_history: { noun: "each client's daily risk level, so you can see whether it is getting better or worse", line: "accounts", personal: {}, notPersonal: [] },
   client_owners: { noun: "who looks after each client in your business (a name you type)", line: "yours", personal: { owner_name: "the name of who looks after each client in your business", set_by: "who set it" }, notPersonal: [] },
@@ -222,10 +222,10 @@ export const INVENTORY: Record<string, TableInfo> = {
   meetings: {
     noun: "meetings from connected tools", line: "meetings",
     personal: {
-      owner_ghl_user_id: "which team member recorded it", title: "the meeting title", attendee_emails: "who attended (email addresses)", summary: "the summary", action_items: "action items",
+      owner_ghl_user_id: "which team member recorded it", title: "the meeting title", attendee_emails: "who attended (email addresses)", attendee_names: "who attended (names)", summary: "the summary", action_items: "action items",
       recording_url: "a link to the recording", transcript_ref: "a reference to the full transcript at the tool that made it (SubSync does not keep the transcript text)",
     },
-    notPersonal: ["provider_meeting_id"],
+    notPersonal: ["provider_meeting_id", "invitee_stats", "rematched_at"],
   },
   notifications: {
     noun: "your notification centre", line: "accounts",
@@ -378,6 +378,9 @@ export const INVENTORY: Record<string, TableInfo> = {
     noun: "a short record of who did what and when", line: "records",
     personal: { actor: "the name of the person who did it", detail: "what changed (ids and setting names, never customer data)" },
   },
+  feedback_triage: { noun: "the owner's triage marks on feedback", line: "records", notPersonal: ["changed_by"] },
+  feedback_owner_settings: { noun: "the owner's feedback alert choices", line: "records", notPersonal: ["changed_by"] },
+  feedback_alert_state: { noun: "the owner's feedback alert state", line: "records", notPersonal: ["last_ref"] },
   install_plans: { noun: "plan and billing events", line: "records" },
   identity_log: { noun: "the sign-in role log", line: "records", notPersonal: ["user_type", "is_agency_owner"] },
 

@@ -18,10 +18,12 @@ export async function GET(request: Request) {
   }
   if (maintenanceOn(process.env)) return NextResponse.json({ skipped: "maintenance" });
   try {
+    // Nightly: every waiting call is looked at again (a contact may have been created or corrected), before the ones whose time is up are removed. Counts only.
+    const rematch = await import("@/lib/connections/rematch-run").then((m) => m.runRematch({ onlyIfSynced: false })).catch((error) => { console.error("Nightly rematch failed", safeError(error)); return null; });
     const result = await runMeetingMaintenance();
     // Our own history (MEETINGS_BRIEF slice 4): counts per account for the day whose seven following days are complete. Idempotent; a failure here never fails the clean-up.
     const outcomes = await recordOutcomesForAll(dayToRecord(Date.now())).catch((error) => { console.error("Meeting outcome record failed", safeError(error)); return { error: "outcome_record_failed" }; });
-    return NextResponse.json({ ...result, outcomes });
+    return NextResponse.json({ ...result, rematch, outcomes });
   } catch (error) {
     console.error("Cron meeting-expiry failed", safeError(error));
     return NextResponse.json({ error: "Meeting clean-up failed" }, { status: 500 });

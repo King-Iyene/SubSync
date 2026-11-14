@@ -13,6 +13,8 @@ import { Badge, Btn, ExtLink, inputClass } from "../ui";
 type Waiting = {
   id: string; title: string | null; startedAt: string | null; attendees: string[]; reason: string | null; kind: "unmatched" | "held" | "permission"; message: string; daysLeft: number | null;
   summary: string | null; actionItems: string[]; recordingUrl: string | null; noteText: string | null;
+  attendeeNames: string[]; detail: string; matchedTo: { name: string | null; accountName: string } | null;
+  possible: Array<Hit & { kind: "same_email" | "plus_tag" | "same_name"; evidence: string; lastActivityAt: string | null }>;
 };
 type Recent = { id: string; title: string | null; startedAt: string | null; receivedAt: string; status: string; outcome: string };
 type Data = {
@@ -87,6 +89,16 @@ function Inbox({ data, reload }: { data: Data; reload: () => Promise<void> }) {
       )}
 
       <Section title="Calls waiting for you" hint="Private to you. Nobody else can see these, not even your admin." id="waiting">
+        {others.length > 0 && data.connected && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+            <Btn disabled={busy} onClick={() => void act(async () => {
+              const r = await api.post<{ checked: number; added: number; matchedWaiting: number; writeLive: boolean }>("meeting-inbox/recheck", {});
+              if (r.added > 0) return `${r.added} ${r.added === 1 ? "call was" : "calls were"} matched to a contact by exact email and ${r.writeLive ? "added" : "checked in test mode (nothing was written)"}.`;
+              return r.checked === 0 ? "Nothing here can be checked again." : "Checked again. No call has a contact with an exact matching email yet.";
+            })}>Check again now</Btn>
+            <span className="text-muted-foreground">SubSync also checks by itself after your contacts update and every night.</span>
+          </div>
+        )}
         {others.length === 0 ? (
           <EmptyState title="Nothing is waiting" body={data.connected ? "When a call has no contact with a matching email, or two contacts share it, it appears here for 14 days. Pick the right contact and the note is added." : "Connect Fathom under Integrations. Calls it cannot place come here."} action={!data.connected ? <a className="font-medium underline" href="#connections">Open Integrations</a> : undefined} compact />
         ) : (
@@ -132,7 +144,8 @@ function Inbox({ data, reload }: { data: Data; reload: () => Promise<void> }) {
 function WaitingRow({ w, data, act, busy }: { w: Waiting; data: Data; act: (fn: () => Promise<string | void>) => Promise<void>; busy: boolean }) {
   const api = useApiClient();
   const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
+  // The search starts from who was on the call (an attendee's name, else their email), so the first look is already the likely person.
+  const [q, setQ] = useState(w.attendeeNames[0] ?? w.attendees[0] ?? "");
   const [account, setAccount] = useState("");
   const [hits, setHits] = useState<Hit[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -153,8 +166,21 @@ function WaitingRow({ w, data, act, busy }: { w: Waiting; data: Data; act: (fn: 
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-medium">{w.title ?? "Untitled call"} <span className="font-normal text-muted-foreground">· {when(w.startedAt)}</span></p>
-          <p className="mt-0.5 break-words text-xs text-muted-foreground">With {w.attendees.length ? w.attendees.join(", ") : "nobody listed"}</p>
-          <p className="mt-1 text-sm">{w.message}</p>
+          <p className="mt-0.5 break-words text-xs text-muted-foreground">With {w.attendees.length ? w.attendees.join(", ") : w.attendeeNames.length ? w.attendeeNames.join(", ") : "nobody listed"}</p>
+          <p className="mt-1 text-sm">{w.matchedTo ? `Matched to ${w.matchedTo.name ?? "a contact"} in ${w.matchedTo.accountName}. ${w.reason === "needs_permission" ? "It will be added when the permission is granted." : w.reason === "over_daily_cap" ? "It will be added when the daily limit allows." : "It will be added when notes are switched on."}` : w.detail || w.message}</p>
+          {w.possible.length > 0 && !w.matchedTo && (
+            <div className="mt-2" data-testid="possible-matches">
+              <p className="text-xs font-medium">Possible matches (SubSync did not choose)</p>
+              <ul className="mt-1 divide-y border-y text-sm">
+                {w.possible.map((p) => (
+                  <li key={`${p.locationId}:${p.contactId}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <span className="min-w-0"><span className="font-medium">{p.name ?? "No name"}</span> <span className="text-muted-foreground">· {p.email ?? "no email"} · {p.accountName}{p.lastActivityAt ? ` · last activity ${when(p.lastActivityAt)}` : ""}</span><span className="block text-xs text-muted-foreground">{p.evidence}</span></span>
+                    <Btn disabled={busy} onClick={() => { setOpen(true); setPicked(p); }}>Add to this one</Btn>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {w.daysLeft !== null && <p className="mt-0.5 text-xs text-muted-foreground">Removed from here in {w.daysLeft} {w.daysLeft === 1 ? "day" : "days"} if you do nothing.</p>}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">

@@ -66,7 +66,7 @@ const num = (v: unknown) => { const n = v === null || v === undefined ? NaN : Nu
 /** The plan block for one account from the stored row (no row = never read). */
 export function planOf(r: BillingRow | undefined, now: number): Cl2Plan {
   const st = r?.state ?? "unknown";
-  const state: PlanState = st === "ok" ? "ok" : st === "no_plan" ? "no_plan" : st === "unknown" || !r ? "not_checked" : "not_available";
+  const state: PlanState = st === "ok" ? "ok" : st === "no_plan" ? "no_plan" : st === "unknown" || !r ? "not_checked" : st === "needs_permission" ? "needs_permission" : "not_available";
   const raw = (r?.subscription_status as string | null | undefined) ?? null;
   const p = payStatus(raw, state);
   const amount = num(r?.price_amount), interval = (r?.billing_interval as string | null | undefined) ?? null;

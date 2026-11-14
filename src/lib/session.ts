@@ -16,6 +16,8 @@ export type Session = {
   locationId?: string | null;
   /** True only for the person who may delete all the data (see mayDeleteData in access.ts). Missing means no. */
   dataOwner?: boolean;
+  /** True only for the platform owner (PLATFORM_OWNER_COMPANY_IDS or PLATFORM_OWNER_EMAILS, agency sessions only). Decided at sign-in from the verified payload. Missing means no. Opens the owner-only Feedback inbox; everyone else gets 404 there. */
+  platformOwner?: boolean;
   /** The role sign-in worked out from the verified payload (agency owner, administrator, staff, account administrator or user). Connections decide who may see and revoke from it. Missing on older sessions, which then get the least privileged reading of the raw role. */
   personRole?: Role;
   exp: number;

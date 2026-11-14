@@ -26,7 +26,8 @@ test("maps the raw subscription status and never hides an unknown one", () => {
 });
 
 test("needs permission only when the stored state says so; other failures say not available", () => {
-  assert.equal(planOf({ state: "needs_permission" }, now).payLabel, "Not available for this kind of app");
+  assert.equal(planOf({ state: "needs_permission" }, now).payLabel, "Needs permission: reconnect");
+  assert.equal(planOf({ state: "needs_permission" }, now).state, "needs_permission");
   assert.equal(planOf({ state: "not_available", http_status: 500 }, now).payLabel, "Not available for this kind of app");
   assert.match(explainPlan("not_available", "unknown", 500, null), /company-level apps/);
   assert.equal(planOf(undefined, now).state, "not_checked");

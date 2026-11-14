@@ -35,10 +35,11 @@ export { SAFE_COLUMNS };
 
 export async function listMine(person: Person, delivery: boolean, now = Date.now()): Promise<MyConnection[]> {
   const db = sql();
-  const rows = await db`select ${db(SAFE_COLUMNS as never)} from user_connections where ghl_user_id = ${person.userId} and company_key = ${person.companyKey} order by created_at`;
+  // `skipped` is the number of calls waiting in this person's inbox now (counted, not the old running tally that never went down when a call was linked or added later).
+  const rows = await db`select ${db(SAFE_COLUMNS as never)}, (select count(*)::int from meetings m where m.installation_id = u.installation_id and m.owner_ghl_user_id = u.ghl_user_id and m.status = 'needs_contact') waiting from user_connections u where u.ghl_user_id = ${person.userId} and u.company_key = ${person.companyKey} order by u.created_at`;
   return rows.map((r) => ({
     id: r.id as string, provider: r.provider as PersonalProvider, status: shownStatus(r.status as string, r.pending_since as Date | null, now), connectedAs: (r.provider_account_email as string | null) ?? null,
-    lastOkAt: iso(r.last_ok_at), lastEventAt: iso(r.last_event_at), saved: r.saved_count as number, skipped: r.skipped_count as number, lastErrorCode: (r.last_error_code as string | null) ?? null, delivery,
+    lastOkAt: iso(r.last_ok_at), lastEventAt: iso(r.last_event_at), saved: r.saved_count as number, skipped: (r.waiting as number) ?? 0, lastErrorCode: (r.last_error_code as string | null) ?? null, delivery,
   }));
 }
 
