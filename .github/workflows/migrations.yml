@@ -2,8 +2,8 @@
 #
 # 1. "Check" runs on every push and pull request: it applies ALL migrations to a brand-new throwaway Postgres, then typechecks and runs the unit tests.
 #    A migration that does not apply cleanly from scratch, or that drops/truncates/deletes, fails here before it can reach production.
-# 2. "Apply to Supabase" runs only on a push to main that changes supabase/migrations (or by hand), after "Check" passes AND a person approves it
-#    (GitHub Environment "production" with required reviewers). It applies only the migrations not yet recorded, once each, in order.
+# 2. "Apply to Supabase" runs only on a push to main that changes supabase/migrations (or by hand), after "Check" passes (no approval wait)
+#    (GitHub Environment "production", no required reviewers). It applies only the migrations not yet recorded, once each, in order.
 #
 # One-time setup (King): see docs/MERGE_AND_MIGRATE.md, section "Automatic migrations".
 name: migrations
@@ -136,7 +136,7 @@ jobs:
     outputs:
       migrations: ${{ steps.diff.outputs.migrations }}
     steps:
-      - uses: actions/checkout@v4
+    # No required reviewers on this environment: the job runs by itself once Check passes.
         with:
           fetch-depth: 0
       - id: diff
