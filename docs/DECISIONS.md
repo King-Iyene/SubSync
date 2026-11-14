@@ -764,3 +764,5 @@ Choices: defaults are the tags the workflow templates really listen for (needs-f
 
 - 2026-11-14 PLAN MONITOR. Who: the agency owner (and a client admin for their own row) who must know which client accounts' SubSync trial is ending, plan changed, or SubSync was removed; they would say "I find out when a client complains" if it were missing. Reason to build: it feeds the change record (moat) and the alert-first wedge.
 - 2026-11-14 PLAN MONITOR READS: only what the published docs support. Charges via charges.readonly (own token, 100 accounts a run, every 6 hours), installed list for plan and trial, nothing via saas/location.read (no SaaS field on GET /locations) and no installer-details call (no new data). Pending SaaS payments are not shown (agency-only permission). Marked NOT VERIFIED LIVE where not run against the live platform.
+## 14 Nov 2026: SubSync is a read and write app
+Who: agency owners, setters, client admins. What they do next: preview and confirm a change, or press Send. Missing: they could not act from SubSync. The old 'read-only by default' wording in CLAUDE.md section 1A is replaced.
