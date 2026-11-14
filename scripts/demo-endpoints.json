@@ -408,6 +408,12 @@
  },
  {
   "module": "Money",
+  "path": "payments?part=checks",
+  "min": 1,
+  "note": "live read; the demo shows labelled sample data"
+ },
+ {
+  "module": "Money",
   "path": "finance?part=overview&from={d29}&to={d0}",
   "min": 1
  },

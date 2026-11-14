@@ -1,8 +1,8 @@
 // Payments module: shared types (server and browser). Pure, no imports of server code.
 // Two kinds of money: "plans" (what the agency's clients pay the agency) and "customers" (what the clients' own customers pay the clients).
-export const PM_FLAGS = ["pm_module", "pm_recovery", "pm_disputes", "pm_upcoming", "pm_resend"] as const;
+export const PM_FLAGS = ["pm_module", "pm_recovery", "pm_disputes", "pm_upcoming", "pm_resend", "pm_checks"] as const;
 export type PmFlag = (typeof PM_FLAGS)[number];
-export const PM_PARTS = ["today", "queue", "item", "disputes", "upcoming", "history", "options", "setup", "export"] as const;
+export const PM_PARTS = ["today", "queue", "item", "disputes", "upcoming", "history", "options", "setup", "export", "checks"] as const;
 export type PmPart = (typeof PM_PARTS)[number];
 
 export type PmKind = "transaction" | "invoice" | "subscription" | "plan";
