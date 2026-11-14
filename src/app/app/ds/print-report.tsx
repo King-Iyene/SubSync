@@ -22,7 +22,7 @@ export type ReportInput = {
 
 export function PrintReport({ r, now }: { r: ReportInput; now: number }) {
   return (
-    <article className="hidden print:block" data-testid="today-print" aria-hidden>
+    <article className="hidden text-black print:block" data-testid="today-print" data-own-print-heading aria-hidden>
       <header className="mb-5 border-b-2 border-black pb-3">
         <p className="text-sm">{r.brandName ?? "Today"}</p>
         <h1 className="text-2xl font-semibold">Today: {r.who}</h1>

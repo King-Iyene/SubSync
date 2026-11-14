@@ -23,7 +23,7 @@ export const SYNCED_DELETE = [
   "campaign_stats", "wf_outcome_daily", "mn_outcomes", "mn_tasks", "am_notices", "am_auto_adds", "am_slack_prefs", "workflow_snapshots", "workflow_changes", "workflow_daily", "workflow_items",
   "dh_snapshots", "dh_flags", "dh_changes", "dh_outcomes", "cu_scans", "cu_actions", "dq_groups", "dq_events", "dq_source_daily", "dq_forms", "dq_submissions", "dq_scores", "dq_poll", "dq_mutes", // Data health (docs/features/DATA_HEALTH.md)
   "message_sends", // Sending messages: one row per send attempt (ids, channel, a one-way hash of the words, result; never the words)
-  "call_queue_log", "meeting_deliveries", "crm_writes", "contact_writes", "field_write_state", "meetings", "meeting_notes", "shared_audits", "sync_jobs", "sync_watermarks", "locations",
+  "call_queue_log", "meeting_deliveries", "crm_writes", "contact_writes", "field_write_state", "meetings", "meeting_notes", "shared_audits", "shared_reports", "sync_jobs", "sync_watermarks", "locations",
 ] as const;
 
 /** Settings, credentials and the agency's own notes. Kept by "delete my data" (the app keeps working), removed on uninstall. */

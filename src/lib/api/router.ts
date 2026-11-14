@@ -154,6 +154,7 @@ import { handleTeamRoles } from "./team-roles-routes";
 import { handleSettings2 } from "./settings2-routes";
 import { handlePayments } from "./payments-routes";
 import { handleToday3, handleToday3Act } from "./today3-routes";
+import { handleReportShare } from "./report-share-routes";
 import { handleCash, handleCashAct } from "./cash-routes";
 import { handleWg, handleWgAct } from "./wg-routes";
 import { handleBr } from "./br-routes";
@@ -2295,6 +2296,8 @@ async function dispatch(ctx: Ctx): Promise<Response> {
     if (a === "clients2" && ((method === "GET" && !b && ctx.url.searchParams.has("part")) || (method === "POST" && b && ctx.segments.length === 2))) {
       return await handleClients2(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
+    // Share a report: /api/app/report-share (list, make a link) and /api/app/report-share/revoke. Owners and administrators only (checked inside); the company is the signed session's.
+    if (a === "report-share" && ((method === "GET" && !b) || (method === "POST" && (!b || (b === "revoke" && ctx.segments.length === 2))))) return await handleReportShare(ctx);
     // Today (front page): /api/app/today3?part=... (today, list, proof, numbers, settings, export; read only) and /api/app/today3/act/... (SubSync-only notes).
     if (a === "today3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleToday3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });

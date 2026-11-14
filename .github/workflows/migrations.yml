@@ -109,6 +109,22 @@ jobs:
           GHL_APP_SHARED_SECRET: ci-shared
           GHL_REDIRECT_URI: http://localhost:3102/api/oauth/callback
         run: npx vitest run tests/unit/ignored-leads-db.test.ts --disableConsoleIntercept
+      - name: Share a report (link ids, names hidden by default, another company never sees or switches off a link, expiry and switch-off open nothing)
+        env:
+          DATABASE_URL: postgresql://postgres:ci@localhost:5432/postgres
+          DATABASE_SSL: "off"
+          DB_POOL_MAX: "2"
+          TOKEN_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+          NEXT_PUBLIC_APP_URL: http://localhost:3102
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon
+          SUPABASE_SERVICE_ROLE_KEY: ci-service
+          GHL_APP_ID: ci-app
+          GHL_CLIENT_ID: ci-client
+          GHL_CLIENT_SECRET: ci-secret
+          GHL_APP_SHARED_SECRET: ci-shared
+          GHL_REDIRECT_URI: http://localhost:3102/api/oauth/callback
+        run: npx vitest run tests/unit/report-share-db.test.ts --disableConsoleIntercept
       - name: Generate the framework types (a clean checkout does not have them)
         run: npx next typegen
       - run: npx tsc --noEmit

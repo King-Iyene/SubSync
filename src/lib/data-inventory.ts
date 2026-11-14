@@ -264,6 +264,7 @@ export const INVENTORY: Record<string, TableInfo> = {
   },
   meeting_deliveries: { noun: "a list of meeting deliveries already handled (ids only)", line: "meetings" },
   field_write_state: { noun: "which meeting last filled each contact field SubSync updates (ids and times only, never the value)", line: "meetings" },
+  shared_reports: { noun: "share links to a report", line: "shares", personal: { payload: "the figures a report screen showed when you shared it (counts, headings and short sentences). Contact names and other client account names are replaced unless you chose to include them" } },
   shared_audits: { noun: "share links", line: "shares", personal: { payload: "a snapshot of totals, finding titles, fix steps and how each number is counted, with client names removed, plus your business name and colour" } },
 
   // ---- what you add, and your settings (kept by "Delete my data", removed by an uninstall)

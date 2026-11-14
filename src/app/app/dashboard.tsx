@@ -26,6 +26,7 @@ import { BackLink, BackProvider, ModuleTabs, TrailProvider } from "./ds/template
 import { InlineAlert } from "./ds/alert";
 import { GlobalFilterBar } from "./ds/global-filter";
 import { useTheme } from "./ds/theme";
+import { PrintSupport } from "./ds/print-support";
 import { remember, remembered } from "./ds/remember";
 import { ApiProvider, makeApi, type Api } from "./session";
 import { LeadDrawerHost } from "./ds/lead-drawer-host";
@@ -582,6 +583,8 @@ export function Dashboard() {
             ))}
           </nav>
           <main className="mx-auto w-full max-w-[1800px] flex-1 p-4 pb-32 sm:px-10 sm:pt-8 sm:pb-28 md:pb-24">
+            <PrintSupport title={labelFor(NAV.find((n) => n.id === shown) ?? NAV[0])} brand={auth.brand.name ?? null}
+              scope={filter.accounts.length > 0 ? `${filter.accounts.length} selected client ${filter.accounts.length === 1 ? "account" : "accounts"}` : auth.kind === "agency" ? "All client accounts" : "Your account"} />
             {fromAccount && view.id !== "today" && (
               <InlineAlert className="mb-3" action={<Btn variant="ghost" onClick={() => { setFilter(EMPTY_FILTER); try { window.history.replaceState(null, "", withTodayAccounts(window.location.hash, [])); window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* see above */ } }}>See all client accounts</Btn>}>
                 You opened this from inside a client account, so every page shows only that account.
