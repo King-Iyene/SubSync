@@ -131,6 +131,12 @@ export function sample(part: string, p: FxParams, empty: boolean): unknown {
     case "billing": b = billing(pp); break;
     case "list": b = list(empty ? { ...p, reason: "none", location: "none" } : p) as unknown as Record<string, unknown>; break;
     case "options": b = (empty ? { accounts: [], industries: [] } : options()) as unknown as Record<string, unknown>; break;
+    case "plan-monitor": {
+      const row = (id: string, name: string, chip: string, chipLabel: string, extra: Record<string, unknown> = {}) => ({ locationId: id, name, planLabel: "Growth plan", trialDaysLeft: null, trialNote: null, installStatus: "installed", lastChargeAt: null, lastChargeAmount: null, lastChargeCurrency: null, chargeNote: "No charge recorded", chip, chipLabel, url: null, ...extra });
+      const rows = empty ? [] : [row("f1", "Sample Roofing Co", "trial", "Trial ends in 2 days", { trialDaysLeft: 2, trialNote: "2 days left" }), row("f2", "Sample Dental", "active", "Active"), row("f3", "Sample Realty", "not_installed", "Not installed", { installStatus: "not_installed", planLabel: null })];
+      b = { rows, total: rows.length, pendingNote: "Pending client payments are not available to this kind of app.", counts: { trialEnding: empty ? 0 : 1, planChanged: 0, paymentProblem: 0, notInstalled: empty ? 0 : 1 }, historyStarts: null };
+      break;
+    }
     default: b = {};
   }
   return { ...b, ...META };
