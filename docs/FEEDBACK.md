@@ -52,7 +52,7 @@ Menu item **Feedback (owner)** with a count of new items. Visible only to the pl
 
 Inside: newest first; kind, severity, account (short id, plus the name when known), page, date, status (new / seen / planned / done / won't fix); search and filters (kind, severity, status); status changes (each writes the audit line `feedback.status_changed`); vote counts for roadmap items; the last alert record per severity; the delivery status. What people typed is shown as plain text (escaped). Customer contacts are never read.
 
-Tables (migration `20261231320000_feedback_owner.sql`, additive): `feedback_triage`, `feedback_owner_settings`, `feedback_alert_state`. Customers still see only their own submissions (`feedback_items`, `roadmap_suggestions` are unchanged).
+Tables (migration `20261231330000_feedback_owner.sql`, additive): `feedback_triage`, `feedback_owner_settings`, `feedback_alert_state`. Customers still see only their own submissions (`feedback_items`, `roadmap_suggestions` are unchanged).
 
 ## Follow-ups (not built)
 
