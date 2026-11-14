@@ -27,7 +27,7 @@ test("the role comes from the session's kind and the platform's own role word, a
 test("each of the four roles has its own guide with a title, short steps, and unique ids", () => {
   for (const role of ROLES) {
     const steps = buildSteps(role, none);
-    assert.ok(steps.length >= 4 && steps.length <= 13, `${role}: ${steps.length} steps`);
+    assert.ok(steps.length >= 4 && steps.length <= 14, `${role}: ${steps.length} steps`);
     assert.equal(new Set(steps.map((s) => s.id)).size, steps.length, `${role}: unique ids`);
     assert.ok(GUIDE_TITLES[role].title && GUIDE_TITLES[role].subtitle);
     for (const s of steps) {

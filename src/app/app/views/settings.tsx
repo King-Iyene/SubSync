@@ -15,6 +15,7 @@ import { SaleBasisSettings } from "./sale-basis-settings";
 import { DealRulesSettings } from "./deal-rules-settings";
 import { PipelineHistoryCard } from "./settings-pipeline-history";
 import { WatchingSlot } from "./settings-slot-watching";
+import { CallQueueTagsCard } from "./call-queue-tags-card";
 import { DailyBriefLine } from "./notifications";
 import { BrandPreview, PermissionsPanel, SettingsHistoryCard, TestAccountsCard, WhoCanOpenCard, type PermissionGroup } from "./settings-parts";
 
@@ -237,6 +238,8 @@ export function SettingsView({ openSection, embedded }: { openSection?: SectionI
               <WriteAccessCard />
             </>
           )}
+
+          {(section === "queues" || embedded?.includes("queues")) && <CallQueueTagsCard />}
 
           {(section === "targets" || embedded?.includes("targets")) && (
             <>

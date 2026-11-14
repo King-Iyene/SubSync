@@ -7,17 +7,17 @@ import { CONTROL_HOME, describeChange, HISTORY_ACTION, isSectionId, MOVED_INTO_S
 // N76 and N89: Settings in the eight sections the note names, nothing lost in the move, settings changes audited, numbers recalculated only when they should be.
 const read = (f: string) => readFileSync(join(process.cwd(), f), "utf8");
 
-test("the eight sections of the note, in order, with plain titles", () => {
-  assert.deepEqual(SECTIONS.map((s) => s.title), ["Replies", "Brand", "Notifications", "Integrations", "Team", "Data", "Sync status", "Advanced"]);
-  assert.equal(new Set(SECTION_IDS).size, 8);
+test("the sections of the note, in order, with plain titles", () => {
+  assert.deepEqual(SECTIONS.map((s) => s.title), ["Replies", "Brand", "Call queues", "Notifications", "Integrations", "Team", "Data", "Sync status", "Advanced"]);
+  assert.equal(new Set(SECTION_IDS).size, 9);
   for (const s of SECTIONS) assert.ok(s.hint.length > 20 && s.hint.length < 120, s.id);
   assert.ok(isSectionId("privacy") && !isSectionId("rules") && !isSectionId(null) && !isSectionId(3));
   assert.equal(SETTINGS_SECTION_KEY, "settings-section");
 });
 
 test("who sees which section: an agency and a business see all of them, a client's staff none (Settings is not in their menu and the API refuses it)", () => {
-  assert.equal(sectionsFor("agency").length, 8);
-  assert.equal(sectionsFor("business").length, 8);
+  assert.equal(sectionsFor("agency").length, 9);
+  assert.equal(sectionsFor("business").length, 9);
   assert.equal(sectionsFor("client").length, 0);
   assert.match(read("src/lib/access.ts"), /client: new Set\(\[[^\]]*\]\)/);
   assert.doesNotMatch(read("src/lib/access.ts").match(/client: new Set\(\[[^\]]*\]\)/)![0], /"settings"/);

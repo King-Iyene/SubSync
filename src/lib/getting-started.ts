@@ -42,6 +42,8 @@ export type Facts = {
   clientFees?: number; clientsPage?: boolean;
   /** The deal AI help (health explanations, follow-up plan, win and loss review, forecast in words): whether any of it is switched on for this company, and whether an AI account is connected. Left out means not on. */
   dealAi?: { on: boolean; connected: boolean };
+  /** The one "Set up your call queues" row: from the cached "Check that it worked" answers (never a live CRM call). Left out means not checked yet. */
+  callQueues?: { done: boolean; detail: string };
 };
 
 const TARGET_KEYS = ["slaHours", "speedTargetMinutes", "staleDays", "dormantDays", "speedBusinessHours", "countAutomatedTouches"] as const;
@@ -95,13 +97,16 @@ export function buildSteps(role: GuideRole, f: Facts): Step[] {
   // Only when the deal AI help is really switched on (never promised before it is live). Optional: SubSync works fully without it.
   const dealAi: Step[] = f.dealAi?.on ? [{ id: "ai_deals", title: "Let AI explain your stuck deals (optional)", done: f.dealAi.connected, optional: true, art: "feedback", detail: null, view: "settings", section: "integrations", cta: "Open AI settings",
     body: "Connect your own AI account in Settings, AI. Then, in Pipeline, each deal gets a plain-words explanation of what is stuck, stuck deals get a suggested next touch, and wins, losses and the forecast are explained. SubSync works out every number; the AI only writes the words, and nothing is sent to a lead." }] : [];
+  // Ticks only when the check found every tag and workflow; never by hand and never skipped. The reason it is still open is shown in plain words.
+  const queues: Step[] = [{ id: "call_queues", title: "Set up your call queues", done: f.callQueues?.done === true, ticksOn: [], art: "bell", detail: f.callQueues?.detail ?? "Not checked yet. Open Settings, Call queues and press Check that it worked.", view: "settings", section: "queues", cta: "Open Call queues",
+    body: "Choose the tag names that start each call queue, then press Check that it worked. The step ticks when your CRM has those tags and the three call workflows. The guide Set up your call queues walks through it." }];
   const feedback: Step = { id: "feedback", title: "Tell us what would help", done: f.feedbackGiven > 0 || seen("roadmap"), ticksOn: ["roadmap"], art: "feedback", optional: true, detail: null, view: "roadmap", cta: "Open What's new",
     body: "Use Give feedback at the bottom of any page, or suggest something on the What's new page. It goes to the people who build SubSync." };
 
   switch (role) {
-    case "agency_owner": return [connected, synced, today, speed, search, targets, brief, email, tests, share, ...fees, clients, ...meetings, ...dealAi, feedback];
+    case "agency_owner": return [connected, synced, today, speed, ...queues, search, targets, brief, email, tests, share, ...fees, clients, ...meetings, ...dealAi, feedback];
     case "agency_staff": return [connected, today, speed, calendar, search, feedback];
-    case "account_admin": return [connected, synced, today, speed, calendar, search, targets, brief, email, ...meetings, ...dealAi, feedback];
+    case "account_admin": return [connected, synced, today, speed, ...queues, calendar, search, targets, brief, email, ...meetings, ...dealAi, feedback];
     case "account_user": return [connected, today, speed, calendar, feedback];
   }
 }

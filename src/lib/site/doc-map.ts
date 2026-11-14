@@ -5,7 +5,7 @@ export const GUIDE_DOC: Readonly<Record<string, string>> = {
   cleanup: "clean-up", team: "team", pipeline: "funnel-and-pipeline", meetings: "meeting-notes", workflows: "workflows", "data-health": "data-health", settings: "settings",
   "conn-email": "email-sender-health", "conn-calendars": "calendars", "conn-slack": "connections", "conn-fathom": "connections", "conn-ai": "connections",
   "what-is-speed-to-lead": "what-is-speed-to-lead", "show-rate": "show-rate", "stale-deals": "stale-deals", "duplicate-certainty": "duplicate-certainty", roles: "roles",
-  "call-queue-tags": "call-queue-tags", "pipeline-replay": "pipeline-replay", "pipeline-river": "pipeline-river", alerts: "alerts", "report-sharing": "report-sharing",
+  "call-queue-tags": "call-queue-tags", "set-up-call-queues": "set-up-call-queues", "pipeline-replay": "pipeline-replay", "pipeline-river": "pipeline-river", alerts: "alerts", "report-sharing": "report-sharing",
   "print-and-pdf": "print-and-pdf", "fathom-unmatched": "fathom-unmatched", safety: "safety-and-sending", permissions: "permissions",
   "settings-replies": "settings-replies", "settings-brand": "settings-brand", "settings-notifications": "settings-notifications", "settings-integrations": "settings-integrations",
   "settings-team": "settings-team", "settings-data": "settings-data", "settings-sync": "settings-sync", "settings-advanced": "settings-advanced",
