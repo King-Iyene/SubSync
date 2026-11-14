@@ -149,6 +149,32 @@
    "caption": "We read contacts and tags to build your call lists."
   },
   {
+   "id": "G2U",
+   "kind": "screen",
+   "go": {
+    "hash": "today",
+    "openLead": {
+     "tab": "Record",
+     "section": "Follow-up and quotes",
+     "fill": [
+      [
+       "What to follow up on",
+       "Call back about the quote"
+      ]
+     ],
+     "press": [
+      "Preview the follow-up"
+     ]
+    },
+    "scrollTo": "Repeating follow-up",
+    "click": [
+     "Recover"
+    ]
+   },
+   "text": "In the lead panel, a follow-up can repeat on a schedule and end by itself. SubSync shows exactly what it will create, and nothing happens until you confirm.",
+   "caption": "Repeating follow-up: preview first, then confirm."
+  },
+  {
    "id": "G3C",
    "kind": "card",
    "title": "3. Conversations and messages",
@@ -459,6 +485,40 @@
    },
    "text": "Money checks looks at one account at a time, read live, and stores nothing.",
    "caption": "We read invoices, orders and products to show money problems."
+  },
+  {
+   "id": "G7U",
+   "kind": "screen",
+   "go": {
+    "hash": "today",
+    "openLead": {
+     "tab": "Record",
+     "section": "Follow-up and quotes",
+     "fill": [
+      [
+       "Name",
+       "Roof quote"
+      ],
+      [
+       "What it is for",
+       "Roof repair"
+      ],
+      [
+       "Amount",
+       "1200"
+      ]
+     ],
+     "press": [
+      "Preview"
+     ]
+    },
+    "scrollTo": "Quote or invoice (saved, not sent)",
+    "click": [
+     "Recover"
+    ]
+   },
+   "text": "The only money changes save an unsent estimate, invoice or template. SubSync previews it, and you send it yourself from your CRM.",
+   "caption": "Quote or invoice: saved, never sent by SubSync."
   },
   {
    "id": "G8C",

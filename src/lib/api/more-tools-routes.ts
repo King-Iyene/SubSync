@@ -118,7 +118,7 @@ async function templatesRoute(ctx: Ctx, h: MoreToolsHelpers, locationId: string)
 
 async function installerRoute(ctx: Ctx, h: MoreToolsHelpers): Promise<Response> {
   if (ctx.kind !== "agency" || !isAdminSide(ctx)) return json({ error: "This is for company owners and administrators" }, 403);
-  if (ctx.demo) return json({ ok: true, demo: true, planId: "demo-plan", isWhitelabel: false, installedAt: null, fields: ["planId"] });
+  if (ctx.demo) return json({ ok: true, demo: true, planId: "growth-plan", recordedPlanId: "growth-plan", matches: true, isWhitelabel: false, installedAt: null, fields: ["planId"] });
   const list = await grantedList(ctx);
   if (!has(list, INSTALLER_SCOPE)) return json({ ok: false, needsPermission: true, message: permissionText("read the install record") }, 403);
   const appId = process.env.GHL_APP_ID;

@@ -102,6 +102,18 @@ async function shots() {
         }
         await sleep(2500);
       }
+      if (s.go.openLead) {
+        // Open the lead panel from the first row that has an Open button, go to its Record tab and open the named section.
+        const opener = page.getByRole("button", { name: /^Open (?!.*CRM)/ }).first();
+        await opener.click({ timeout: 20000 }).catch((e) => problems.push(`${s.id}: could not open a lead: ${e.message.split("\n")[0]}`));
+        await sleep(4000);
+        await page.getByRole("tab", { name: s.go.openLead.tab }).or(page.getByRole("button", { name: s.go.openLead.tab, exact: true })).first().click({ timeout: 8000 }).catch((e) => problems.push(`${s.id}: could not open tab: ${e.message.split("\n")[0]}`));
+        await sleep(3000);
+        await page.getByText(s.go.openLead.section, { exact: true }).first().click({ timeout: 8000 }).catch((e) => problems.push(`${s.id}: could not open section: ${e.message.split("\n")[0]}`));
+        await sleep(2500);
+        for (const [label, value] of s.go.openLead.fill || []) await page.getByLabel(label, { exact: true }).first().fill(value, { timeout: 6000 }).catch((e) => problems.push(`${s.id}: could not fill "${label}": ${e.message.split("\n")[0]}`));
+        for (const name of s.go.openLead.press || []) { await page.getByRole("button", { name, exact: true }).first().click({ timeout: 8000 }).catch((e) => problems.push(`${s.id}: could not press "${name}": ${e.message.split("\n")[0]}`)); await sleep(3500); }
+      }
       if (s.go.scrollTo) {
         let target = page.getByText(s.go.scrollTo, { exact: true }).first();
         if (!(await target.waitFor({ timeout: 4000 }).then(() => true).catch(() => false))) target = page.getByText(s.go.scrollTo).first();
@@ -110,7 +122,7 @@ async function shots() {
         await sleep(1200);
       }
       // Hide the "Sample data" notes and the example-data line: they are app text that must not be on the video.
-      await page.evaluate(() => { for (const el of document.querySelectorAll("p,div,span")) if (el.childElementCount === 0 && /^Sample data/.test((el.textContent || "").trim())) el.style.display = "none"; const c = document.getElementById("vd-cursor"); if (c) c.style.display = "none"; });
+      await page.evaluate(() => { const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); const hit = []; while (w.nextNode()) { const n = w.currentNode; if (/^\s*Sample data|\bdemo\b|made-up|fictional/i.test(n.nodeValue || "") && n.parentElement && !n.parentElement.closest("#vd-caption")) hit.push(n.parentElement); } for (const el of hit) el.style.display = "none"; const c = document.getElementById("vd-cursor"); if (c) c.style.display = "none"; });
       await page.mouse.move(W - 40, H - 40);
       const bad = await scanText(page);
       if (bad) problems.push(`${s.id}: on-screen text matched "${bad}"`);
@@ -118,6 +130,7 @@ async function shots() {
     await caption(page, s.caption);
     await sleep(700);
     await page.screenshot({ path: file });
+    if (s.go && s.go.openLead) { await page.keyboard.press("Escape"); await sleep(1500); }
     console.log("shot", s.id);
   }
   await browser.close();
