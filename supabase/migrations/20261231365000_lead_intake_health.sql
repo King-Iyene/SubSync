@@ -21,7 +21,7 @@ create table if not exists public.dq_health_daily (
   location_id text not null,
   kind text not null check (kind in ('form', 'survey', 'funnel')),
   ext_id text not null,
-  day date not null,
+  day date not null default ((now() at time zone 'UTC')::date),
   recent integer,
   usual numeric,
   drop_pct integer,

@@ -104,8 +104,9 @@ export async function recordHealth(inst: string): Promise<{ recorded: number }> 
       ...funnels.map((f) => ({ installation_id: inst, location_id: f.locationId, kind: "funnel", ext_id: f.id, recent: null as number | null, usual: null as number | null, drop_pct: null as number | null, verdict: "no_views", pages: f.pages, steps: f.steps })),
     ];
     for (let i = 0; i < rows.length; i += 300) {
-      const chunk = rows.slice(i, i + 300).map((r) => ({ ...r, day: new Date().toISOString().slice(0, 10), rules_version: HEALTH_VERSION }));
-      await db`insert into dq_health_daily ${db(chunk, "installation_id", "location_id", "kind", "ext_id", "day", "recent", "usual", "drop_pct", "verdict", "pages", "steps", "rules_version")}
+      // `day` is the column default (today, UTC), so no date window is built here.
+      const chunk = rows.slice(i, i + 300).map((r) => ({ ...r, rules_version: HEALTH_VERSION }));
+      await db`insert into dq_health_daily ${db(chunk, "installation_id", "location_id", "kind", "ext_id", "recent", "usual", "drop_pct", "verdict", "pages", "steps", "rules_version")}
         on conflict (installation_id, location_id, kind, ext_id, day) do update set recent = excluded.recent, usual = excluded.usual, drop_pct = excluded.drop_pct, verdict = excluded.verdict, pages = excluded.pages, steps = excluded.steps, rules_version = excluded.rules_version, taken_at = now()`;
     }
     return { recorded: rows.length };
