@@ -68,6 +68,7 @@ A person in one client account never sees another client account's data. An agen
 | `/proof/[id]` | public_by_design | Branded monthly report for one client account (a front gate, src/proxy.ts, answers a true 404 with one generic page for any bad link): 256-bit random token (hash stored), account derived only from the token, switched off or replaced by the owner, rate limited, never indexed, totals only, no contact, message, other account or vendor name |
 | `/reply-proof/[id]` | public_by_design | Shared reply-time page for one client account: 192-bit random id, 30-day expiry, switch-off by its owner, rate limited, never indexed, totals only, hash-chain check, no contact or message on it |
 | `/audit/[id]` | public_by_design | Shared audit snapshot: 192-bit random id, 14-day expiry, switch-off by its owner, rate limited, totals, finding titles and a fix plan only, account names removed |
+| `/r/[id]` | public_by_design | Shared report snapshot: 192-bit random id, expiry of 1, 7, 14 or 30 days, switch-off by its owner, rate limited, never indexed, reads one stored row; names hidden unless the owner chose to include them; no navigation or link into the app |
 | `/` | public_static | Marketing page |
 | `/app` | public_static | App shell with no data; data comes from `api/app` with a session |
 | `/design` | public_static | The style guide (stage D0): tokens and shared components on made-up sample data produced in the page's own code; no sign-in, no tenant data, no API calls, noindex |

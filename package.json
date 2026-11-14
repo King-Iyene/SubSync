@@ -11,6 +11,7 @@
     "test:unit": "vitest run",
     "e2e": "playwright test",
     "check:bundle": "node scripts/check-bundle.mjs",
+    "check:print": "node --import tsx scripts/check-print-pdf.ts",
     "check:history": "node scripts/check-history.mjs",
     "verify": "next typegen && tsc --noEmit && eslint && next build && node scripts/check-bundle.mjs && node --test src/lib/__tests__/ && vitest run",
     "demo:server": "node scripts/demo-server.mjs",

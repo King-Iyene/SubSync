@@ -5,6 +5,8 @@ import { MUTE_WORDS, type MuteKind, type Receipt, type SetupItem } from "@/lib/a
 import { useApiClient, useData } from "../../session";
 import { EmptyState, SkeletonRows } from "../../ds";
 import { Btn, ErrorBox, inputClass } from "../../ui";
+import { PrintPdfButton, ShareReport } from "../../ds/share-report";
+import { weeklyDoc } from "../../ds/report-docs";
 
 // Clients > Reports (slice CB): the last 7 days per client as a plain receipt to copy, print or download; quiet one kind of attention for a client and put it back; set one client's
 // reply target; and the setup health with the exact "Needs permission: reconnect" words. Everything is a count from the synced data. Nothing here writes to the CRM or messages anyone.
@@ -39,7 +41,11 @@ export function ReportsTab() {
     <div className="space-y-6" data-testid="clients-reports">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <p className="max-w-2xl text-sm text-muted-foreground">The last 7 days for each client, from the data SubSync has read. Copy it for the client, print it, or download all of them.</p>
-        <Btn onClick={() => api.download("clients/act/csv", "subsync-weekly-report.csv")}>Download CSV</Btn>
+        <div className="flex flex-wrap items-center gap-2">
+          <Btn onClick={() => api.download("clients/act/csv", "subsync-weekly-report.csv")}>Download CSV</Btn>
+          <PrintPdfButton />
+          <ShareReport kind="clients" build={() => (rep.data ? weeklyDoc(rep.data.receipts, null) : null)} />
+        </div>
       </div>
       <div aria-live="polite" className="min-h-5 text-sm print:hidden">{err ? <span role="alert" className="text-destructive">{err}</span> : msg}</div>
       {setup.data && setup.data.needsReconnect > 0 && (
@@ -92,7 +98,6 @@ export function ReportsTab() {
         })}
       </ul>
       {rep.data.capped && <p className="text-xs text-muted-foreground">Showing the first 200 clients.</p>}
-      <div className="print:hidden"><Btn onClick={() => window.print()}>Print all</Btn></div>
     </div>
   );
 }
