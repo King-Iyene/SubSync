@@ -136,7 +136,7 @@ jobs:
     outputs:
       migrations: ${{ steps.diff.outputs.migrations }}
     steps:
-    # No required reviewers on this environment: the job runs by itself once Check passes.
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - id: diff
@@ -152,7 +152,7 @@ jobs:
     if: >-
       ((github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.migrations == 'true') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
-    # Required reviewers on this environment make the job wait for a click from King.
+    # No required reviewers on this environment: the job runs by itself once Check passes.
     environment: production
     env:
       # The database connection address (Supabase, Connect, Session pooler, with the database password filled in). The workflow talks to the

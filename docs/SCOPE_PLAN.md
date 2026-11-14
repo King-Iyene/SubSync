@@ -97,3 +97,7 @@ The app now asks for 39 scopes: three new OPTIONAL read scopes, `forms.readonly`
 ## Release 1.1.0 addition (12 Nov 2026): 40 scopes in total (7 required, 33 optional)
 
 One new OPTIONAL change scope, `locations/customFields.write`, joins four already listed ones (`conversations/reports.readonly`, `locations/tasks.readonly`, `locations/tasks.write`, `locations/tags.write`) so the coming AI follow-up tasks, AI data cleaning and richer response-time numbers never force a second approval. None is used by any screen yet, and the Permissions screen says so. Still never requested: `conversations/message.write`, `invoices.write`, `conversations.write` (delete).
+
+## 14 Nov 2026 cleanup: 35 scopes in total (7 required, 28 optional)
+
+Five scopes no feature used were removed before going Public (`conversations/reports.readonly`, `locations/tasks.readonly`, `locations/tasks.write`, `locations/tags.write`, `locations/customFields.write`). The app now asks for 35 scopes, and the developer portal draft lists the same 35 scopes.

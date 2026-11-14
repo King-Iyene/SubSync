@@ -6,7 +6,7 @@ Plain words. Written 11 Nov 2026, scope list updated 12 Nov 2026, from `src/lib/
 
 ## 1. Scopes for this release
 
-The app asks for 40 permissions today (7 required, 33 optional, the 40th being conversations/message.write added 13 Nov 2026 for sending a text or email when a person presses Send): the 29-row table, the 3 Lead intake scopes, the 5 coming-feature scopes and 2 still-unused ones below. Against the 21 published in 2.0.0, **19 are new** (marked NEW; 15 in the table, 3 Lead intake, plus `locations/customFields.write`). The installed app has no workflows permission at all today. Anything already granted stays granted; only NEW ones make installs press Update.
+The app asks for 35 permissions today (7 required, 28 optional; five unused ones were removed on 14 Nov 2026, and the list includes conversations/message.write added 13 Nov 2026 for sending a text or email when a person presses Send): the 29-row table, the 3 Lead intake scopes, the 5 coming-feature scopes and 2 still-unused ones below. Against the 21 published in 2.0.0, **19 are new** (marked NEW; 15 in the table, 3 Lead intake, plus `locations/customFields.write`). The installed app has no workflows permission at all today. Anything already granted stays granted; only NEW ones make installs press Update.
 
 Name check: the official scope page (marketplace.gohighlevel.com/docs/oauth/Scopes) loads with scripts, so it could not be read from here. "VERIFIED" below means a primary-source read recorded in our docs (SCOPE_PLAN, PAYMENTS_BRIEF); "INFERENCE" means not confirmed. Check each in the portal's scope picker: if the picker does not list it, do not tick it.
 
