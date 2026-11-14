@@ -5,8 +5,8 @@ import { COMPANY } from "../company.ts";
 export const SITE = {
   name: "SubSync",
   url: (process.env.NEXT_PUBLIC_APP_URL || "https://subsync.kdsquares.com").replace(/\/+$/, ""),
-  tagline: "Know what is happening in every account you manage before a customer tells you.",
-  description: "SubSync watches every account you manage and tells you what needs attention first: leads nobody answered, appointments nobody marked, no-shows nobody called back, and deals that went quiet.",
+  tagline: "Your command center for every client account. See what needs attention, what it is costing you and what to do next.",
+  description: "SubSync shows what needs attention, what it is costing you and what to do next: leads nobody answered, appointments nobody marked, no-shows nobody called back, and deals that went quiet.",
   supportEmail: COMPANY.supportEmail,
   supportReply: COMPANY.supportReply,
 } as const;

@@ -9,7 +9,7 @@ export const COMPANY = {
   product: "SubSync",
   supportEmail: "code@kdsquares.com",
   /** What the support page and the help page both promise. A commitment, not something software can check. */
-  supportReply: "one business day",
+  supportReply: "24 hours",
 } as const;
 
 /** The outside services that process data, and why. The Trust page lists exactly these; a test checks each one against the code or the config. */
