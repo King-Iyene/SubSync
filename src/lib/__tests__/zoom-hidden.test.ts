@@ -29,7 +29,6 @@ function files(dir: string, out: string[] = []): string[] {
 const ALLOWED: Record<string, { count: number; why: string }> = {
   "src/app/app/views/connections.tsx": { count: 3, why: "gated: the Zoom card (its name and its sentence) is drawn only when the API lists Zoom, and an older shared Zoom connection is listed only when the API sends it; the API leaves both out while the switch is off" },
   "src/app/app/views/meetings.tsx": { count: 2, why: "gated: each mention is behind moreTools, which is the switch" },
-  "src/app/privacy/page.tsx": { count: 1, why: "gated: the sentence about connected services picks its words from the switch" },
   "src/lib/getting-started.ts": { count: 1, why: "gated: the meeting step picks its words from the switch (the facts say whether Zoom is on)" },
   "src/app/api/hooks/zoom/route.ts": { count: 1, why: "plumbing: a log line when a Zoom notification fails" },
   "src/lib/api/connections-api.ts": { count: 1, why: "gated: the card list adds Zoom only when zoomOn(ctx), the switch" },
