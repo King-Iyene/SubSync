@@ -21,7 +21,7 @@ const session = (company: string, kind: "agency" | "client", loc: string | null)
   signSession({ companyId: company, userId: `u-${kind}`, role: "admin", userName: "T", demo: false, kind, locationId: loc, personRole: kind === "agency" ? "agency_owner" : "account_user" });
 async function call(token: string, path: string) {
   const [p, q] = path.split("?");
-  const res = await handle(new Request(`http://localhost/api/app/${p}${q ? "?" + q : ""}`, { headers: { Authorization: `Bearer ${token}` } }));
+  const res = await handle(new Request(`http://localhost/api/app/${p}${q ? "?" + q : ""}`, { headers: { Authorization: `Bearer ${token}` } }), p.split("/"));
   const text = await res.text();
   let body: Json = {};
   try { body = text ? JSON.parse(text) : {}; } catch { /* not json */ }
