@@ -1,3 +1,4 @@
+import { GROWTH_PLAN_ID } from "../entitlements-core";
 import { sql } from "../db";
 import { DAY, TEAM } from "./fill-core";
 
@@ -56,6 +57,22 @@ export async function fillMoney(inst: string): Promise<void> {
       // SubSync is missing in two client accounts (the "app missing" filter has something to show).
       const missing = l.name === "Green Leaf Landscaping" || l.name === "Starlight Cleaning";
       await db`insert into cl3_app_installs (installation_id, location_id, name, is_installed, version_id, installed_at, seen_at) values (${inst}, ${l.location_id}, ${l.name}, ${!missing}, ${missing ? null : "1.4.0"}, ${missing ? null : at(70)}, now()) on conflict do nothing`;
+    }
+  }
+  // Plan monitor: the SubSync plan and trial on the install rows (one account on a trial that ends in 2 days, one whose plan changed 3 days ago, one removed 3 days ago). Only fills rows that have no plan yet.
+  const planId = GROWTH_PLAN_ID;
+  await db`update cl3_app_installs set plan_id = ${planId}, on_trial = false where installation_id = ${inst} and is_installed and plan_id is null`.catch(() => undefined);
+  const paws = byName.get("Paws & Claws Vet"), blue = byName.get("Blue Door Realty"), oak = byName.get("Oak & Ember Bistro");
+  if (paws) {
+    await db`update cl3_app_installs set on_trial = true where installation_id = ${inst} and location_id = ${paws}`.catch(() => undefined);
+    await db`insert into install_plans (installation_id, location_id, plan_id, on_trial, trial_days, trial_started_at) values (${inst}, ${paws}, ${planId}, true, 14, ${at(12)}) on conflict (installation_id, location_id) do nothing`.catch(() => undefined);
+  }
+  const [pmh] = await db`select count(*)::int n from cl3_history where installation_id = ${inst} and kind = 'app_plan'`.catch(() => [{ n: 1 }]);
+  if (Number(pmh?.n) === 0) {
+    if (blue) await db`insert into cl3_history (installation_id, location_id, kind, from_value, to_value, at) values (${inst}, ${blue}, 'app_plan', 'Earlier test plan', 'Growth plan', ${at(3)})`.catch(() => undefined);
+    if (oak) {
+      await db`update cl3_app_installs set is_installed = false where installation_id = ${inst} and location_id = ${oak}`.catch(() => undefined);
+      await db`insert into cl3_history (installation_id, location_id, kind, at) values (${inst}, ${oak}, 'app_removed', ${at(3)})`.catch(() => undefined);
     }
   }
   const [hist] = await db`select count(*)::int n from cl3_history where installation_id = ${inst}`;
