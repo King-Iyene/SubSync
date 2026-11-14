@@ -39,7 +39,7 @@ export const CONTROL_HOME: Readonly<Record<string, SectionId>> = {
   "connections": "integrations", "my-connections": "integrations", "permissions": "integrations", "watching": "sync",
   "stale-days": "targets", "dormant-days": "targets", "reply-target-hours": "targets", "speed-target": "targets", "automated-touches": "targets", "business-hours": "targets", "inbox-ack-grace": "targets",
   "brand-name": "brand", "brand-colour": "brand",
-  "call-queue-tags": "queues", "call-queue-check": "queues", "call-queue-snapshot": "queues",
+  "call-queue-tags": "queues", "call-queue-check": "queues", "call-queue-snapshot": "queues", "crm-setup": "queues",
   "what-we-store": "privacy", "meeting-privacy": "privacy", "delete-my-data": "privacy", "trust-page": "privacy",
   "sync-status": "sync",
   "links": "advanced", "checklist": "advanced", "ai-keys": "advanced", "settings-history": "advanced",
