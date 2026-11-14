@@ -132,7 +132,7 @@ export const DOC_PAGES: readonly DocPage[] = [
     who: "Owners and administrators for shared tools; each person for their own tools.",
     steps: ["Open Settings, Integrations.", "Read What's connected, then the list of tools.", "Press Connect on a tool, sign in on its own page, and come back.", "Use How this works on any row for its guide."],
     reads: "Only what the connected tool is for: Slack receives alerts, Fathom sends meeting summaries, your AI provider receives short summaries of counts.", changes: "Nothing in your CRM.",
-    sees: ["A personal tool (Fathom, Zoom, Google Meet) belongs to the person who connected it: one connection per person, never visible to anyone else.", "A workspace tool (Slack, the sending address) belongs to the account and needs an administrator."],
+    sees: ["A personal tool (such as your meeting notes tool) belongs to the person who connected it: one connection per person, never visible to anyone else.", "A workspace tool (Slack, the sending address) belongs to the account and needs an administrator."],
     faq: [["Do I need an AI account?", "No. AI is optional and uses your own key, so SubSync never pays for it and you control the spend."]],
     related: ["email-sender-health", "calendars", "alerts", "permissions"], keywords: ["ai", "slack", "fathom", "email", "calendars", "integrations", "openrouter", "anthropic", "openai", "google"] },
   { slug: "email-sender-health", title: "Email sender health", group: "Connections and settings", guideIds: ["conn-email"], tryView: "settings",
