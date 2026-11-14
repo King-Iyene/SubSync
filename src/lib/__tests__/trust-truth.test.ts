@@ -194,8 +194,8 @@ test("the company details are written once and match on every public page", () =
   }
   assert.match(trustText(), new RegExp(COMPANY.legalName));
   assert.match(trustText(), new RegExp(COMPANY.supportEmail.replace(".", "\\.")));
-  assert.match(read("src/app/support/page.tsx"), /COMPANY.supportReply|one business day/, "the support page promises what COMPANY.supportReply says");
-  assert.equal(COMPANY.supportReply, "one business day");
+  assert.match(read("src/app/support/page.tsx"), /COMPANY.supportReply/, "the support page promises what COMPANY.supportReply says");
+  assert.equal(COMPANY.supportReply, "24 hours");
   // Nothing invented: no registration number, address or phone in the constants until King supplies them.
   assert.deepEqual(Object.keys(COMPANY).sort(), ["legalName", "product", "supportEmail", "supportReply"]);
 });

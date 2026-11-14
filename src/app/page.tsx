@@ -6,7 +6,7 @@ import { VideoPlayer } from "@/components/site/video-player";
 import { INSTALL_HREF, PRICING, SITE, VIDEO } from "@/lib/site/config";
 
 export const metadata: Metadata = {
-  title: "SubSync: know what is happening in every account you manage",
+  title: "SubSync: your command center for every client account",
   description: SITE.description,
   alternates: { canonical: "/" },
   openGraph: { title: "SubSync", description: SITE.tagline, url: "/", type: "website", images: [{ url: "/og.png", width: 1200, height: 630, alt: "SubSync" }] },
@@ -73,8 +73,8 @@ export default function Home() {
       <section className="hero">
         <div className="wrap">
           <p className="eyebrow">For agencies, multi-location businesses and single businesses</p>
-          <h1>Know which accounts need you today, before a customer tells you.</h1>
-          <p className="lede">Whether you run one account or a hundred, SubSync watches them and tells you what needs attention first: leads nobody answered, appointments nobody marked, no-shows nobody called back and deals that went quiet.</p>
+          <h1>Your <span className="grad">command center</span> for every client account.</h1>
+          <p className="lede">SubSync shows what needs attention, what it is costing you and what to do next, before a customer tells you. Leads nobody answered, appointments nobody marked, no-shows nobody called back and deals that went quiet. One account or a hundred.</p>
           <div className="cta-row">
             <a className="btn btn-primary" href={INSTALL_HREF}>Install SubSync</a>
             <a className="btn btn-ghost" href="#tour">Watch the 6-minute tour</a>

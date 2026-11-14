@@ -52,6 +52,11 @@ import { LiveStatus, SyncNow } from "./ds/sync-now";
 
 import { TodayView } from "./views/today";
 
+/** The address of the page that frames this app, from the referrer (null when the browser hides it). */
+function parentOrigin(): string | null {
+  try { return document.referrer ? new URL(document.referrer).origin : null; } catch { return null; }
+}
+
 // Round 6 (cold start): every page except Today is loaded when first needed (and warmed on hover and when the browser is idle), so the first paint carries only the shell and Today.
 function ViewLoading() {
   return <div aria-busy="true" aria-label="Loading" className="space-y-3 p-1">{[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-muted/60" />)}</div>;
@@ -235,7 +240,8 @@ export function Dashboard() {
       pending.current = resolve;
       // Perf round: the host page may not be listening yet when the first message goes out (it answers only once its own page is ready), so the request is repeated every 700 ms until it answers;
       // a lost first message no longer costs the whole wait. The first answer wins; later ones find nothing waiting and are ignored.
-      const ask = () => { if (pending.current === resolve) window.parent.postMessage({ message: "REQUEST_USER_DATA" }, "*"); };
+      // The framing page's own address (from the referrer) is the only place the request is sent when it is known; the answer is also checked against it below.
+      const ask = () => { if (pending.current === resolve) window.parent.postMessage({ message: "REQUEST_USER_DATA" }, parentOrigin() ?? "*"); };
       ask();
       const again = setInterval(() => { if (pending.current !== resolve) clearInterval(again); else ask(); }, 700);
       setTimeout(() => {
@@ -268,6 +274,10 @@ export function Dashboard() {
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.source !== window.parent) return;
+      // Only the page that frames us may answer: its address must match the referrer when we know it, and must be https when we do not.
+      // (The payload is also decrypted and checked on the server, so a forged answer could never open a session.)
+      const expected = parentOrigin();
+      if (expected ? event.origin !== expected : !(event.origin.startsWith("https://") || event.origin.startsWith("http://localhost"))) return;
       const data = event.data as { message?: string; payload?: unknown } | null;
       if (data?.message === "REQUEST_USER_DATA_RESPONSE" && typeof data.payload === "string" && pending.current) {
         const resolve = pending.current;
