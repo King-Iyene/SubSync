@@ -276,6 +276,8 @@ export const FEATURES = [
   "safe_writes",
   // More tools (repeating follow-ups, unsent estimate and invoice drafts, email template list, install record, pipeline stage rename), each change behind a preview and a confirm. On by default; writes stay in practice mode until WRITE_GHL_LIVE and the account opt-in.
   "more_tools",
+  // Speed to lead > Missed: missed calls and missed replies, each with aging buckets, from SubSync's own history. Read only. On by default.
+  "missed_board",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

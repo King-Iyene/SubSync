@@ -10,6 +10,8 @@ import { parseFilter } from "../analytics/speed-v4-more";
 import { isStep, speedCoverage, speedJourney, speedJourneyList, speedProof, speedRace, speedStory } from "../analytics/speed-v4-queries";
 import { ladderLeads, ladderPreview, saveLadder, speedBooking } from "../analytics/speed5-queries";
 import { speedPulse } from "../analytics/speed6-queries";
+import { missedBoard } from "../analytics/missed-board";
+import { isBucket, isChannel, isView, type Bucket, type ReplyChannel, type View } from "../analytics/missed-board-rules";
 import { zoneLabel } from "../analytics/speed6";
 import { buildMessage, destination, sanitizeDigest } from "../analytics/speed-digest";
 import { deliver, digestNumbers, loadDigest, saveDigest } from "../analytics/speed-digest-db";
@@ -98,7 +100,7 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
     if (cmp && !cmp.ok) return json({ error: "The comparison range is not valid: " + cmp.error }, 400);
     const out = await speedHome({ installationId: ctx.installationId, allowed: allowedAll, targetMinutes, now, win: w.win, cmp: cmp && cmp.ok ? cmp.win : null, seePeople, canChangeTarget: ctx.kind !== "client" });
     const m = await h.measuring();
-    return json(withUrls({ ...out, measuring: { targetMinutes, countAutomated: m.countAutomated, businessHours: m.businessHours, canChange: ctx.kind !== "client" }, seePeople, ignoredOn: await featureOn("sp_ignored_leads") }, links.contact));
+    return json(withUrls({ ...out, measuring: { targetMinutes, countAutomated: m.countAutomated, businessHours: m.businessHours, canChange: ctx.kind !== "client" }, seePeople, ignoredOn: await featureOn("sp_ignored_leads"), missedOn: await featureOn("missed_board") }, links.contact));
   }
 
   if (part === "list") {
@@ -182,6 +184,25 @@ export async function handleSpeedPart(ctx: Ctx, h: SpeedHelpers): Promise<Respon
     const step = sp.get("step");
     if (!isStep(step)) return json({ error: "Unknown step" }, 400);
     return json(withUrls(await speedJourneyList({ ...input, step, dropped: sp.get("dropped") === "1" }), links.contact));
+  }
+
+  // Missed calls and missed replies (flag missed_board): two separate lists, aggregated and paged in SQL. The accounts come from the session; an account or owner id only narrows inside them.
+  if (part === "missed") {
+    if (!(await featureOn("missed_board"))) return json({ error: "Not available" }, 404);
+    const allowed = narrowed(allowedAll, sp.get("account") ?? sp.get("f_account"));
+    if (allowed === "none") return json({ error: "Unknown account" }, 404);
+    const mode = sp.get("mode") === "replies" ? "replies" : "calls";
+    const view = isView(sp.get("view")) ? (sp.get("view") as View) : "waiting";
+    const owner = sp.get("owner");
+    const size = [20, 50, 100].includes(int(sp.get("size"), 20)) ? int(sp.get("size"), 20) : 20;
+    const to = win.winTo ?? now + DAY, from = win.winFrom ?? now - 30 * DAY;
+    const out = await missedBoard({
+      installationId: ctx.installationId, allowed: allowed as string[] | null, fromMs: from, toMs: Math.min(to, now + DAY), now, mode, view,
+      bucket: isBucket(sp.get("bucket")) ? (sp.get("bucket") as Bucket) : null, channel: mode === "replies" && isChannel(sp.get("channel")) ? (sp.get("channel") as ReplyChannel) : null,
+      owner: seePeople && owner && (owner === "none" || ID.test(owner)) ? owner : null, ownerId: ctx.kind === "client" ? (ctx.session.userId ?? "") : undefined,
+      limit: size, offset: Math.max(0, int(sp.get("page"), 0)) * size,
+    });
+    return json(withUrls({ ...out, mode, size, now }, links.contact));
   }
 
   if (part === "insights" || part === "insight-list") {

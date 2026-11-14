@@ -18,6 +18,7 @@ const REVIEWED_ALWAYS_ON_BASELINE = new Set([
   "pm_checks",
   "safe_writes",
   "more_tools",
+  "missed_board",
 ]);
 
 describe("new features default off", () => {
