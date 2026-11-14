@@ -9,6 +9,8 @@ import {
   certainSafe, countLeads, formDays, formsRollup, funnelsList, intakeAlertList, intakeAsOf, isLeadFlag, listEvents, listGroups, listLeads, listMutes, logEvent, pollStatus, portfolioQuality, scoreDetail, scoreTrend, scoresLatest,
   setMute, sourceByAccount, sourceDays, sourcesRollup, tierCounts, dqSweep, FLAG_LABEL, LEAD_FLAGS, type Scope,
 } from "../analytics/dq-queries";
+import { formHealth, funnelHealth, healthSettings, healthStatus, linkHealth, setHealthSettings } from "../analytics/dq-health-queries";
+import { DEFAULT_DROP_PCT, DEFAULT_MIN_BASELINE, MAX_DROP_PCT, MIN_DROP_PCT, NO_VIEWS } from "../dq/health-core";
 import { PROTECT_WORDS, NOT_KNOWN_LINE, typedMatches } from "../cleanup/cu-core";
 import {
   BULK_MERGE_CAP, DELETE_CAP, DQ_DATE, DQ_VERSION, FORMULA_HOURS, MIN_LEADS, PAGE, TIERS, TIER_HINT, TIER_LABEL, bestWorst, bestWorstLine, bulkMergePhrase, decodeCur, deletePhrase, dialerHours, headlineOf, parseRange, qualityWhy,
@@ -43,7 +45,7 @@ const logAudit = async (inst: string, actor: string | null, action: string, deta
 const SRC = /^[\x20-\x7e]{1,80}$/;
 
 const GET = ["options", "overview", "dupes", "dupe", "intake", "intake-source", "leads", "accounts", "events", "form"];
-const POST = ["decide", "delete", "bulk-merge", "mute", "scan"];
+const POST = ["decide", "delete", "bulk-merge", "mute", "scan", "health-settings"];
 
 async function account(ctx: Ctx, allowed: string[] | null): Promise<{ ok: true; id: string | null } | { ok: false; res: Response }> {
   const v = ctx.url.searchParams.get("account");
@@ -276,7 +278,14 @@ export async function handleDq(ctx: Ctx, h: DqHelpers): Promise<Response | null>
         const [rows, forms, funnels, al, status, asOf, mutes] = await Promise.all([sourcesRollup(s, days), formsRollup(s, days).catch((e) => { if (missing(e)) return []; throw e; }), funnelsList(s).catch(() => []), intakeAlertList(s).catch(() => []), pollStatus(s).catch(() => ({ forms: "never" as const, at: null })), intakeAsOf(s), listMutes(s)]);
         const bw = bestWorst(rows as SourceRow[]);
         const total = rows.reduce((t, r) => t + r.leads, 0);
+        // Lead intake health: low applications per form and survey, funnel pages, redirects and trigger links. Each part says why it is empty (needs permission, not read yet, no data).
+        const hs = await healthSettings(ctx.installationId);
+        const [hForms, hFunnels, hLinks, hStatus] = await Promise.all([
+          formHealth(s, hs).catch((e) => { if (missing(e)) return []; throw e; }), funnelHealth(s).catch(() => []), linkHealth(s).catch(() => ({ rows: [], total: 0, empty: 0 })), healthStatus(s).catch(() => null),
+        ]);
+        const health = { settings: { ...hs, defaultDropPct: DEFAULT_DROP_PCT, defaultMinBaseline: DEFAULT_MIN_BASELINE, minDropPct: MIN_DROP_PCT, maxDropPct: MAX_DROP_PCT }, canChange: adminSide(ctx), forms: hForms, funnels: hFunnels, links: hLinks, status: hStatus, viewsNote: NO_VIEWS };
         return json({
+          health,
           range, days, asOf, minLeads: MIN_LEADS, total, sources: rows, best: bw.best?.label ?? null, worst: bw.worst?.label ?? null, line: bestWorstLine(bw), note: bw.note,
           forms, funnels, formsStatus: status, alerts: alerts ? al : [], mutes, canMute: adminSide(ctx),
           funnelNote: "Views, opt-ins and conversion rates of funnels: Not available from the platform yet. SubSync shows the funnel's structure and the leads whose source carries its name.",
@@ -326,6 +335,18 @@ export async function handleDq(ctx: Ctx, h: DqHelpers): Promise<Response | null>
       const src = typeof body?.src === "string" && SRC.test(body.src) ? body.src.toLowerCase() : "*";
       const days = typeof body?.days === "number" && body.days > 0 && body.days <= 365 ? Math.floor(body.days) : null;
       return (await setMute(ctx.installationId, allowed, loc, src, body?.on !== false, days, h.actor(ctx))) ? json({ ok: true }) : json({ error: "That client account is not available" }, 404);
+    }
+
+    if (m === "POST" && b === "health-settings") {
+      if (!intake) return off();
+      if (!adminSide(ctx)) return json({ error: "Ask your administrator to change this." }, 403);
+      const body = (await ctx.request.json().catch(() => null)) as { dropPct?: unknown; minBaseline?: unknown } | null;
+      const d = Number(body?.dropPct), b2 = Number(body?.minBaseline);
+      if (!Number.isFinite(d) || d < MIN_DROP_PCT || d > MAX_DROP_PCT) return json({ error: `Choose a drop between ${MIN_DROP_PCT}% and ${MAX_DROP_PCT}%.` }, 400);
+      if (!Number.isFinite(b2) || b2 < 1 || b2 > 100) return json({ error: "Choose a smallest usual week between 1 and 100." }, 400);
+      const saved = await setHealthSettings(ctx.installationId, d, b2, h.actor(ctx));
+      await logAudit(ctx.installationId, h.actor(ctx), "dq.health_settings", { ...saved }).catch(() => undefined);
+      return json({ ok: true, ...saved });
     }
 
     // ---------------------------------------------------------------- scores, history, scan
