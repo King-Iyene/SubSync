@@ -32,7 +32,7 @@ Your pipelines and the money in them.
 | Permission | Kind | Required | Why we ask |
 | --- | --- | --- | --- |
 | `opportunities.readonly` | read | required | Deals, pipelines and stages, for open pipeline, stale deals and the account audit. |
-| `opportunities.write` | change | optional | Reserved for a later, previewed action on deals. Nothing in SubSync uses it today. |
+| `opportunities.write` | change | optional | Only to change a deal (stage, status, value, owner, name) or delete one from the Pipeline screen, after a preview. A delete also needs a typed confirmation. Optional. |
 
 ## Conversations and calls
 
@@ -54,7 +54,7 @@ Bookings and what happened to them.
 | `calendars/events.readonly` | read | optional | Appointments and their status (showed, no-show, never marked), for the appointment checks and the no-show list. |
 | `calendars/groups.readonly` | read | optional | Calendar groups, so every calendar can be listed under its group, even one with no bookings. |
 | `calendars/resources.readonly` | read | optional | Reserved for rooms and equipment. Not used yet. |
-| `calendars/events.write` | change | optional | Reserved for marking an appointment showed or no-show after a preview. Nothing in SubSync uses it today. |
+| `calendars/events.write` | change | optional | Only to create, change (status, time, owner, calendar, title) or delete an appointment from the Appointments screen, after a preview. A delete also needs a typed confirmation. Optional. |
 
 ## Team
 
@@ -71,7 +71,7 @@ How your accounts label and follow up on contacts.
 | Permission | Kind | Required | Why we ask |
 | --- | --- | --- | --- |
 | `locations/tags.readonly` | read | optional | Tag names, for hot-lead and cold-list rules. |
-| `locations/customFields.readonly` | read | optional | Reserved for lead-source detail. Not used yet. |
+| `locations/customFields.readonly` | read | optional | The names of your custom fields, so a field shows its name instead of a code. Names only, never the values. |
 
 ## Workflows and campaigns
 
