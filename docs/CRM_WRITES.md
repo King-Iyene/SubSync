@@ -22,3 +22,5 @@ Common guardrails for every row below: the server switch `WRITE_GHL_LIVE` (off u
 | Add a contact to a workflow, create or change workflows | contacts.write, workflows.write, workflows.publish, workflows.delete | `workflow-module/`, `crm-writes.ts` | Preview; typed confirmation and a saved copy for delete | Delete: from saved copy |
 
 What SubSync reads is listed on the Trust page (every permission with its reason). A client's own staff see a read-only view of their own account.
+
+The per-account "Turn on sending" control (Settings > Safety > Sending rules, owners and administrators, typed account name, audit lines message.sending_on / message.sending_off) sets the same account opt-in as "Which clients may be changed"; both read and write locations.cleanup_write_enabled.

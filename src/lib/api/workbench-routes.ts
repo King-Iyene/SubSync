@@ -14,7 +14,7 @@ import { buildOwnerOptions } from "../ghl/owner-list";
 import { installationHasScope } from "../analytics/cleanup-queries";
 import { isOurNote } from "../people/writeback";
 import { liveRoute, findRoute, refreshLead } from "../live/live-route";
-import { bulkRoute, messageRoute, sendStateFor, settingsRoute, templatesRoute } from "./send-routes";
+import { bulkRoute, messageRoute, sendAccountsRoute, sendOptinRoute, sendStateFor, settingsRoute, templatesRoute } from "./send-routes";
 import { crmSource } from "../live/live-read";
 import { cacheConversations } from "../live/live-cache";
 
@@ -156,6 +156,8 @@ export async function handleWorkbench(ctx: Ctx, h: WorkbenchHelpers): Promise<Re
   const sd = { allowed: () => h.allowed(), locationToken: h.locationToken, loadLead: async (loc: string, cid: string) => { const l = await loadLead(ctx, await h.allowed(), loc, cid); return l ? { target: l.target, locationName: l.locationName } : null; } };
   if (m === "POST" && (b === "send-bulk-preview" || b === "send-bulk")) return bulkRoute(ctx, sd, ((await ctx.request.json().catch(() => null)) as Record<string, unknown> | null) ?? {}, b === "send-bulk");
   if (b === "send-settings" && (m === "GET" || m === "POST")) return settingsRoute(ctx, sd);
+  if (b === "send-accounts" && m === "GET") return sendAccountsRoute(ctx, sd);
+  if (b === "send-optin" && m === "POST") return sendOptinRoute(ctx, sd);
   if (b === "send-templates" && (m === "GET" || m === "POST")) return templatesRoute(ctx, sd);
   return json({ error: "Not found" }, 404);
 }

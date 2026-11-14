@@ -92,12 +92,50 @@ export function quietText(tz: string, now: Date, s: Pick<SendSettings, "quietEnd
   return `It is quiet hours where this person is (sending opens at ${String(s.quietEndHour).padStart(2, "0")}:00 their time, in about ${wait} hour${wait === 1 ? "" : "s"}). SubSync cannot schedule a message for later, so write to them then.`;
 }
 
+// ---- what the message box says before anyone types (one plain sentence per state) ----
+export const NOT_AVAILABLE = "Texting and emailing from SubSync is not available in this version yet. You can still read the conversation and open it in your CRM.";
+export const NEEDS_PERMISSION_SEND = "Needs permission: reconnect to allow sending";
+export const PREVIEW_ONLY_LINE = "Preview only: nothing was sent, because sending is not turned on for this account yet. Turn it on in Settings > Sending rules (account owners and admins).";
+export const MASTER_OFF_LINE = "Preview only: nothing was sent, because SubSync has not switched live sending on yet. This account is ready; nothing is wrong on your side.";
+
+/** What turning sending on for one account means, in the words the screen shows before the typed confirmation. */
+export const TURN_ON_MEANS = [
+  "SubSync can send texts and emails to this account's contacts, one person at a time, only when a person presses Send after a preview.",
+  "It never sends to someone who asked not to be contacted. Quiet hours, daily limits and your pause switch still apply.",
+  "This is the same per-account switch that lets SubSync make the other changes you confirm here (tags, notes, fixes).",
+  "A message cannot be taken back once it is sent. You can turn this off again at any time.",
+] as const;
+
+/** The one line shown after a send that was only recorded: "account" means the account's own opt-in is missing, "switch" means SubSync's live switch is off. */
+export const dryRunMessage = (reason: "account" | "switch"): string => (reason === "account" ? PREVIEW_ONLY_LINE : MASTER_OFF_LINE);
+
+export type ComposerFacts = { enabled: boolean; killed: boolean; paused: boolean; needsPermission: boolean; roleOk: boolean; agencyOff: boolean; optedIn: boolean; masterOn: boolean };
+export type ComposerLockId = "feature_off" | "permission" | "role" | "paused" | "killed";
+export type ComposerState = { lock: { id: ComposerLockId; text: string } | null; previewOnly: { id: "account" | "switch"; text: string } | null };
+
+/** The one place that says why the message box is shown, or why it cannot be. Order of check: feature, permission, role, paused, kill switch. When none stops it, the box works; while live sending is not on (the master switch or the account's own opt-in) it works up to the preview and a send is a dry run. */
+export function composerState(f: ComposerFacts): ComposerState {
+  const lock = (id: ComposerLockId, text: string): ComposerState => ({ lock: { id, text }, previewOnly: null });
+  if (!f.enabled) return lock("feature_off", NOT_AVAILABLE);
+  if (f.needsPermission) return lock("permission", NEEDS_PERMISSION_SEND);
+  if (!f.roleOk) return lock("role", f.agencyOff ? "The account has turned off sending by the company that manages it. An owner or administrator of the account can allow it again in Settings > Sending rules." : "Only an account owner or administrator can send from here.");
+  if (f.paused) return lock("paused", "Sending is paused for this account. An owner or administrator can resume it in Settings > Sending rules.");
+  if (f.killed) return lock("killed", "Sending is paused for everyone by SubSync right now. Nothing can be sent.");
+  if (!f.optedIn) return { lock: null, previewOnly: { id: "account", text: PREVIEW_ONLY_LINE } };
+  if (!f.masterOn) return { lock: null, previewOnly: { id: "switch", text: MASTER_OFF_LINE } };
+  return { lock: null, previewOnly: null };
+}
+
+/** Why one way of sending cannot be used for this contact (null when it can). */
+export const channelOffReason = (channel: SendChannel | "WhatsApp", c: { phone: string | null; email: string | null }): string | null =>
+  channel === "Email" ? (c.email ? null : "No email address on this contact") : channel === "SMS" ? (c.phone ? null : "No phone number on this contact") : "WhatsApp is not available from SubSync";
+
 export const dndFor = (d: DndState, channel: SendChannel) => d.all || (channel === "SMS" ? d.sms : d.email);
 
 /** Every reason this send must not go ahead. An empty list means it may. */
 export function guardSend(i: GuardInput): Blocker[] {
   const b: Blocker[] = [];
-  if (!i.enabled) b.push({ id: "off", text: "Sending from SubSync is not switched on." });
+  if (!i.enabled) b.push({ id: "off", text: NOT_AVAILABLE });
   if (i.killed) b.push({ id: "killed", text: "Sending is paused for everyone right now. Nothing was sent." });
   if (i.settings.paused) b.push({ id: "paused", text: "Sending is paused for this account (Settings, Messages)." });
   if (i.scopeGranted !== true) b.push({ id: "needs_permission", text: "Needs permission: reconnect SubSync and allow it to send messages. Nothing was sent." });
