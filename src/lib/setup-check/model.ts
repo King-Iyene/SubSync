@@ -51,6 +51,9 @@ export const SCOPE_OF = {
   tasks: "locations/tasks.readonly", files: "medias.readonly", emailBuilder: "emails/builder.readonly", emailSchedule: "emails/schedule.readonly", numbers: "phonenumbers.read", pools: "numberpools.read", resources: "calendars/resources.readonly",
 } as const;
 
+/** The platform's published description names the file storage permission medias.readonly; the app's permission list names it files.readonly. Either one grants the read. */
+export const ALSO_ACCEPTED: Record<string, string[]> = { "medias.readonly": ["files.readonly"] };
+
 /** What a refusal or a missing answer means. A permission the install never granted is "needs permission"; a refusal despite the permission is the platform's own limit. */
 export function classifyStatus(status: number, scopeGranted: boolean | null): "ok" | "permission" | "unavailable" | "error" {
   if (status >= 200 && status < 300) return "ok";

@@ -1,6 +1,6 @@
 import { GHL_API } from "../ghl/client.ts";
 import { ghlFetch } from "../ghl/http.ts";
-import { classifyStatus, lastFour, SCOPE_OF, type Capped, type Read, type Reads } from "./model.ts";
+import { ALSO_ACCEPTED, classifyStatus, lastFour, SCOPE_OF, type Capped, type Read, type Reads } from "./model.ts";
 
 // Account setup, live reads (docs/features/ACCOUNT_SETUP.md). READ ONLY: every call is a GET, except two that the platform defines as POST searches (open tasks, records of a custom object);
 // both only read. Each answer is reduced to COUNTS inside this file. No name, text, number or id leaves it, except the last four digits of a phone number.
@@ -20,7 +20,8 @@ type Budget = { left: number };
 type Raw = { state: "ok"; body: unknown } | { state: "permission" } | { state: "unavailable" } | { state: "error" };
 
 async function call(c: ReadCtx, b: Budget, scope: string, version: string, path: string, body?: unknown): Promise<Raw> {
-  const granted = c.granted === null ? null : c.granted.includes(scope);
+  const have = c.granted;
+  const granted = have === null ? null : [scope, ...(ALSO_ACCEPTED[scope] ?? [])].some((s) => have.includes(s));
   if (granted === false) return { state: "permission" };
   if (b.left <= 0) return { state: "error" };
   b.left--;

@@ -22,7 +22,7 @@ Read-only checklist per account. Code: src/lib/setup-check (model.ts rules and w
 Notes across an account (only per contact), repeating tasks (only get, make or change by id), features switched on in an account, sending-domain verification (`/email/verify` checks one address and costs credits, so it is not called), the SaaS flag (company-login endpoints only).
 
 ## Names that differ from the brief
-files = `medias.readonly` (not files.readonly); pipelines = `opportunities.readonly` (not pipelines.readonly); templates = `locations/templates.readonly` (no emails/templates.readonly). `notes.readonly`, `recurring-tasks.readonly`, `locations.features.read` and `lc-email.readonly` are not in the published description, so asking for them unlocks nothing SubSync can show. The scopes list and docs/SCOPES.md are owned by the Scopes PR.
+files = `medias.readonly` in the published description; the app asks for `files.readonly`, so the check accepts either name (ALSO_ACCEPTED in model.ts; which name the portal really grants is NOT VERIFIED LIVE); pipelines = `opportunities.readonly` (not pipelines.readonly); templates = `locations/templates.readonly` (no emails/templates.readonly). `notes.readonly`, `recurring-tasks.readonly`, `locations.features.read` and `lc-email.readonly` are not in the published description, so asking for them unlocks nothing SubSync can show. The scopes list and docs/SCOPES.md are owned by the Scopes PR.
 
 ## Privacy
 Counts only. Phone numbers: last four digits. Nothing in the database; a five minute copy of the counts in server memory keyed by company and account. A client's own staff have no access rule for this address.
