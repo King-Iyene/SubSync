@@ -23,8 +23,8 @@ plan.shots.forEach((s, i) => {
   filt += `${last}[${i}:v]xfade=transition=fade:duration=${plan.overlap}:offset=${s.start.toFixed(3)}${lbl};`;
   last = lbl;
 });
-filt += `${last}fade=t=out:st=${(total - 0.7).toFixed(2)}:d=0.7,format=yuv420p[v]`;
-run([...clips.flatMap((c) => ["-i", c]), "-filter_complex", filt, "-map", "[v]", "-r", "30", "-c:v", "libx264", "-crf", "17", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-t", total.toFixed(3), w("video.mp4")]);
+filt += `${last}fade=t=out:st=${(total - 0.7).toFixed(2)}:d=0.7,format=yuv420p[vf];[vf][${clips.length}:v]overlay=enable='lt(t,0.07)':format=auto,format=yuv420p[v]`; // the poster is the first two frames, so it is the cover in players that show frame 1
+run([...clips.flatMap((c) => ["-i", c]), "-i", w("poster-1920.png"), "-filter_complex", filt, "-map", "[v]", "-r", "30", "-c:v", "libx264", "-crf", "17", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-t", total.toFixed(3), w("video.mp4")]);
 console.log("video.mp4 done");
 
 // 2. Voice bus: every line placed at its start time, then loudness-normalised to -16 LUFS (two passes).
@@ -51,7 +51,4 @@ run(["-i", w("music.wav"), "-af", `atrim=0:${total.toFixed(2)},${musicChain(-20)
 const mux = (audio, dest) => run(["-i", w("video.mp4"), "-i", audio, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-t", total.toFixed(3), "-movflags", "+faststart", dest]);
 mux(w("mix-voice.wav"), path.join(OUT, "subsync-preview.mp4"));
 mux(w("mix-silent.wav"), path.join(OUT, "subsync-preview-silent.mp4"));
-// Poster: the closing card with the logo, 1600x900.
-const posterAt = plan.shots.find((s) => s.id === "close").start + 11.0;
-run(["-ss", posterAt.toFixed(2), "-i", w("video.mp4"), "-frames:v", "1", "-vf", "scale=1600:900:flags=lanczos", path.join(OUT, "subsync-preview-poster.png")]);
 console.log("done", total.toFixed(1), "s");

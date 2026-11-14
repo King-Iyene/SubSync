@@ -144,8 +144,23 @@ export const scenes = {
       tick: tickNum("g", 0, 163, t0 + 0.6, t0 + 5.6, (n) => Math.round(n) + " duplicate groups"),
     };
   },
+  // Illustration: a lead waits, the timer grows past the target, and SubSync raises the alert (the screens come next).
+  p_wait: (t0) => {
+    const a = t0 + 1.9, b = t0 + 6.4;
+    return {
+      body: words([["A", ""], ["lead", "ok"], ["is", ""], ["waiting.", "bad"]], t0 + 0.3, 0.3) + svg(`
+        <g class="pop" style="--d:${t0 + 0.9}s"><rect x="130" y="330" width="520" height="270" rx="26" fill="#223029" stroke="${C.sage}" stroke-width="5"/><circle cx="215" cy="420" r="46" fill="${C.skin2}"/><rect x="290" y="392" width="260" height="22" rx="11" fill="${C.cream}"/><rect x="290" y="432" width="190" height="16" rx="8" fill="#4b6a5c"/><rect x="170" y="500" width="150" height="46" rx="23" fill="${C.sageDark}"/><text x="245" y="532" text-anchor="middle" font-size="26" font-weight="700" fill="#fff">New lead</text></g>
+        <g class="fade" style="--d:${t0 + 1.6}s"><rect x="760" y="340" width="900" height="30" rx="15" fill="#1d2a25"/><rect id="bar" x="760" y="340" width="0" height="30" rx="15" fill="${C.sage}"/><rect x="${760 + 900 * 15 / 180}" y="322" width="6" height="66" rx="3" fill="#fff"/><text x="${760 + 900 * 15 / 180 + 14}" y="316" font-size="30" font-weight="700" fill="#cfe3da">Target: 15 min</text></g>
+        <g class="pop" style="--d:${t0 + 5.0}s"><g transform="translate(1030 745) rotate(-6)"><rect x="-210" y="-52" width="420" height="104" rx="14" fill="none" stroke="${C.red}" stroke-width="9"/><text x="0" y="22" text-anchor="middle" font-size="66" font-weight="900" fill="${C.red}">PAST TARGET</text></g></g>
+        <g class="pop" style="--d:${t0 + 6.6}s"><circle cx="1750" cy="220" r="64" fill="#223029" stroke="${C.sage}" stroke-width="5"/><path d="M1750 188 q-30 0 -30 34 v22 l-12 14 h84 l-12 -14 v-22 q0 -34 -30 -34z" fill="${C.cream}"/><circle cx="1750" cy="282" r="9" fill="${C.cream}"/><circle cx="1790" cy="178" r="22" fill="${C.red}"/><text x="1790" y="187" text-anchor="middle" font-size="26" font-weight="800" fill="#fff">1</text></g>
+        <circle class="ring" style="--d:${t0 + 6.7}s" cx="1750" cy="220" r="64" fill="none" stroke="${C.amber}" stroke-width="6"/><circle class="ring" style="--d:${t0 + 7.2}s" cx="1750" cy="220" r="64" fill="none" stroke="${C.amber}" stroke-width="6"/>`) +
+        `<div class="counter fade" id="wt" style="left:760px;top:420px;font-size:170px;color:${C.sage};--d:${t0 + 1.8}s">0 min</div><div class="bubble amber" style="left:1290px;top:300px;--d:${t0 + 8.6}s;font-size:36px;display:none">x</div>` +
+        `<div class="bubble" style="left:1290px;top:310px;--d:${t0 + 6.9}s;font-size:40px">SubSync spotted it</div>`,
+      tick: `{const p=Math.max(0,Math.min(1,(t-${a})/(${b}-${a})));const m=Math.round(160*(1-Math.pow(1-p,1.6)));const e=document.getElementById("wt");if(e){e.textContent=m<60?m+" min":Math.floor(m/60)+"h "+String(m%60).padStart(2,"0")+"m";e.style.color=m<15?"${C.sage}":m<45?"${C.amber}":"${C.red}";}const bar=document.getElementById("bar");if(bar){bar.setAttribute("width",String(Math.min(900,900*m/180)));bar.setAttribute("fill",m<15?"${C.sage}":m<45?"${C.amber}":"${C.red}");}}`,
+    };
+  },
   p_client: (t0) => ({
-    body: words([["Your", ""], ["client", "ok"], ["finds", ""], ["out", ""], ["first.", "bad"]], t0 + 0.2, 0.3) + svg(`
+    body: words([["Your", ""], ["customer", "ok"], ["finds", ""], ["out", ""], ["first.", "bad"]], t0 + 0.2, 0.3) + svg(`
       ${desk(300, 690, 520, 130)}${laptop(380, 690)}
       ${person({ x: 520, y: 790, s: 1.05, mood: "surprised", legs: false, shirt: C.sage, arms: "up", b: 1 })}
       <g>${desk(300, 690, 520, 130)}${laptop(400, 690)}</g>

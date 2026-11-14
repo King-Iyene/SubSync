@@ -1,71 +1,78 @@
-# SubSync preview video v2: script and timing
+# SubSync preview video v3: script and timing
 
-Voice: Kokoro-82M, voice `af_heart`, speed 0.95 (local, CPU). 453 spoken words, total length 3:05.5 (185.5 s), 1920x1080, 30 fps. Captions on screen are these exact words, cut into short pieces. The first 0:56.9 is the animated pain-point story, then the turn to SubSync, then one chapter per feature.
+Voice: Kokoro-82M, voice `af_heart`, speed 0.95 (local, CPU). 630 spoken words, total length 4:09.3 (249.3 s), 1920x1080, 30 fps. Captions are these exact words, cut into short pieces (none on the closing card, which carries its own words). Order: animated pain story, product intro, ten modules, call to action.
 
 ## Shots and timing
 
 | Start | Length | Shot | What is on screen |
 |---|---|---|---|
-| 0:00.0 | 7.8 s | p_owner | Pain 1: the busy owner, the phone that never stops (animated people and objects) |
-| 0:07.2 | 10.4 s | p_leads | Pain 2: a lead waits, the clock ticks, they walk away (3 days, no reply) |
-| 0:17.0 | 7.4 s | p_appts | Pain 3: a calendar of unmarked appointments (4 with no outcome) |
-| 0:23.8 | 6.0 s | p_noshow | Pain 4: the empty chair, NO-SHOW stamp, 0 calls back |
-| 0:29.1 | 6.7 s | p_deals | Pain 5: deal cards turn grey and fall out of the pipeline |
-| 0:35.2 | 7.0 s | p_dupes | Pain 6: the same contact multiplies (163 duplicate groups) |
-| 0:41.5 | 8.3 s | p_reports | Pain 7: reports piled up by hand, month end |
-| 0:49.3 | 8.2 s | p_client | Pain 8: the client walks in angry, the owner is the last to know |
-| 0:56.9 | 15.2 s | what | The turn: the real SubSync logo alone, and the one-breath explanation |
-| 1:11.5 | 14.3 s | today | Chapter: Today (what to do first, money at risk). Screen: 01-today |
-| 1:25.2 | 10.3 s | speed | Chapter: Speed to lead (who is waiting, call first). Screen: 02-speed-to-lead |
-| 1:34.9 | 16.4 s | appts | Chapter: Appointments (true show rate, unmarked, no-shows, flow tree). Screens: 03, 17 |
-| 1:50.7 | 12.2 s | funnel | Chapter: Pipeline funnel (where deals sit, biggest leak, replay). Screen: 11 |
-| 2:02.3 | 10.9 s | find | Chapter: Find a lead (search, going cold, call lists). Screens: 06, 22 |
-| 2:12.6 | 11.2 s | clean | Chapter: Clean-up and duplicates (163 groups, typed confirmation). Screen: 09 |
-| 2:23.2 | 8.9 s | clients | Chapter: Clients and Money (all accounts, past-due plans, failed payments). Screens: 04, 05 |
-| 2:31.5 | 10.8 s | audit | Chapter: Account audit and Team. Screens: 07, 08 |
-| 2:41.7 | 10.1 s | alerts | Alerts: the real Slack message, an email in the same style, the CRM list it opens |
-| 2:51.2 | 14.3 s | close | Close: your brand, preview-confirm-undo, free 14 days, the logo |
+| 0:00.0 | 9.4 s | p_owner | Pain 1: phone never stops, everyone wants an answer (animated people and objects) |
+| 0:08.8 | 10.3 s | p_leads | Pain 2: a lead waits, the clock ticks, they go elsewhere |
+| 0:18.5 | 7.4 s | p_appts | Pain 3: a calendar of unmarked appointments |
+| 0:25.2 | 6.0 s | p_noshow | Pain 4: the empty chair, NO-SHOW stamp, 0 calls back |
+| 0:30.6 | 6.7 s | p_deals | Pain 5: deal cards turn grey and fall out of the pipeline |
+| 0:36.6 | 7.0 s | p_dupes | Pain 6: the same contact multiplies |
+| 0:43.0 | 8.3 s | p_reports | Pain 7: reports built by hand, month end |
+| 0:50.7 | 7.9 s | p_client | Pain 8: a customer comes back, you are the last to know |
+| 0:58.1 | 17.9 s | what | Product intro: the real SubSync logo alone, and what it does in one breath |
+| 1:15.3 | 20.0 s | today | Module 1 TODAY: real screen 01, money-at-risk counter, quiet deals, accounts to save, open one |
+| 1:34.7 | 9.5 s | p_wait | Module 2 SPEED (drawing): a lead waits, the timer passes the target, SubSync spots it |
+| 1:43.6 | 12.9 s | speed | Module 2 SPEED TO LEAD: real screens 02 and the call list, 13 past target, longest wait first |
+| 1:55.9 | 17.8 s | appts | Module 3 APPOINTMENTS: screens 03, no-show list, flow tree 17 (zoomed to the tree) |
+| 2:13.1 | 15.4 s | funnel | Module 4 FUNNEL: screen 11 (replay controls, biggest leak, click a step), screen 12 (deals with no value) |
+| 2:27.9 | 12.5 s | find | Module 5 FIND A LEAD: screens 06 (typed search) and 22 (going cold) |
+| 2:39.8 | 21.4 s | clean | Module 6 CLEAN-UP: screen 09 (163 groups, Certain/Likely/Possible), two labelled drawings (record compare, preview-confirm-undo) |
+| 3:00.7 | 12.1 s | clients | Module 7 CLIENTS: screens 04 and 05 (all connected accounts, past due, payments) |
+| 3:12.2 | 19.1 s | audit | Module 8 ACCOUNT AUDIT: screen 07 (estimate, how it is worked out, what to fix, copy/print/sample) |
+| 3:30.6 | 11.9 s | team | Module 9 TEAM: screen 08 (scorecards, 3 things need you, 4 leads waiting) |
+| 3:41.9 | 13.9 s | alerts | Module 10 ALERTS: in-app bell, the real Slack message, an email in the same style, the CRM list it opens |
+| 3:55.2 | 14.1 s | close | Call to action: logo, SubSync, the exact call-to-action words, Install once, Free for 14 days |
 
 ## Voice-over, line by line
 
 | Start | Shot | Line | Spoken words |
 |---|---|---|---|
-| 0:00.5 | p_owner | P1 | You run a busy agency. Your phone never stops buzzing, and every client wants an answer, right now. |
-| 0:07.7 | p_leads | P2 | A new lead comes in, and nobody answers. A lead that waits an hour is far less likely to reply. Three days later, they have hired someone else. |
-| 0:17.5 | p_appts | P3 | Appointments come and go, and nobody marks what happened. Was it a show, or a no-show? Nobody knows. |
-| 0:24.3 | p_noshow | P4 | The no-shows never get a call back. They just sit in the calendar, and slip away. |
-| 0:29.6 | p_deals | P5 | Good deals sit untouched, until they quietly turn grey, and fall out of the pipeline. |
-| 0:35.7 | p_dupes | P6 | Meanwhile, the same contact turns up again, and again, and again, clogging your CRM. |
-| 0:42.0 | p_reports | P7 | And every month, you build the reports by hand. You are not careless. You just cannot watch every account, all day. |
-| 0:49.8 | p_client | P8 | Then your client walks in, and tells you something you did not know. And you find out when the client tells you. |
-| 0:57.4 | what | W1 | SubSync fixes that. |
-| 0:59.9 | what | W2 | It watches every client account, finds what is going wrong, and puts a dollar figure on it. |
-| 1:06.3 | what | W3 | Then it tells you what to do first, inside your CRM, under your own name. |
-| 1:12.1 | today | T1 | Every morning, where do you start? Today tells you. It lists the accounts to save first, and what is at risk: about seven hundred and fifty-one thousand dollars, in eighty-seven quiet deals. |
-| 1:25.8 | speed | S1 | Speed to lead shows who is waiting, and for how long. Thirteen new leads are past your target, so you call the longest wait first. |
-| 1:35.5 | appts | A1 | Appointments tells the truth. Four have no outcome marked, so your real show rate is fifty-seven percent, and eight no-shows are waiting to be won back. The flow tree shows which person, or calendar, loses your bookings. |
-| 1:51.3 | funnel | F1 | The funnel shows where deals sit, and the biggest leak. Replay it day by day, and click any step to open those deals. Deals with no value still show up. |
-| 2:02.9 | find | D1 | Find a lead searches every client account at once, with leads that never had a reply, leads going cold, and ready-made call lists. |
-| 2:13.2 | clean | C1 | Clean-up found one hundred and sixty-three duplicate groups, sorted by how sure it is. Nothing is deleted until you type a confirmation. |
-| 2:23.8 | clients | M1 | Clients puts every client account on one screen. Five need you now, and two paid plans are past due. |
-| 2:32.1 | audit | U1 | The account audit puts a monthly dollar figure on what your accounts are losing. The team page shows who is slow, and who earns the money. |
-| 2:42.3 | alerts | N1 | Alerts reach you in Slack or email, with a link that opens the right account in your CRM. You know before your client does. |
-| 2:51.8 | close | X1 | It wears your brand, not ours. It only changes things after a preview and a confirmation, and you can undo it. Install it once. Free for fourteen days. |
+| 0:00.5 | p_owner | P1 | Whether you run one business or fifty, it feels the same. Your phone never stops buzzing, and everyone wants an answer, right now. |
+| 0:09.3 | p_leads | P2 | A new lead comes in, and nobody answers. A lead that waits an hour is far less likely to reply. Three days later, they have gone elsewhere. |
+| 0:19.0 | p_appts | P3 | Appointments come and go, and nobody marks what happened. Was it a show, or a no-show? Nobody knows. |
+| 0:25.7 | p_noshow | P4 | The no-shows never get a call back. They just sit in the calendar, and slip away. |
+| 0:31.1 | p_deals | P5 | Good deals sit untouched, until they quietly turn grey, and fall out of the pipeline. |
+| 0:37.1 | p_dupes | P6 | Meanwhile, the same contact turns up again, and again, and again, clogging your CRM. |
+| 0:43.5 | p_reports | P7 | And every month, you build the reports by hand. You are not careless. You just cannot watch every account, all day. |
+| 0:51.2 | p_client | P8 | Then a customer comes back, and tells you something you did not know. And you find out when they tell you. |
+| 0:58.6 | what | W1 | SubSync brings it all together. |
+| 1:01.5 | what | W2 | It connects to every business you manage, watches your leads and appointments, finds what is going wrong, and puts a dollar figure on it. |
+| 1:10.6 | what | W3 | Then it shows you what to do first, with all your accounts in one place. |
+| 1:15.9 | today | T1 | Every morning, start with Today. It shows which connected accounts need attention, and what is at risk: about seven hundred and fifty-one thousand dollars, across eighty-seven quiet deals. Below it are the accounts to save first. Open one, and you know exactly where to focus. |
+| 1:35.2 | p_wait | S0 | Here is how a lead gets lost. A new lead arrives. Nobody replies. The timer keeps growing, and soon it is past your target. |
+| 1:44.2 | speed | S1 | Speed to lead catches it. Thirteen new leads are past your target right now. Each one shows how long it has waited, so you know who to call first, longest wait on top. |
+| 1:56.5 | appts | A1 | Appointments tell the truth. Four have no outcome marked, so your real show rate is fifty-seven percent. Eight no-shows are waiting to be won back, with a list to call. And the flow tree shows which person, or which calendar, is losing your bookings. |
+| 2:13.7 | funnel | F1 | The funnel shows where every deal sits, step by step, and where the biggest leak is. Replay it day by day. Click any step to open the deals there. And deals with no value still show up, so nothing hides. |
+| 2:28.5 | find | D1 | Need one lead? Find a lead searches every connected account at once. It shows leads that never had a reply, leads going cold, and ready-made call lists. |
+| 2:40.4 | clean | C1 | Duplicates clog the CRM, and merging by hand is scary. Clean-up found one hundred and sixty-three duplicate groups, sorted by how sure it is: certain, likely, or possible. You preview every change first, bigger changes ask you to type a confirmation, and you can undo. You stay in control. |
+| 3:01.3 | clients | M1 | Clients puts all your connected accounts on one screen. Five need you now, and two paid plans are past due. Payments are right there too, with the money at risk. |
+| 3:12.8 | audit | U1 | The account audit checks every account today. It estimates what you are losing, about two hundred and fifty-eight thousand dollars a month here, with the working one tap away, and lists what to fix first. You can copy a summary, print it, or see a sample to send a client. |
+| 3:31.2 | team | Y1 | Team shows who follows up fast, and who is overloaded. Here, three things need you today, and one person has four leads waiting more than two hours. |
+| 3:42.5 | alerts | N1 | And you do not have to keep checking. Alerts reach you in the app, in Slack, or by email. Each one says what is wrong, what to do next, and links straight to the right account in your CRM. |
+| 3:55.8 | close | X1 | Bring your connected accounts together. Know what's happening, see what needs attention and take action with SubSync. Install once. Free for 14 days. |
 
 ## Rules followed
 
-- Plain words, speaks to the agency owner, "client accounts" (never sub-accounts), no vendor names.
-- Numbers are spoken only when they are on screen (751,385 dollars and 87 quiet deals, 13 new leads, 4 unmarked, 57 percent, 8 no-shows, 163 duplicate groups, 5 need you now, 2 past due). "3 days, no reply" in the story is illustrative. "A lead that waits an hour is far less likely to reply" is a general statement, with no figure.
-- The real logo (assets/brand/subsync-logo-main-transparent.png) sits alone on the dark background, in its own colours.
-- The Slack picture is King's real test message (assets/video-in/real-slack-alert.png), upscaled; the account name in it is his own test account.
+- Positioning: connected accounts and every business you manage, for agency operators and single businesses alike. No claims about branding or naming; the words are about connected accounts and the leads, appointments and deals in them.
+- Only live features are shown or claimed: in-app alerts, Slack and email. Nothing is sent to leads in the video.
+- Numbers are spoken only when they are on the screen being shown ($751,385 and 87 quiet deals, 13 new leads, 4 unmarked, 57 percent, 8 no-shows, 163 duplicate groups, 5 need you now and 2 past due, about $258,064 a month (an estimate), 3 things need you and 4 leads waiting). The "3 days" and timer in the drawings are illustrative.
+- Every module step is tied to a phrase of the voice line, so highlights land as the words are spoken.
+- Drawings are labelled (the duplicate pair, the preview-confirm-undo steps) and never replace the product screens.
+- The typed search ("Harper") is an overlay on the real search box of the Find a lead screen; the results shown are the real screen's.
+- The real logo (assets/brand/subsync-logo-main-transparent.png) sits alone on the dark background. The chat message is King's real test alert.
 
 ## Rebuild
 
 1. `node scripts/video/logo-cutout.mjs <logo.png> assets/brand/subsync-logo-main-transparent.png`
-2. `python tts.py scripts/video/script.json <work>/wav` (Kokoro), `python music.py <work>/music.wav 225`
+2. `python tts.py scripts/video/script.json <work>/wav` (Kokoro), `python music.py <work>/music.wav 262`
 3. `node scripts/video/plan.mjs <work>`
-4. `node scripts/video/record-anim.mjs <work>` (animated scenes, frame by frame, no server)
-5. `node scripts/video/record.mjs <work>` (chapters, alerts, close; set STILLS to a copy of the listing pictures)
-6. `node scripts/video/compose.mjs <work> assets/video-out`
+4. `node scripts/video/record-anim.mjs <work>` (animated scenes, frame by frame)
+5. `node scripts/video/record.mjs <work>` (STILLS = a copy of the listing pictures plus p-race2.png and p-noshow.png)
+6. `node scripts/video/poster.mjs <stills> <out> <work>`, then `node scripts/video/compose.mjs <work> assets/video-out`
 
 No server, demo data fill or database connection is used anywhere.

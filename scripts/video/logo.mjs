@@ -9,7 +9,7 @@ export const logoCss = (t0, h = 520, left = 300, top = 190) => `<style>
 
 // The turn to SubSync: the logo and the one-breath explanation.
 export function whatScene(t0, w2, w3) {
-  const chips = [["Watches every client account", w2], ["Finds what is going wrong", w2 + 1.6], ["Puts a dollar figure on it", w2 + 3.2], ["Tells you what to do first", w3], ["Under your own name", w3 + 2.6]];
+  const chips = [["Connects every business you manage", w2], ["Watches leads and appointments", w2 + 1.8], ["Finds what is going wrong", w2 + 3.6], ["Puts a dollar figure on it", w2 + 5.4], ["Shows what to do first", w3]];
   return {
     body: logoCss(t0 + 0.1, 560, 300, 150) + `<style>.chip{position:absolute;left:960px;padding:20px 34px;border-radius:20px;background:#1b2b25;border:2px solid #3d6b58;color:#eaf4ef;font-size:48px;font-weight:700;opacity:0;animation:pop .5s cubic-bezier(.2,.9,.3,1.2) forwards}</style>
     <img class="lg" src="data:image/png;base64,${logoData()}"><div class="wm" style="left:230px;top:740px;width:560px;text-align:center;animation-delay:${t0 + 0.8}s">SubSync</div>` + chips.map(([c, d], i) => `<div class="chip" style="top:${230 + i * 112}px;animation-delay:${d.toFixed(2)}s">${c}</div>`).join(""),

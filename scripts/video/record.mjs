@@ -61,7 +61,7 @@ async function record(id, choreo) {
   const T = { at, lineStart: (lid) => sp.lines.find((l) => l.id === lid).clipStart, lineEnd: (lid) => { const l = sp.lines.find((x) => x.id === lid); return l.clipStart + l.dur; } };
 
   const captions = (async () => {
-    for (const l of sp.lines) {
+    for (const l of (id === "close" ? [] : sp.lines)) { // the closing card carries its own words, so no caption strip
       const chunks = id === "hook" ? [{ t: plan.lines.find((x) => x.id === l.id).text, kind: "hook" }] : l.chunks.map((t) => ({ t }));
       const total = chunks.reduce((a, c) => a + c.t.length, 0);
       let acc = 0;
