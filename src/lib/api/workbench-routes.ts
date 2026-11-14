@@ -16,6 +16,7 @@ import { isOurNote } from "../people/writeback";
 import { liveRoute, findRoute, refreshLead } from "../live/live-route";
 import { bulkRoute, messageRoute, sendAccountsRoute, sendOptinRoute, sendStateFor, settingsRoute, templatesRoute } from "./send-routes";
 import { crmSource } from "../live/live-read";
+import { ourTaskIds } from "./safe-writes-routes";
 import { cacheConversations } from "../live/live-cache";
 
 // The Lead workbench endpoints, under /api/app/workbench/... (the one catch-all route, already guarded by the plan and by access.ts). Every handler derives who is asking from the
@@ -341,7 +342,10 @@ async function recordRoute(ctx: Ctx, h: WorkbenchHelpers): Promise<Response> {
     }
     if (part === "tasks") {
       const list = (Array.isArray(j.tasks) ? j.tasks : []) as Array<Record<string, unknown>>;
-      return json({ state: "ok", note: null, items: list.slice(0, 100).map((t) => ({ id: str(t.id), title: str(t.title) ?? "Task", due: str(t.dueDate), done: t.completed === true, by: who(t.assignedTo) })) });
+      // "deletable": SubSync made this task and the person is an administrator (a delete needs the name typed back). Anything else can only be marked done.
+      const adminSide = ctx.kind !== "client" || ctx.session.role === "admin";
+      const mine = adminSide ? await ourTaskIds(ctx.installationId, locationId, list.slice(0, 100).map((t) => str(t.id)).filter((x): x is string => !!x)) : new Set<string>();
+      return json({ state: "ok", note: null, items: list.slice(0, 100).map((t) => ({ id: str(t.id), title: str(t.title) ?? "Task", due: str(t.dueDate), done: t.completed === true, by: who(t.assignedTo), deletable: mine.has(str(t.id) ?? "") })) });
     }
     const orders = (Array.isArray(j.data) ? j.data : []) as Array<Record<string, unknown>>;
     return json({ state: "ok", note: null, items: orders.slice(0, 20).map((o) => ({ id: str(o._id) ?? str(o.id), title: str(o.name) ?? str(o.sourceName) ?? "Order", amount: typeof o.amount === "number" ? o.amount : null, currency: str(o.currency), status: str(o.status) ?? str(o.paymentStatus), at: str(o.createdAt) })) });

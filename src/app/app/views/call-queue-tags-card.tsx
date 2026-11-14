@@ -7,6 +7,7 @@ import { remember } from "../ds/remember";
 import { useApiClient, useData } from "../session";
 import { Badge, Btn, Card, inputClass } from "../ui";
 import { GUIDE_REQUEST_KEY } from "./st-state";
+import { CreateTagButton, CrmSetupCard } from "./safe-writes-ui";
 
 // Settings, Call queues. The tag names that start each call queue in one account, a check that the CRM is set up, and (agency only, when switched on) the optional one-click setup.
 // The workflows only give your own team a call task. Everything that changes is previewed first; reset is a change too.
@@ -106,10 +107,12 @@ export function CallQueueTagsCard() {
         {result && (
           <div className="mt-3" data-testid="cq-result">
             <p className="text-sm font-medium">{result.summary}</p>
-            <ul className="mt-1 space-y-1 text-sm">{result.lines.map((l) => <li key={l.id} className="flex flex-wrap items-center gap-2"><Badge tone={tone(l.state)}>{l.state === "found" ? "Found" : l.state === "missing" ? "Not yet" : "Reconnect"}</Badge><span>{l.text}</span></li>)}</ul>
+            <ul className="mt-1 space-y-1 text-sm">{result.lines.map((l) => <li key={l.id} className="flex flex-wrap items-center gap-2"><Badge tone={tone(l.state)}>{l.state === "found" ? "Found" : l.state === "missing" ? "Not yet" : "Reconnect"}</Badge><span>{l.text}</span>{l.state === "missing" && l.id.startsWith("tag:") && canEdit && d && <CreateTagButton locationId={loc} name={d.tags[l.id.slice(4) as QueueKey] ?? ""} onDone={() => void check()} />}</li>)}</ul>
           </div>
         )}
       </Card>
+
+      {loc && canEdit && <CrmSetupCard locationId={loc} />}
 
       {d?.snapshot.show && (
         <Card title="One-click setup (optional)">
