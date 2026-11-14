@@ -149,11 +149,11 @@ function compose() {
   let t = 0;
   for (const s of scenes) {
     const wav = path.join(WORK, "wav", `${s.id}.wav`), img = path.join(WORK, "img", `${s.id}.png`);
-    const narr = wavSeconds(wav), lead = 0.5, tail = s.kind === "card" ? 1.6 : 1.0, dur = lead + narr + tail;
+    const TEMPO = 1.08, narr = wavSeconds(wav) / TEMPO, lead = 0.35, tail = s.kind === "card" ? 1.2 : 0.8, dur = lead + narr + tail;
     const clip = path.join(WORK, "clips", `${s.id}.mp4`);
     const zoom = s.kind === "screen" ? `scale=2880:-2,zoompan=z='1+0.00028*on':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${W}x${H}:fps=30,` : `scale=${W}:${H},fps=30,`;
     execFileSync(FFMPEG, ["-y", "-loglevel", "error", "-framerate", "30", "-loop", "1", "-t", dur.toFixed(3), "-i", img, "-i", wav,
-      "-filter_complex", `[0:v]${zoom}format=yuv420p[v];[1:a]adelay=${Math.round(lead * 1000)}|${Math.round(lead * 1000)},apad=whole_dur=${dur.toFixed(3)},aformat=sample_rates=44100:channel_layouts=stereo[a]`,
+      "-filter_complex", `[0:v]${zoom}format=yuv420p[v];[1:a]atempo=${TEMPO},adelay=${Math.round(lead * 1000)}|${Math.round(lead * 1000)},apad=whole_dur=${dur.toFixed(3)},aformat=sample_rates=44100:channel_layouts=stereo[a]`,
       "-map", "[v]", "-map", "[a]", "-t", dur.toFixed(3), "-c:v", "libx264", "-crf", "20", "-preset", "medium", "-c:a", "aac", "-b:a", "160k", "-r", "30", clip], { stdio: "inherit" });
     list.push(`file '${clip.replace(/\\/g, "/")}'`);
     const sentences = s.text.match(/[^.!?]+[.!?]+/g) || [s.text];
@@ -165,7 +165,7 @@ function compose() {
   }
   fs.writeFileSync(path.join(WORK, "list.txt"), list.join("\n"));
   const out = path.join(OUT, "subsync-scopes.mp4");
-  execFileSync(FFMPEG, ["-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", path.join(WORK, "list.txt"), "-c", "copy", "-movflags", "+faststart", out], { stdio: "inherit" });
+  execFileSync(FFMPEG, ["-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", path.join(WORK, "list.txt"), "-c:v", "copy", "-af", "loudnorm=I=-16:LRA=11:TP=-1.5", "-c:a", "aac", "-b:a", "160k", "-ar", "44100", "-movflags", "+faststart", out], { stdio: "inherit" });
   fs.writeFileSync(path.join(OUT, "subsync-scopes.vtt"), `WEBVTT\n\n${cues.join("\n\n")}\n`);
   fs.copyFileSync(path.join(WORK, "img", "S00.png"), path.join(OUT, "subsync-scopes-poster.png"));
   const mb = (fs.statSync(out).size / 1048576).toFixed(1);

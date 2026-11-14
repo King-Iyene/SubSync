@@ -1,160 +1,667 @@
 {
  "title": "What SubSync asks for, and why",
  "scenes": [
-  { "id": "S00", "kind": "card", "style": "intro", "title": "What SubSync asks for, and why",
-    "sub": "Reads your accounts. Changes only after a preview and a confirm. Sends a message only when a person presses Send.",
-    "text": "SubSync shows agencies and businesses what needs attention in their client accounts. It reads your accounts. It changes something only after a preview and a confirm. And it sends a message only when a person presses Send. Here is why each permission is asked for.",
-    "caption": "Reads your accounts. Changes only after you preview and confirm. Sends only when a person presses Send." },
-  { "id": "S01", "kind": "screen", "go": { "hash": "speed" },
-    "text": "This is SubSync. Every number on screen comes from the permissions in this video. The accounts here are made-up examples.",
-    "caption": "Example accounts. No real customer data." },
-
-  { "id": "G1C", "kind": "card", "title": "1. Accounts and sign-in", "badge": "7 required",
-    "rows": [
-      { "k": "read", "label": "Account names, time zones, contact details", "scopes": ["locations.readonly"] },
-      { "k": "read", "label": "Which accounts SubSync is installed on", "scopes": ["oauth.readonly"] },
-      { "k": "change", "label": "A key limited to one account at a time (the platform has no read-only way)", "scopes": ["oauth.write"] },
-      { "k": "read", "label": "People, with tags, source and owner", "scopes": ["contacts.readonly"] },
-      { "k": "read", "label": "Deals, pipelines and stages", "scopes": ["opportunities.readonly"] },
-      { "k": "read", "label": "The conversation list, never the message text", "scopes": ["conversations.readonly"] },
-      { "k": "read", "label": "Which calendars exist", "scopes": ["calendars.readonly"] }
+  {
+   "id": "S00",
+   "kind": "card",
+   "style": "intro",
+   "title": "What SubSync asks for, and why",
+   "sub": "Reads your accounts. Changes only after a preview and a confirm. Sends a message only when a person presses Send.",
+   "text": "SubSync shows what needs attention in your client accounts. It reads your accounts. It changes something only after a preview and a confirm. And it sends a message only when a person presses Send.",
+   "caption": "Reads your accounts. Changes only after you preview and confirm. Sends only when a person presses Send."
+  },
+  {
+   "id": "S01",
+   "kind": "screen",
+   "go": {
+    "hash": "speed"
+   },
+   "text": "This is SubSync, with made-up example accounts. Next, each group of permissions, and why we ask.",
+   "caption": "Example accounts. No real customer data."
+  },
+  {
+   "id": "G1C",
+   "kind": "card",
+   "title": "1. Accounts and sign-in",
+   "badge": "7 required",
+   "rows": [
+    {
+     "k": "read",
+     "label": "Account names, time zones, contact details",
+     "scopes": [
+      "locations.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Which accounts SubSync is installed on",
+     "scopes": [
+      "oauth.readonly"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "A key limited to one account at a time (the platform has no read-only way)",
+     "scopes": [
+      "oauth.write"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "People, with tags, source and owner",
+     "scopes": [
+      "contacts.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Deals, pipelines and stages",
+     "scopes": [
+      "opportunities.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "The conversation list, never the message text",
+     "scopes": [
+      "conversations.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Which calendars exist",
+     "scopes": [
+      "calendars.readonly"
+     ]
+    }
+   ],
+   "text": "One. Accounts and sign-in. Seven permissions are required: your accounts, contacts, deals, conversations and calendars, plus a key limited to one account at a time.",
+   "caption": "Seven required permissions: we read to show every number against the right account."
+  },
+  {
+   "id": "G1S",
+   "kind": "screen",
+   "go": {
+    "hash": "accounts"
+   },
+   "text": "We read the account list, so each number sits under the right account.",
+   "caption": "We read your accounts to show each number under the right account."
+  },
+  {
+   "id": "G2C",
+   "kind": "card",
+   "title": "2. Contacts, tags and notes",
+   "badge": "optional",
+   "rows": [
+    {
+     "k": "read",
+     "label": "Tag names, for hot-lead and cold-list rules",
+     "scopes": [
+      "locations/tags.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Names of your custom fields, never the values",
+     "scopes": [
+      "locations/customFields.readonly"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "Add a note, a tag or a task result on one contact",
+     "scopes": [
+      "contacts.write"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "Create a missing call queue tag",
+     "scopes": [
+      "locations/tags.write"
+     ]
+    }
+   ],
+   "text": "Two. Contacts, tags and notes. We read tag and field names, never the values. We change a contact only after a preview and a confirm.",
+   "caption": "We read tag names. We change a contact only after you preview and confirm."
+  },
+  {
+   "id": "G2S",
+   "kind": "screen",
+   "go": {
+    "hash": "calls"
+   },
+   "text": "Call lists use contacts and tags to rank who to call first.",
+   "caption": "We read contacts and tags to build your call lists."
+  },
+  {
+   "id": "G3C",
+   "kind": "card",
+   "title": "3. Conversations and messages",
+   "badge": "optional",
+   "rows": [
+    {
+     "k": "read",
+     "label": "Who wrote to a lead, and when, a person or an automation. Text is never stored",
+     "scopes": [
+      "conversations/message.readonly"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "Send one text or email, only when a person presses Send, after a preview",
+     "scopes": [
+      "conversations/message.write"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "Delete one junk conversation, after a preview and a typed count",
+     "scopes": [
+      "conversations.write"
+     ]
+    }
+   ],
+   "text": "Three. Conversations and messages. We read who wrote and when, never the text. A message goes out only when a person presses Send.",
+   "caption": "We read who replied and when. A message goes out only when a person presses Send."
+  },
+  {
+   "id": "G3S",
+   "kind": "screen",
+   "go": {
+    "hash": "inbox"
+   },
+   "text": "Unanswered messages shows who is still waiting for a reply, and for how long.",
+   "caption": "We read message times to show who is still waiting."
+  },
+  {
+   "id": "G4C",
+   "kind": "card",
+   "title": "4. Appointments and calendars",
+   "badge": "optional",
+   "rows": [
+    {
+     "k": "read",
+     "label": "Appointments and their status: showed, no-show, never marked",
+     "scopes": [
+      "calendars/events.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Calendar groups",
+     "scopes": [
+      "calendars/groups.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Rooms and equipment (for the Account setup check)",
+     "scopes": [
+      "calendars/resources.readonly"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "Create, change or delete an appointment, after a preview (a delete needs typing)",
+     "scopes": [
+      "calendars/events.write"
+     ]
+    }
+   ],
+   "text": "Four. Appointments. We read their status. We change one only after a preview, and a delete needs typing.",
+   "caption": "We read appointments to find ones nobody marked. Changes need a preview and a confirm."
+  },
+  {
+   "id": "G4S",
+   "kind": "screen",
+   "go": {
+    "hash": "appointments"
+   },
+   "text": "Appointments lists the ones that need an outcome.",
+   "caption": "We read appointment status to show what needs an outcome."
+  },
+  {
+   "id": "G5C",
+   "kind": "card",
+   "title": "5. Deals and pipelines",
+   "badge": "optional",
+   "rows": [
+    {
+     "k": "change",
+     "label": "Change a deal (stage, status, value, owner) or delete one, after a preview",
+     "scopes": [
+      "opportunities.write"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "Create the standard sales pipeline, only when an account has none",
+     "scopes": [
+      "pipelines.create"
+     ]
+    }
+   ],
+   "text": "Five. Deals and pipelines. We read deals to find stale ones. We change a deal only after a preview, and a delete needs typing.",
+   "caption": "We read deals to find stale ones. We change a deal only after a preview and a confirm."
+  },
+  {
+   "id": "G5S",
+   "kind": "screen",
+   "go": {
+    "hash": "pipeline"
+   },
+   "text": "Pipeline and deals shows the money in each step, and the deals that stopped moving.",
+   "caption": "We read deals and stages to show stale deals."
+  },
+  {
+   "id": "G6C",
+   "kind": "card",
+   "title": "6. Workflows",
+   "badge": "optional",
+   "rows": [
+    {
+     "k": "read",
+     "label": "The list of workflows and their state",
+     "scopes": [
+      "workflows.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "How many times each ran and how many steps failed",
+     "scopes": [
+      "workflows.logs"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Campaign lists and delivery totals, never who received what",
+     "scopes": [
+      "campaigns.readonly",
+      "emails/campaigns.readonly",
+      "emails/stats.readonly"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "Rename or copy a workflow",
+     "scopes": [
+      "workflows.write"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "Publish or pause",
+     "scopes": [
+      "workflows.publish"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "Delete, after typing its name and a saved copy",
+     "scopes": [
+      "workflows.delete"
+     ]
+    }
+   ],
+   "text": "Six. Workflows. We read runs, failures and campaign totals. We change a workflow only after a preview and a confirm.",
+   "caption": "We read workflow runs to find broken ones. We change one only after a preview and a confirm."
+  },
+  {
+   "id": "G6S",
+   "kind": "screen",
+   "go": {
+    "hash": "workflows"
+   },
+   "text": "The Workflows page flags failing and idle workflows across all accounts.",
+   "caption": "We read workflow runs to show which ones failed or went idle."
+  },
+  {
+   "id": "G7C",
+   "kind": "card",
+   "title": "7. Money",
+   "badge": "all read only",
+   "dense": true,
+   "rows": [
+    {
+     "k": "read",
+     "label": "Payments, repeat payments, invoices",
+     "scopes": [
+      "payments/transactions.readonly",
+      "payments/subscriptions.readonly",
+      "invoices.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Credit balance of each account",
+     "scopes": [
+      "wallet.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Orders and coupons",
+     "scopes": [
+      "payments/orders.readonly",
+      "payments/coupons.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Payment provider connected, live or test",
+     "scopes": [
+      "payments/integration.readonly",
+      "payments/custom-provider.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Products, prices, collections",
+     "scopes": [
+      "products.readonly",
+      "products/prices.readonly",
+      "products/collection.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Invoice schedules, templates, estimates",
+     "scopes": [
+      "invoices/schedule.readonly",
+      "invoices/template.readonly",
+      "invoices/estimate.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Charges apps made",
+     "scopes": [
+      "charges.readonly"
+     ]
+    }
+   ],
+   "text": "Seven. Money. All read only: payments, invoices, orders, products. SubSync cannot charge, refund or send an invoice.",
+   "caption": "Money is read only. SubSync cannot charge, refund or send an invoice."
+  },
+  {
+   "id": "G7S",
+   "kind": "screen",
+   "go": {
+    "hash": "payments",
+    "click": [
+     "Money checks"
     ],
-    "text": "One. Accounts and sign-in. Seven permissions are required. We read your account names and time zones, the accounts SubSync is installed on, and your contacts, deals, conversations and calendars. One more gives us a key limited to a single account, because the platform has no read-only way to do that.",
-    "caption": "Seven required permissions: we read to show every number against the right account." },
-  { "id": "G1S", "kind": "screen", "go": { "hash": "accounts" },
-    "text": "We read the account list, so each number sits under the right account.", "caption": "We read your accounts to show each number under the right account." },
-
-  { "id": "G2C", "kind": "card", "title": "2. Contacts, tags and notes", "badge": "optional",
-    "rows": [
-      { "k": "read", "label": "Tag names, for hot-lead and cold-list rules", "scopes": ["locations/tags.readonly"] },
-      { "k": "read", "label": "Names of your custom fields, never the values", "scopes": ["locations/customFields.readonly"] },
-      { "k": "change", "label": "Add a note, a tag or a task result on one contact", "scopes": ["contacts.write"] },
-      { "k": "change", "label": "Create a missing call queue tag", "scopes": ["locations/tags.write"] }
+    "scrollTo": "Invoices"
+   },
+   "text": "Money checks looks at one account at a time, read live, and stores nothing.",
+   "caption": "We read invoices, orders and products to show money problems."
+  },
+  {
+   "id": "G8C",
+   "kind": "card",
+   "title": "8. Lead intake",
+   "badge": "optional, read only",
+   "rows": [
+    {
+     "k": "read",
+     "label": "Form and survey names and when each was submitted, never the answers",
+     "scopes": [
+      "forms.readonly",
+      "surveys.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Funnel names, their steps and pages",
+     "scopes": [
+      "funnels/funnel.readonly",
+      "funnels/page.readonly",
+      "funnels/pagecount.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Redirects and trigger links",
+     "scopes": [
+      "funnels/redirect.readonly",
+      "links.readonly"
+     ]
+    }
+   ],
+   "text": "Eight. Lead intake. We read form and funnel names and times, never the answers, and find links with an empty target.",
+   "caption": "We read form and funnel names and times, never the answers."
+  },
+  {
+   "id": "G8S",
+   "kind": "screen",
+   "go": {
+    "hash": "cleanup",
+    "click": [
+     "Lead intake"
     ],
-    "text": "Two. Contacts, tags and notes. We read tag names and custom field names, never the values. We change a contact only when you press a button and confirm a preview, for example to add a note.",
-    "caption": "We read tag names. We change a contact only after you preview and confirm." },
-  { "id": "G2S", "kind": "screen", "go": { "hash": "calls" },
-    "text": "Call lists use contacts and tags to rank who to call first.", "caption": "We read contacts and tags to build your call lists." },
-
-  { "id": "G3C", "kind": "card", "title": "3. Conversations and messages", "badge": "optional",
-    "rows": [
-      { "k": "read", "label": "Who wrote to a lead, and when, a person or an automation. Text is never stored", "scopes": ["conversations/message.readonly"] },
-      { "k": "change", "label": "Send one text or email, only when a person presses Send, after a preview", "scopes": ["conversations/message.write"] },
-      { "k": "change", "label": "Delete one junk conversation, after a preview and a typed count", "scopes": ["conversations.write"] }
+    "scrollTo": "Applications this week"
+   },
+   "text": "Lead intake warns you when a form stops bringing leads. It reads names and times only, never the answers.",
+   "caption": "We read form and funnel names and times, never the answers."
+  },
+  {
+   "id": "G9C",
+   "kind": "card",
+   "title": "9. Setup and team",
+   "badge": "optional",
+   "dense": true,
+   "rows": [
+    {
+     "k": "read",
+     "label": "Team member names",
+     "scopes": [
+      "users.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Custom values, text and email templates",
+     "scopes": [
+      "locations/customValues.readonly",
+      "locations/templates.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Files and saved email designs, scheduled emails: counts only",
+     "scopes": [
+      "files.readonly",
+      "emails/builder.readonly",
+      "emails/schedule.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Phone numbers (last four digits) and number pools",
+     "scopes": [
+      "phonenumbers.read",
+      "numberpools.read"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Custom record types and their counts, open tasks",
+     "scopes": [
+      "objects/schema.readonly",
+      "objects/record.readonly",
+      "locations/tasks.readonly"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "Save one reply target value, after a preview",
+     "scopes": [
+      "locations/customValues.write"
+     ]
+    }
+   ],
+   "text": "Nine. Setup and team. We read names and counts. Phone numbers show four digits. One small change saves your reply target, after a preview.",
+   "caption": "We read counts and names to show what an account is missing."
+  },
+  {
+   "id": "G9S",
+   "kind": "screen",
+   "go": {
+    "hash": "onboarding",
+    "click": [
+     "Account setup"
+    ]
+   },
+   "text": "Account setup lists what each client account has, and what is still missing.",
+   "caption": "We read counts and names to show what is set up and what is missing."
+  },
+  {
+   "id": "G9T",
+   "kind": "screen",
+   "go": {
+    "hash": "settings",
+    "click": [
+     "Targets"
     ],
-    "text": "Three. Conversations and messages. We read who wrote to a lead and when, so we can time the first reply. We never store the text. A message is sent only when a person presses Send, and a delete needs a typed count.",
-    "caption": "We read who replied and when. A message goes out only when a person presses Send." },
-  { "id": "G3S", "kind": "screen", "go": { "hash": "inbox" },
-    "text": "Unanswered messages shows who is still waiting for a reply, and for how long.", "caption": "We read message times to show who is still waiting." },
-
-  { "id": "G4C", "kind": "card", "title": "4. Appointments and calendars", "badge": "optional",
-    "rows": [
-      { "k": "read", "label": "Appointments and their status: showed, no-show, never marked", "scopes": ["calendars/events.readonly"] },
-      { "k": "read", "label": "Calendar groups", "scopes": ["calendars/groups.readonly"] },
-      { "k": "read", "label": "Rooms and equipment (for the Account setup check)", "scopes": ["calendars/resources.readonly"] },
-      { "k": "change", "label": "Create, change or delete an appointment, after a preview (a delete needs typing)", "scopes": ["calendars/events.write"] }
+    "scrollTo": "Call queue tags"
+   },
+   "text": "In Settings, Call queues, we change a tag or a value only after you preview it and confirm.",
+   "caption": "We change a tag or value only after you preview and confirm."
+  },
+  {
+   "id": "G10C",
+   "kind": "card",
+   "title": "10. Plan monitor",
+   "badge": "optional",
+   "rows": [
+    {
+     "k": "read",
+     "label": "Which accounts are installed, their plan and trial flag",
+     "scopes": [
+      "oauth.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "The last charge made through the platform's billing",
+     "scopes": [
+      "charges.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "Installer details: kept for later, not called today",
+     "scopes": [
+      "marketplace-installer-details.readonly"
+     ]
+    },
+    {
+     "k": "read",
+     "label": "One plan permission: kept for later, it unlocks no read yet",
+     "scopes": [
+      "saas/location.read"
+     ]
+    }
+   ],
+   "text": "Ten. Plan monitor. We read the installed accounts and the last charge. Two permissions here are kept for later.",
+   "caption": "We read plans and charges. Two permissions here are kept for later."
+  },
+  {
+   "id": "G10S",
+   "kind": "screen",
+   "go": {
+    "hash": "clients",
+    "click": [
+     "Money and plans"
     ],
-    "text": "Four. Appointments and calendars. We read appointments and their status, to find ones nobody marked. We create, change or delete an appointment only after a preview, and a delete needs a typed confirmation.",
-    "caption": "We read appointments to find ones nobody marked. Changes need a preview and a confirm." },
-  { "id": "G4S", "kind": "screen", "go": { "hash": "appointments" },
-    "text": "Appointments lists the ones that need an outcome.", "caption": "We read appointment status to show what needs an outcome." },
-
-  { "id": "G5C", "kind": "card", "title": "5. Deals and pipelines", "badge": "optional",
-    "rows": [
-      { "k": "change", "label": "Change a deal (stage, status, value, owner) or delete one, after a preview", "scopes": ["opportunities.write"] },
-      { "k": "change", "label": "Create the standard sales pipeline, only when an account has none", "scopes": ["pipelines.create"] }
-    ],
-    "text": "Five. Deals and pipelines. The deals themselves are read with the required permission. We change a deal only after a preview, and a delete needs a typed confirmation. One optional permission creates a standard pipeline, only when an account has none.",
-    "caption": "We read deals to find stale ones. We change a deal only after a preview and a confirm." },
-  { "id": "G5S", "kind": "screen", "go": { "hash": "pipeline" },
-    "text": "Pipeline and deals shows the money in each step, and the deals that stopped moving.", "caption": "We read deals and stages to show stale deals." },
-
-  { "id": "G6C", "kind": "card", "title": "6. Workflows", "badge": "optional",
-    "rows": [
-      { "k": "read", "label": "The list of workflows and their state", "scopes": ["workflows.readonly"] },
-      { "k": "read", "label": "How many times each ran and how many steps failed", "scopes": ["workflows.logs"] },
-      { "k": "read", "label": "Campaign lists and delivery totals, never who received what", "scopes": ["campaigns.readonly", "emails/campaigns.readonly", "emails/stats.readonly"] },
-      { "k": "change", "label": "Rename or copy a workflow", "scopes": ["workflows.write"] },
-      { "k": "change", "label": "Publish or pause", "scopes": ["workflows.publish"] },
-      { "k": "change", "label": "Delete, after typing its name and a saved copy", "scopes": ["workflows.delete"] }
-    ],
-    "text": "Six. Workflows. We read the list, run counts and failed steps, and campaign totals, to find ones that broke. We rename, copy, publish, pause or delete a workflow only after a preview and a confirm.",
-    "caption": "We read workflow runs to find broken ones. We change one only after a preview and a confirm." },
-  { "id": "G6S", "kind": "screen", "go": { "hash": "workflows" },
-    "text": "The Workflows page flags failing and idle workflows across all accounts.", "caption": "We read workflow runs to show which ones failed or went idle." },
-
-  { "id": "G7C", "kind": "card", "title": "7. Money", "badge": "all read only", "dense": true,
-    "rows": [
-      { "k": "read", "label": "Payments, repeat payments, invoices", "scopes": ["payments/transactions.readonly", "payments/subscriptions.readonly", "invoices.readonly"] },
-      { "k": "read", "label": "Credit balance of each account", "scopes": ["wallet.readonly"] },
-      { "k": "read", "label": "Orders and coupons", "scopes": ["payments/orders.readonly", "payments/coupons.readonly"] },
-      { "k": "read", "label": "Payment provider connected, live or test", "scopes": ["payments/integration.readonly", "payments/custom-provider.readonly"] },
-      { "k": "read", "label": "Products, prices, collections", "scopes": ["products.readonly", "products/prices.readonly", "products/collection.readonly"] },
-      { "k": "read", "label": "Invoice schedules, templates, estimates", "scopes": ["invoices/schedule.readonly", "invoices/template.readonly", "invoices/estimate.readonly"] },
-      { "k": "read", "label": "Charges apps made", "scopes": ["charges.readonly"] }
-    ],
-    "text": "Seven. Money. All read only. We read payments, invoices, orders, coupons, products and prices, to show late invoices and problems in how an account takes money. SubSync cannot charge, refund or send an invoice.",
-    "caption": "Money is read only. SubSync cannot charge, refund or send an invoice." },
-  { "id": "G7S", "kind": "screen", "go": { "hash": "payments", "click": ["Money checks"], "scrollTo": "Invoices" },
-    "text": "Money checks looks at one account at a time, read live, and stores nothing.", "caption": "We read invoices, orders and products to show money problems." },
-
-  { "id": "G8C", "kind": "card", "title": "8. Lead intake", "badge": "optional, read only",
-    "rows": [
-      { "k": "read", "label": "Form and survey names and when each was submitted, never the answers", "scopes": ["forms.readonly", "surveys.readonly"] },
-      { "k": "read", "label": "Funnel names, their steps and pages", "scopes": ["funnels/funnel.readonly", "funnels/page.readonly", "funnels/pagecount.readonly"] },
-      { "k": "read", "label": "Redirects and trigger links", "scopes": ["funnels/redirect.readonly", "links.readonly"] }
-    ],
-    "text": "Eight. Lead intake. We read the names of forms, surveys and funnels, and when each was submitted, never the answers. We also read funnel pages, redirects and trigger links, to find one with an empty target.",
-    "caption": "We read form and funnel names and times, never the answers." },
-  { "id": "G8S", "kind": "screen", "go": { "hash": "cleanup", "click": ["Lead intake"], "scrollTo": "Applications this week" },
-    "text": "Lead intake warns you when a form stops bringing leads. It reads names and times only, never the answers.", "caption": "We read form and funnel names and times, never the answers." },
-
-  { "id": "G9C", "kind": "card", "title": "9. Setup and team", "badge": "optional", "dense": true,
-    "rows": [
-      { "k": "read", "label": "Team member names", "scopes": ["users.readonly"] },
-      { "k": "read", "label": "Custom values, text and email templates", "scopes": ["locations/customValues.readonly", "locations/templates.readonly"] },
-      { "k": "read", "label": "Files and saved email designs, scheduled emails: counts only", "scopes": ["files.readonly", "emails/builder.readonly", "emails/schedule.readonly"] },
-      { "k": "read", "label": "Phone numbers (last four digits) and number pools", "scopes": ["phonenumbers.read", "numberpools.read"] },
-      { "k": "read", "label": "Custom record types and their counts, open tasks", "scopes": ["objects/schema.readonly", "objects/record.readonly", "locations/tasks.readonly"] },
-      { "k": "change", "label": "Save one reply target value, after a preview", "scopes": ["locations/customValues.write"] }
-    ],
-    "text": "Nine. Setup and team. We read team names, templates, files, phone numbers, tasks and custom records, as counts and names. Phone numbers show only the last four digits. One small change saves your reply target, after a preview.",
-    "caption": "We read counts and names to show what an account is missing." },
-  { "id": "G9S", "kind": "screen", "go": { "hash": "onboarding", "click": ["Account setup"] },
-    "text": "Account setup lists what each client account has, and what is still missing.", "caption": "We read counts and names to show what is set up and what is missing." },
-  { "id": "G9T", "kind": "screen", "go": { "hash": "settings", "click": ["Targets"], "scrollTo": "Call queue tags" },
-    "text": "In Settings, Call queues, we change a tag or a value only after you preview it and confirm.", "caption": "We change a tag or value only after you preview and confirm." },
-
-  { "id": "G10C", "kind": "card", "title": "10. Plan monitor", "badge": "optional",
-    "rows": [
-      { "k": "read", "label": "Which accounts are installed, their plan and trial flag", "scopes": ["oauth.readonly"] },
-      { "k": "read", "label": "The last charge made through the platform's billing", "scopes": ["charges.readonly"] },
-      { "k": "read", "label": "Installer details: kept for later, not called today", "scopes": ["marketplace-installer-details.readonly"] },
-      { "k": "read", "label": "One plan permission: kept for later, it unlocks no read yet", "scopes": ["saas/location.read"] }
-    ],
-    "text": "Ten. Plan monitor. We read which accounts are installed and the last charge, to show each plan, trial days left, and an uninstall. Installer details and one plan permission are kept for later, and nothing uses them today.",
-    "caption": "We read plans and charges. Two permissions here are kept for later." },
-  { "id": "G10S", "kind": "screen", "go": { "hash": "clients", "click": ["Money and plans"], "scrollTo": "Plan monitor" },
-    "text": "Plan monitor warns you when a trial is about to end, or an account leaves.", "caption": "We read plan and install status to warn about trials and uninstalls." },
-
-  { "id": "E1", "kind": "card", "title": "What we do not ask for", "badge": "not requested",
-    "rows": [
-      { "k": "none", "label": "Adding, changing or removing team members", "scopes": ["users.write"] },
-      { "k": "none", "label": "Reading your clients' own plans and payments (company level only)", "scopes": ["saas/company.read"] },
-      { "k": "none", "label": "Sending invoices. The resend button is switched off", "scopes": ["invoice sending"] }
-    ],
-    "text": "What we do not ask for. We never ask to add or remove team members. We never ask to read your clients' own plans. And SubSync does not send invoices.",
-    "caption": "Not requested: users.write, saas/company.read, invoice sending." },
-  { "id": "E2", "kind": "card", "title": "Kept for upcoming features", "badge": "18 permissions", "dense": true, "keep": true,
-    "rows": [
-      { "k": "read", "label": "Read permissions with no screen yet", "scopes": ["locations.features.read", "conversations/reports.readonly", "saas/location.read", "marketplace-installer-details.readonly", "pipelines.readonly", "notes.readonly", "recurring-tasks.readonly", "lc-email.readonly", "emails/templates.readonly"] },
-      { "k": "change", "label": "Change permissions with no screen yet", "scopes": ["conversations/livechat.write", "locations/tasks.write", "recurring-tasks.write", "notes.write", "pipelines.write", "invoices.write", "invoices/schedule.write", "invoices/template.write", "invoices/estimate.write"] }
-    ],
-    "text": "Kept for upcoming features. Eighteen permissions have no screen yet. Nothing uses them today, and any future use will show a preview first.",
-    "caption": "Kept for upcoming features. Nothing uses these today." },
-  { "id": "E3", "kind": "card", "style": "outro", "title": "Your data stays yours",
-    "sub": "Uninstall SubSync and we delete the keys and the copied data.",
-    "text": "When you uninstall SubSync, we delete the keys and the data we copied. Thank you for watching.",
-    "caption": "Uninstall SubSync and we delete the keys and the copied data." }
+    "scrollTo": "Plan monitor"
+   },
+   "text": "Plan monitor warns you when a trial is about to end, or an account leaves.",
+   "caption": "We read plan and install status to warn about trials and uninstalls."
+  },
+  {
+   "id": "E1",
+   "kind": "card",
+   "title": "What we do not ask for",
+   "badge": "not requested",
+   "rows": [
+    {
+     "k": "none",
+     "label": "Adding, changing or removing team members",
+     "scopes": [
+      "users.write"
+     ]
+    },
+    {
+     "k": "none",
+     "label": "Reading your clients' own plans and payments (company level only)",
+     "scopes": [
+      "saas/company.read"
+     ]
+    },
+    {
+     "k": "none",
+     "label": "Sending invoices. The resend button is switched off",
+     "scopes": [
+      "invoice sending"
+     ]
+    }
+   ],
+   "text": "What we do not ask for. We never ask to manage team members or to read your clients own plans. And SubSync does not send invoices.",
+   "caption": "Not requested: users.write, saas/company.read, invoice sending."
+  },
+  {
+   "id": "E2",
+   "kind": "card",
+   "title": "Kept for upcoming features",
+   "badge": "18 permissions",
+   "dense": true,
+   "keep": true,
+   "rows": [
+    {
+     "k": "read",
+     "label": "Read permissions with no screen yet",
+     "scopes": [
+      "locations.features.read",
+      "conversations/reports.readonly",
+      "saas/location.read",
+      "marketplace-installer-details.readonly",
+      "pipelines.readonly",
+      "notes.readonly",
+      "recurring-tasks.readonly",
+      "lc-email.readonly",
+      "emails/templates.readonly"
+     ]
+    },
+    {
+     "k": "change",
+     "label": "Change permissions with no screen yet",
+     "scopes": [
+      "conversations/livechat.write",
+      "locations/tasks.write",
+      "recurring-tasks.write",
+      "notes.write",
+      "pipelines.write",
+      "invoices.write",
+      "invoices/schedule.write",
+      "invoices/template.write",
+      "invoices/estimate.write"
+     ]
+    }
+   ],
+   "text": "Kept for upcoming features: eighteen permissions with no screen yet. Nothing uses them today, and any future use will show a preview first.",
+   "caption": "Kept for upcoming features. Nothing uses these today."
+  },
+  {
+   "id": "E3",
+   "kind": "card",
+   "style": "outro",
+   "title": "Your data stays yours",
+   "sub": "Uninstall SubSync and we delete the keys and the copied data.",
+   "text": "When you uninstall SubSync, we delete the keys and the data we copied. Thank you for watching.",
+   "caption": "Uninstall SubSync and we delete the keys and the copied data."
+  }
  ]
 }
