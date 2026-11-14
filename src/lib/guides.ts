@@ -1,7 +1,7 @@
 import { CONCEPT_GUIDES } from "./concept-guides.ts";
 // Short guides, one per page: what it shows, how to read it, what to do next. About 60 seconds each. Plain words for agency owners, setters and business owners.
 // Pure data. `view` is the menu page the guide belongs to (the ? button and the empty-state link find it from the address).
-export type Guide = { id: string; view: string; title: string; shows: string; read: string[]; next: string; tabs?: string[]; more?: { title: string; read: string[] }; /** The page the "Try it now" button opens (a menu id). */ tryView?: string };
+export type Guide = { id: string; view: string; title: string; shows: string; read: string[]; next: string; tabs?: string[]; more?: { title: string; read: string[] }; /** The page the "Try it now" button opens (a menu id). */ tryView?: string; /** Pictures for the guide: a path under /guides and the caption that says what the picture shows. A picture that is not there yet is simply not drawn. */ shots?: { src: string; caption: string }[] };
 
 const PAGE_GUIDES: readonly Guide[] = [
   { id: "today", view: "today", title: "Today", shows: "What needs you first, ranked, with the reason and a link to the person or deal.", tabs: ["Today", "Proof", "Numbers"],

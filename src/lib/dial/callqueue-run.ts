@@ -10,6 +10,7 @@ import { keyOf } from "./dial";
 import { clampCfg, cleanQueueTag, DEFAULT_TAG, planQueue, planSend, WORKFLOW_ID_RE, WRITES_PER_MIN, type Cand, type Plan } from "./callqueue";
 import { execute, type Done, type Route } from "./callqueue-exec";
 import { setupState, type SetupState } from "./powerdialer";
+import { ownTags, saveQueueTags } from "../call-queue-tags/store";
 
 // CRM call queue, server side (docs/features/DIALQUEUE.md). SubSync cannot start a call itself: it fills the CRM's own queue (a tag a customer workflow listens for, or a workflow enrolment)
 // through the one write gateway (WRITE_GHL_LIVE + the account's opt-in; off, every call is a "WOULD WRITE" line). Tables come from the not-yet-applied migration 20261116090000: until it
@@ -20,7 +21,15 @@ export const DEFAULT_LISTS = ["missed", "new_unanswered", "hot_uncontacted", "no
 const missing = (e: unknown) => ["42P01", "42703"].includes((e as { code?: string })?.code ?? "");
 const defaults = (locationId: string): Settings => ({ locationId, route: "tag", tag: DEFAULT_TAG, workflowId: null, autoOn: false, paused: false, lists: DEFAULT_LISTS, maxPerRun: 25, maxPerDay: 100, windowStart: 9, windowEnd: 20, lastRunAt: null, lastAdded: 0 });
 
+/** The call-now tag the account chose under Settings, Call queues wins over the one saved here earlier; the default applies when neither exists. */
 export async function getSettings(installationId: string, locationId: string): Promise<{ ready: boolean; s: Settings }> {
+  const r = await getSettingsRaw(installationId, locationId);
+  if (!r.ready) return r;
+  const own = (await ownTags(installationId, locationId)).call_now;
+  return own ? { ready: true, s: { ...r.s, tag: own } } : r;
+}
+
+async function getSettingsRaw(installationId: string, locationId: string): Promise<{ ready: boolean; s: Settings }> {
   try {
     const [r] = await sql()`select * from call_queue_settings where installation_id = ${installationId} and location_id = ${locationId}`;
     if (!r) return { ready: true, s: defaults(locationId) };
@@ -44,6 +53,8 @@ export async function saveSettings(installationId: string, locationId: string, p
     values (${installationId}, ${locationId}, ${route}, ${tag}, ${wf}, ${autoOn}, ${paused}, ${lists}::text[], ${c.maxPerRun}, ${c.maxPerDay}, ${c.window.start}, ${c.window.end}, now())
     on conflict (installation_id, location_id) do update set route = excluded.route, tag = excluded.tag, workflow_id = excluded.workflow_id, auto_on = excluded.auto_on, paused = excluded.paused, lists = excluded.lists,
       max_per_run = excluded.max_per_run, max_per_day = excluded.max_per_day, window_start = excluded.window_start, window_end = excluded.window_end, updated_at = now()`;
+  // The call-now tag has one home (Settings, Call queues): a tag saved from the call queue panel is stored there too, so the two screens never disagree.
+  if (p.tag !== undefined) await saveQueueTags(installationId, locationId, { call_now: tag }, "call queue settings").catch(() => undefined);
   return { ok: true, s: (await getSettings(installationId, locationId)).s };
 }
 

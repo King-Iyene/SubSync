@@ -266,6 +266,7 @@ export const FEATURES = [
   "bf_forecast",
   "bf_recover",
   "bf_today",
+  "cq_snapshot",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

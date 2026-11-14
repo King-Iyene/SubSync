@@ -2,7 +2,7 @@
 // Pure: no database, no React. The screen draws one section at a time; every control keeps its meaning and its name.
 import type { AccessKind } from "./access.ts";
 
-export type SectionId = "team" | "notifications" | "integrations" | "targets" | "brand" | "privacy" | "sync" | "advanced";
+export type SectionId = "team" | "notifications" | "integrations" | "targets" | "brand" | "queues" | "privacy" | "sync" | "advanced";
 
 export type Section = {
   id: SectionId;
@@ -17,6 +17,7 @@ export const SECTIONS: readonly Section[] = [
   // Shown as visible tabs in this order (stage SHELL): Replies, Brand, Notifications, Integrations, Team, Data, then the two technical ones.
   { id: "targets", title: "Replies", hint: "How fast your team should reply, and what counts as late, stale or gone quiet.", kinds: ["agency", "business"] },
   { id: "brand", title: "Brand", hint: "Your name and colour on screens, reports and share links.", kinds: ["agency", "business"] },
+  { id: "queues", title: "Call queues", hint: "The tag names that start your call queues, and a check that your CRM is set up.", kinds: ["agency", "business"] },
   { id: "notifications", title: "Notifications", hint: "Where alerts and the daily and weekly summaries go, and when.", kinds: ["agency", "business"] },
   { id: "integrations", title: "Integrations", hint: "Connect your own tools once, see who on your team has connected, and what SubSync may read.", kinds: ["agency", "business"] },
   { id: "team", title: "Team", hint: "Who can open SubSync, and which client accounts are left out of every number.", kinds: ["agency", "business"] },
@@ -38,6 +39,7 @@ export const CONTROL_HOME: Readonly<Record<string, SectionId>> = {
   "connections": "integrations", "my-connections": "integrations", "permissions": "integrations", "watching": "sync",
   "stale-days": "targets", "dormant-days": "targets", "reply-target-hours": "targets", "speed-target": "targets", "automated-touches": "targets", "business-hours": "targets", "inbox-ack-grace": "targets",
   "brand-name": "brand", "brand-colour": "brand",
+  "call-queue-tags": "queues", "call-queue-check": "queues", "call-queue-snapshot": "queues",
   "what-we-store": "privacy", "meeting-privacy": "privacy", "delete-my-data": "privacy", "trust-page": "privacy",
   "sync-status": "sync",
   "links": "advanced", "checklist": "advanced", "ai-keys": "advanced", "settings-history": "advanced",

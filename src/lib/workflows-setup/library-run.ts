@@ -7,6 +7,15 @@ import { preview, type PlanInput, type Preview } from "./library";
 import { getSetupSettings, grantedFor, storeFor } from "./run";
 import { provision, type Result } from "./provisioner";
 import type { Template } from "./templates";
+import { getQueueTags } from "../call-queue-tags/store";
+import type { QueueKey } from "../call-queue-tags/tags";
+
+// The tag each library workflow listens for is the account's own choice (Settings, Call queues), else the template default.
+const TEMPLATE_QUEUE: Record<string, QueueKey> = { call_queue: "call_now", speed_breach_task: "first_reply", noshow_task: "no_show" };
+async function libraryTag(installationId: string, locationId: string, t: Template): Promise<string> {
+  const k = TEMPLATE_QUEUE[t.key];
+  return k ? (await getQueueTags(installationId, locationId))[k] : t.defaultTag;
+}
 
 // Server glue for the library: reads our own tables for the plan, and installs one account at a time through the provisioner (which is the only thing that writes, and always
 // through the write gateway). Every account id given here has already passed ownedLocation in the route.
@@ -31,6 +40,6 @@ export async function installOne(t: Template, a: { installationId: string; compa
   const optedIn = await writeEnabledFor(a.installationId, a.locationId);
   return provision(t, {
     client: httpClient(token, a.locationId), store: storeFor(a.installationId, a.locationId), installationId: a.installationId, locationId: a.locationId, optedIn, manual: true, granted: await grantedFor(a.installationId), autoPublish: st.s.autoPublish,
-    settings: { folderName: st.s.folderName, tag: t.defaultTag, assign: st.s.assignMode === "user" && st.s.assignUserId ? { mode: "user", userId: st.s.assignUserId } : { mode: "round_robin" } },
+    settings: { folderName: st.s.folderName, tag: await libraryTag(a.installationId, a.locationId, t), assign: st.s.assignMode === "user" && st.s.assignUserId ? { mode: "user", userId: st.s.assignUserId } : { mode: "round_robin" } },
   });
 }
