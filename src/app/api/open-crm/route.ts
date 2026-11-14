@@ -7,5 +7,7 @@ import { crmTarget, readLanding } from "@/lib/install-landing";
 export function GET(request: Request) {
   let landing = null;
   try { landing = readLanding(new URL(request.url).searchParams.get("v")); } catch { landing = null; }
+  // No valid signed details: we do not know which CRM address is this person's, so go back to the page that explains where to find SubSync.
+  if (!landing) return NextResponse.redirect(new URL("/installed", request.url), 302);
   return NextResponse.redirect(crmTarget(landing).href, 302);
 }

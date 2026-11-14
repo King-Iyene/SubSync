@@ -67,7 +67,12 @@ async function InstalledBody({ searchParams }: { searchParams: Promise<Record<st
             ))}
           </ol>
           <div className="cta-row">
-            <a className="btn btn-primary" href={openHref}>Open SubSync in your CRM</a>
+            {landing ? (
+              <a className="btn btn-primary" href={openHref}>Open SubSync in your CRM</a>
+            ) : (
+              // Without the signed install details we do not know which CRM address is yours, so no button guesses one.
+              <p className="lede" style={{ margin: 0 }}>Open your own CRM, then click <strong>SubSync</strong> in the left menu.</p>
+            )}
             <a className="btn btn-ghost" href="#menu">Where is SubSync in my CRM menu?</a>
           </div>
           {target.auto && <AutoRedirect href={openHref} />}
