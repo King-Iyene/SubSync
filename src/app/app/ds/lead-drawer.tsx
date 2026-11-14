@@ -80,6 +80,9 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
   const [channelPref, setChannelPref] = useState<"SMS" | "Email">("SMS");
   // The message box opens by itself when this person has an unsent draft, so the words are never hidden behind "Write a message".
   const [composerOpen, setComposerOpen] = useState(!!seed.reply || !!getDraft(draftKey(seed.locationId, seed.contactId)));
+  // A lead with no conversation yet opens with the message box ready, to start the first text or email (once, so closing it stays closed).
+  const [closedByPerson, setClosedByPerson] = useState(false);
+  const autoOpen = !!wb && !wb.hasConversation && !!wb.send && !wb.send.state.lock && !closedByPerson;
   // Re-reading the panel's parts after a change. A re-read never starts while one is still on its way (a new one would cancel the old answer, so a slow CRM would starve the panel
   // of any answer at all); one more follows when something changed meanwhile. The message box is never part of this: it is not remounted, so a draft is never lost.
   const refreshing = useRef(false), again = useRef(false);
@@ -182,7 +185,7 @@ function Body({ seed, top, showAccount, wide, onLogged }: { seed: LeadSeed; top?
             ))}
           </div>
           <div role="tabpanel" id="wb-panel" aria-labelledby={`wb-tab-${tab}`} className="pt-5">
-            {tab === "conversation" && <><Thread locationId={seed.locationId} contactId={seed.contactId} reloadKey={threadKey} crmUrl={wb.crmUrl ?? url} /><Composer ctx={wb} runner={runner} initial={channelPref} open={composerOpen} onOpenChange={setComposerOpen} focusOnMount={!!seed.reply} draftKey={draftKey(seed.locationId, seed.contactId)} lead={{ locationId: seed.locationId, contactId: seed.contactId }} /></>}
+            {tab === "conversation" && <><Thread locationId={seed.locationId} contactId={seed.contactId} reloadKey={threadKey} crmUrl={wb.crmUrl ?? url} onChannel={setChannelPref} /><Composer ctx={wb} runner={runner} initial={channelPref} open={composerOpen || autoOpen} onOpenChange={(o) => { setComposerOpen(o); setClosedByPerson(!o); }} focusOnMount={!!seed.reply} draftKey={draftKey(seed.locationId, seed.contactId)} lead={{ locationId: seed.locationId, contactId: seed.contactId }} onSendChanged={() => void wbq.reload()} /></>}
             {tab === "update" && <UpdateTab ctx={wb} runner={runner} />}
             {tab === "timeline" && data && <TimelinePanel items={timeline} timeZone={tz} note={tlNote} className="max-h-[70vh]" />}
             {tab === "record" && <RecordTab locationId={seed.locationId} contactId={seed.contactId} name={name} account={c?.locationName ?? seed.locationName ?? null} fields={extra?.live.customFields ?? []} />}

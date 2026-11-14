@@ -9,6 +9,7 @@ import { InlineAlert } from "../ds";
 import { useData } from "../session";
 import { Badge, Btn, Card, ErrorBox, Loading } from "../ui";
 import { WriteAccessCard } from "./write-access";
+import { SendingRulesCard } from "../ds/wb/send-settings-card";
 import { useStState } from "./st-state";
 import type { PermissionGroup } from "./settings-parts";
 
@@ -120,6 +121,7 @@ export function SafetySection() {
         </ul>
       </Card>
       <Card title="Which clients may be changed"><WriteAccessCard embedded /></Card>
+      <Card title="Sending rules"><SendingRulesCard /></Card>
     </div>
   );
 }

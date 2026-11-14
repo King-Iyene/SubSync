@@ -9,11 +9,13 @@ import { AiDraftButton } from "../ai-lead";
 import { DRAFT_NOTE } from "@/lib/ai/lead-core";
 import { INPUT, wbButtons, type Runner } from "./runner";
 import type { WbContext, WbThread } from "./types";
-import { smsSegments } from "@/lib/ghl/send-guard";
+import { channelOffReason, smsSegments } from "@/lib/ghl/send-guard";
 import { SendRules } from "./send-panels";
 
 // The conversation tab: the live thread (fetched when the panel opens, shown, never stored by SubSync) and the composer, docked under it. Sending goes through the review sheet and the server's gateway.
 
+/** Where the person goes to give SubSync the message permission again (the install screen). */
+export const RECONNECT_HREF = "/api/oauth/install";
 const CHANNELS = [["SMS", "Text"], ["Email", "Email"], ["WhatsApp", "WhatsApp"]] as const;
 type Msg = WbThread["messages"][number];
 const ICON: Record<string, typeof Phone> = { SMS: MessageSquare, Email: Mail, WhatsApp: MessageCircle, Call: Phone };
@@ -44,7 +46,7 @@ function Bubble({ m }: { m: Msg }) {
   );
 }
 
-export function Thread({ locationId, contactId, reloadKey, crmUrl }: { locationId: string; contactId: string; reloadKey: number; crmUrl?: string }) {
+export function Thread({ locationId, contactId, reloadKey, crmUrl, onChannel }: { locationId: string; contactId: string; reloadKey: number; crmUrl?: string; /** Called when the person opens the Text or Email tab, so the message box below starts on the same way of sending. */ onChannel?: (c: "SMS" | "Email") => void }) {
   const t = useData<WbThread>(`workbench/thread?locationId=${encodeURIComponent(locationId)}&contactId=${encodeURIComponent(contactId)}&k=${reloadKey}`);
   const scroller = useRef<HTMLOListElement>(null);
   const [filter, setFilter] = useState<"all" | "SMS" | "Email" | "WhatsApp">("all");
@@ -54,12 +56,13 @@ export function Thread({ locationId, contactId, reloadKey, crmUrl }: { locationI
   const toEnd = (smooth = true) => { const el = scroller.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" }); };
   useEffect(() => { toEnd(false); }, [shown.length, filter]);
   const onScroll = () => { const el = scroller.current; if (el) setAtEnd(el.scrollHeight - el.scrollTop - el.clientHeight < 48); };
-  const tabs: Array<["all" | "SMS" | "Email" | "WhatsApp", string]> = [["all", "All"], ...CHANNELS.map(([k, l]) => [k, l] as ["SMS" | "Email" | "WhatsApp", string])];
+  // WhatsApp cannot be sent from SubSync, so its tab only appears when this person has WhatsApp messages to read.
+  const tabs: Array<["all" | "SMS" | "Email" | "WhatsApp", string]> = [["all", "All"], ...CHANNELS.filter(([k]) => k !== "WhatsApp" || all.some((m) => m.channel === "WhatsApp")).map(([k, l]) => [k, l] as ["SMS" | "Email" | "WhatsApp", string])];
   return (
     <section aria-label="Conversation" data-testid="wb-thread" className="overflow-hidden rounded-xl border bg-card">
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b bg-card px-3 py-2">
         <div role="tablist" aria-label="Channel" className="inline-flex rounded-lg bg-muted p-0.5">
-          {tabs.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={filter === k} onClick={() => setFilter(k)} className={`min-h-8 cursor-pointer rounded-md px-2.5 text-sm font-medium ${filter === k ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`} data-testid={`wb-channel-${k}`}>{l}</button>)}
+          {tabs.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={filter === k} onClick={() => { setFilter(k); if (k === "SMS" || k === "Email") onChannel?.(k); }} className={`min-h-8 cursor-pointer rounded-md px-2.5 text-sm font-medium ${filter === k ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`} data-testid={`wb-channel-${k}`}>{l}</button>)}
         </div>
         <div className="ml-auto flex items-center gap-1">
           {crmUrl && <a href={crmUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-md px-2 text-sm font-medium text-primary hover:bg-accent" data-testid="wb-open-crm">Open in your CRM<ExternalLink aria-hidden className="size-3.5" /></a>}
@@ -74,7 +77,7 @@ export function Thread({ locationId, contactId, reloadKey, crmUrl }: { locationI
         )}
         {t.error && <p className="m-4 rounded-lg border border-destructive/40 p-3 text-[15px] text-destructive" role="alert">The conversation could not be loaded. <button type="button" className="cursor-pointer font-medium underline" onClick={() => void t.reload()}>Try again</button></p>}
         {t.data && all.length === 0 && <p className="m-4 rounded-xl border border-dashed p-5 text-center text-[15px] text-muted-foreground" data-testid="wb-thread-empty">{t.data.note ?? "No messages yet. Say hello below."}</p>}
-        {t.data && all.length > 0 && shown.length === 0 && <p className="m-4 text-center text-sm text-muted-foreground">No messages on this channel.</p>}
+        {t.data && all.length > 0 && shown.length === 0 && <p className="m-4 text-center text-sm text-muted-foreground" data-testid="wb-channel-empty">No messages on this channel yet.{filter === "SMS" || filter === "Email" ? ` Write the first one below.` : ""}</p>}
         {shown.length > 0 && (
           <ol ref={scroller} onScroll={onScroll} tabIndex={0} aria-label="Messages" className="thin-scroll min-h-[55vh] max-h-[75vh] space-y-3 overflow-y-auto scroll-smooth px-4 py-4" data-testid="wb-messages">
             {shown.map((m, i) => (
@@ -92,7 +95,7 @@ export function Thread({ locationId, contactId, reloadKey, crmUrl }: { locationI
   );
 }
 
-export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChange, focusOnMount = false, draftKey, lead }: { ctx: WbContext; runner: Runner; initial?: "SMS" | "Email"; open?: boolean; onOpenChange?: (o: boolean) => void; focusOnMount?: boolean; /** Where this person's unsent text is kept while the panel closes, reopens or refreshes. */ draftKey?: string; /** The lead this box writes to, for the optional AI draft button. */ lead?: { locationId: string; contactId: string } }) {
+export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChange, focusOnMount = false, draftKey, lead, onSendChanged }: { ctx: WbContext; /** Called after the account switch for sending changed, so the page re-reads its state. */ onSendChanged?: () => void; runner: Runner; initial?: "SMS" | "Email"; open?: boolean; onOpenChange?: (o: boolean) => void; focusOnMount?: boolean; /** Where this person's unsent text is kept while the panel closes, reopens or refreshes. */ draftKey?: string; /** The lead this box writes to, for the optional AI draft button. */ lead?: { locationId: string; contactId: string } }) {
   const saved = draftKey ? getDraft(draftKey) : undefined;
   const [channel, setChannel] = useState<"SMS" | "Email" | "WhatsApp">(saved?.channel ?? (initial === "SMS" && !ctx.phone ? "Email" : initial));
   const [text, setText] = useState(saved?.text ?? "");
@@ -120,25 +123,29 @@ export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChan
   useEffect(() => { if (focusOnMount) requestAnimationFrame(() => box.current?.focus()); }, [focusOnMount]);
   const seg = !email ? smsSegments(text) : null;
   const sms = seg ? Math.max(1, seg.parts) : 0;
-  const sendOff = ctx.send ? (!ctx.send.enabled ? "Sending from SubSync is not switched on for your account yet. You can still read the conversation and open it in your CRM." : ctx.send.killed ? "Sending is paused for everyone right now. Nothing can be sent." : ctx.send.paused ? "Sending is paused for this account (Settings, Messages)." : !ctx.send.roleOk ? "Only an owner or administrator can send from here." : ctx.send.needsPermission ? "Needs permission: reconnect SubSync and allow it to send messages." : null) : null;
+  // Why the box is locked, or that it works up to the preview only: one plain sentence, decided by the server (composerState in send-guard).
+  const lock = ctx.send?.state.lock ?? null;
+  const previewOnly = ctx.send?.state.previewOnly ?? null;
+  const channelOff = channelOffReason(channel, ctx);
   const channels = ctx.send ? CHANNELS.filter(([k]) => k !== "WhatsApp") : CHANNELS;
   const allTemplates = [...ctx.templates.filter((t) => !ctx.send || t.channel !== "WhatsApp"), ...(ctx.send?.templates ?? [])];
 
   if (ctx.dnd) return <p className="mt-4 rounded-xl border border-destructive/50 p-3.5 text-[15px] font-medium text-destructive" data-testid="wb-dnd">{ctx.name} asked not to be contacted. SubSync will not send them anything.</p>;
-  if (sendOff) return <p className="mt-4 rounded-xl border p-3.5 text-[15px] text-muted-foreground" role="status" data-testid="wb-send-off">{sendOff}</p>;
+  if (lock) return <p className="mt-4 rounded-xl border p-3.5 text-[15px] text-muted-foreground" role="status" data-testid="wb-send-off" data-lock={lock.id}>{lock.text}{lock.id === "permission" && <> <a href={RECONNECT_HREF} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline underline-offset-2" data-testid="wb-reconnect">Reconnect</a>.</>}</p>;
   if (!open) {
     return (
       <div className="sticky bottom-0 z-10 mt-3 flex items-center gap-3 rounded-xl border bg-card px-3 py-2 shadow-[0_-8px_14px_-10px_rgb(0_0_0/0.3)]" data-testid="wb-composer-collapsed">
         <button type="button" onClick={() => onOpenChange?.(true)} className="flex min-h-10 flex-1 cursor-pointer items-center gap-2 text-left text-[15px] font-medium text-muted-foreground hover:text-foreground" data-testid="wb-composer-open"><SendHorizonal aria-hidden className="size-4" />Write a message</button>
-        <span className="inline-flex items-center gap-2 text-muted-foreground" aria-label="Text, Email and WhatsApp"><MessageSquare aria-hidden className="size-4" /><Mail aria-hidden className="size-4" /><MessageCircle aria-hidden className="size-4" /></span>
+        <span className="inline-flex items-center gap-2 text-muted-foreground" aria-label="Text and Email"><MessageSquare aria-hidden className="size-4" /><Mail aria-hidden className="size-4" /></span>
       </div>
     );
   }
   return (
     <><form className="sticky bottom-0 z-10 mt-3 space-y-2.5 rounded-xl border bg-card p-3 shadow-[0_-8px_14px_-10px_rgb(0_0_0/0.3)]" aria-label="Write a message" data-testid="wb-composer" onSubmit={(e) => { e.preventDefault(); void runner.preview({ kind: "message", channel, text, ...(email ? { subject } : {}) }, { quote: email ? `Subject: ${subject}\n\n${text}` : text, verb: "Send now" }); }}>
+      {previewOnly && <p className="rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground" role="status" data-testid="wb-preview-only" data-state={previewOnly.id}>{previewOnly.text}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <div role="radiogroup" aria-label="How to send" className="inline-flex rounded-lg border p-0.5">
-          {channels.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={channel === k} disabled={!canUse(k)} onClick={() => setChannel(k)} className={`min-h-10 rounded-md px-3 text-[15px] font-medium disabled:opacity-40 ${channel === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`} data-testid={`wb-ch-${k}`}>{l}</button>)}
+          {channels.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={channel === k} disabled={!canUse(k)} title={channelOffReason(k, ctx) ?? undefined} onClick={() => setChannel(k)} className={`min-h-10 rounded-md px-3 text-[15px] font-medium disabled:opacity-40 ${channel === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`} data-testid={`wb-ch-${k}`}>{l}</button>)}
         </div>
         <button type="button" onClick={() => onOpenChange?.(false)} aria-label="Collapse the message box" className="ml-auto inline-flex size-9 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground" data-testid="wb-composer-collapse"><ChevronDown aria-hidden className="size-4" /></button>
         <select aria-label="Start from a template" value="" onChange={(e) => applyTemplate(e.target.value)} className={`${INPUT} !w-auto min-w-40`} data-testid="wb-template">
@@ -147,6 +154,7 @@ export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChan
         </select>
         {lead && <AiDraftButton locationId={lead.locationId} contactId={lead.contactId} channel={channel} hasText={text.trim().length > 0} onDraft={(t) => { setText(t); setAiDraft(true); requestAnimationFrame(() => box.current?.focus()); }} />}
       </div>
+      {channelOff && <p className="text-sm text-muted-foreground" role="status" data-testid="wb-channel-off">{channelOff}. {ctx.phone || ctx.email ? "Use the other way to write to them." : "There is no way to write to them from here."}</p>}
       {email && <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" aria-label="Subject" maxLength={200} className={INPUT} data-testid="wb-subject" />}
       <textarea ref={box} value={text} onChange={(e) => { setText(e.target.value); if (!e.target.value.trim()) setAiDraft(false); }} rows={2} maxLength={email ? 10000 : 1000} placeholder={`Write to ${first || "them"}...`} aria-label="Message" className="thin-scroll block max-h-56 w-full resize-none rounded-lg border bg-background px-3 py-2.5 text-[15px] leading-relaxed focus-visible:outline-2 focus-visible:outline-[var(--ring)]" data-testid="wb-text" />
       {aiDraft && text.trim() && <p className="flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm" role="status" data-testid="ai-draft-note"><span className="rounded bg-primary/15 px-1.5 py-0.5 text-xs font-semibold text-primary">AI draft</span><span>{DRAFT_NOTE}</span></p>}
@@ -161,8 +169,8 @@ export function Composer({ ctx, runner, initial = "SMS", open = true, onOpenChan
           <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${ctx.mode.live ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}><span aria-hidden className={`size-1.5 rounded-full ${ctx.mode.live ? "bg-success" : "bg-muted-foreground"}`} />{ctx.mode.live ? "Live" : "Dry run"}</span>
           <InfoTip label="About sending" text={ctx.mode.live ? "Messages you send are really sent, after you review them." : "Sending is switched off for now: you can write and review, but nothing is sent."} />
         </span>
-        <button type="submit" disabled={runner.busy || !text.trim() || (email && !subject.trim())} title={runner.busy ? "Working on the last step" : !text.trim() ? "Write a message first" : email && !subject.trim() ? "Add a subject first" : undefined} className={`${wbButtons.PRIMARY} cursor-pointer disabled:cursor-not-allowed`} data-testid="wb-preview"><SendHorizonal aria-hidden className="size-4" />Review and send</button>
+        <button type="submit" disabled={runner.busy || !!channelOff || !text.trim() || (email && !subject.trim())} title={runner.busy ? "Working on the last step" : channelOff ? channelOff : !text.trim() ? "Write a message first" : email && !subject.trim() ? "Add a subject first" : undefined} className={`${wbButtons.PRIMARY} cursor-pointer disabled:cursor-not-allowed`} data-testid="wb-preview"><SendHorizonal aria-hidden className="size-4" />Review and send</button>
       </div>
-    </form>{lead && ctx.send?.enabled && <SendRules locationId={lead.locationId} />}</>
+    </form>{lead && ctx.send?.enabled && <SendRules locationId={lead.locationId} onChanged={onSendChanged} />}</>
   );
 }
