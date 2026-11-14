@@ -50,7 +50,7 @@ export default function Support() {
           <li>Open SubSync from your CRM&apos;s left menu.</li>
         </ol>
 
-        <h2 id="video">Watch the 4-minute tour</h2>
+        <h2 id="video">Watch the 6-minute tour</h2>
         <div style={{ margin: "12px 0" }}><VideoPlayer /></div>
 
         <h2 id="a-to-z">All pages, A to Z</h2>

@@ -22,4 +22,5 @@ export const PROCESSORS: readonly Processor[] = [
   { id: "slack", name: "Slack", role: "Receives the alerts and the daily brief, in the channel you choose.", whenUsed: "Only if you connect it." },
   { id: "fathom", name: "Fathom", role: "Sends meeting summaries to SubSync.", whenUsed: "Only if you connect it." },
   { id: "ai", name: "Your own AI provider", role: "Receives the short summary of counts that SubSync sends to write the 7 am brief wording, under your own account and terms.", whenUsed: "Only if an administrator connects their own AI account (OpenRouter, Anthropic, OpenAI, Google or a compatible service)." },
+  { id: "video", name: "YouTube", role: "Plays the tour and welcome videos on our website pages.", whenUsed: "Only when a visitor presses Play." },
 ];

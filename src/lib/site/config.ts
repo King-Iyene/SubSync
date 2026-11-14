@@ -28,8 +28,21 @@ export const VIDEO = {
   src720: "/video/subsync-tour-720.mp4",
   poster: "/video/subsync-tour-poster.jpg",
   captions: "/video/subsync-tour.en.vtt",
-  title: "SubSync in 4 minutes",
-  description: "A four-minute tour of SubSync: Today, Speed to lead, Appointments, Pipeline, Clients, the account audit, Clean-up and Alerts.",
-  durationIso: "PT4M9S",
-  uploadDate: "2026-11-13",
+  title: "SubSync in 6 minutes",
+  description: "A six-minute tour of SubSync: Today, Speed to lead, Appointments, Clients, Money, Find a lead, the account audit, Clean-up, Team, Pipeline, Meeting notes, Workflows, Overview and Settings.",
+  durationIso: "PT6M16S",
+  uploadDate: "2026-11-14",
+  /** The two videos play from YouTube (unlisted is fine for embedding). */
+  tour: {
+    youtubeId: "EQkggKwlizs",
+    poster: "/video/subsync-tour-poster.jpg",
+    title: "SubSync in 6 minutes",
+    button: "Watch the 6-minute tour",
+  },
+  welcome: {
+    youtubeId: "O_rmGyzSSU8",
+    poster: "/video/subsync-welcome-poster.jpg",
+    title: "Welcome to SubSync: your first steps",
+    button: "Watch the welcome video",
+  },
 } as const;
