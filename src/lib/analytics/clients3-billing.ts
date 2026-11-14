@@ -4,6 +4,8 @@ import { ghlFetch } from "../ghl/http";
 import { getCompanyAccessToken } from "../ghl/installations";
 import { PLANS_AGENCY_ONLY, PLANS_NEED_PERMISSION, readSaasPlans, stateFor, type Getter } from "./clients3-saas";
 import { readInstalls } from "./clients3-installs";
+import { planObservation } from "./plan-monitor-core";
+import { refreshPlanMonitor } from "./plan-monitor";
 import { parseGranted } from "../scope-groups";
 import type { Cl3Billing } from "./clients3-types";
 import { accountsIn, type Scope } from "./clients3-queries";
@@ -142,7 +144,9 @@ async function refreshAppInstalls(inst: string, get: Getter, companyKey: string)
   const appId = process.env.GHL_APP_ID;
   if (!appId) return;
   const db = sql();
-  const prev = new Map<string, boolean>((await db`select location_id, is_installed from cl3_app_installs where installation_id = ${inst}`.catch(() => [])).map((r) => [r.location_id as string, r.is_installed === true]));
+  const prevRows = await db`select location_id, is_installed, plan_id from cl3_app_installs where installation_id = ${inst}`.catch(async () => db`select location_id, is_installed from cl3_app_installs where installation_id = ${inst}`.catch(() => []));
+  const prev = new Map<string, boolean>(prevRows.map((r) => [r.location_id as string, r.is_installed === true]));
+  const prevPlan = new Map<string, string | null>(prevRows.map((r) => [r.location_id as string, (r.plan_id as string | null | undefined) ?? null]));
   const res = await readInstalls(get, companyKey, appId);
   if (res.failed) return;
   const seen = new Set<string>();
@@ -151,6 +155,9 @@ async function refreshAppInstalls(inst: string, get: Getter, companyKey: string)
     await db`insert into cl3_app_installs (installation_id, location_id, name, is_installed, version_id, installed_at, plan_id, on_trial, seen_at)
       values (${inst}, ${it.locationId}, ${it.name}, ${it.installed}, ${it.versionId}, ${it.installedAt}, ${it.planId}, ${it.onTrial}, now())
       on conflict (installation_id, location_id) do update set name = excluded.name, is_installed = excluded.is_installed, version_id = excluded.version_id, installed_at = excluded.installed_at, plan_id = excluded.plan_id, on_trial = excluded.on_trial, seen_at = now()`;
+    // Plan observation: every change of the plan id between two reads goes into our own record (cl3_history, kind app_plan), so plan changes can be detected later.
+    const obs = planObservation(prevPlan.get(it.locationId), it.planId);
+    if (obs) await db`insert into cl3_history (installation_id, location_id, kind, from_value, to_value) values (${inst}, ${it.locationId}, 'app_plan', ${obs.from}, ${obs.to})`.catch(() => undefined);
     const was = prev.get(it.locationId);
     if (was !== undefined && was !== it.installed) await db`insert into cl3_history (installation_id, location_id, kind) values (${inst}, ${it.locationId}, ${it.installed ? "app_installed" : "app_removed"})`.catch(() => undefined);
   }
@@ -160,4 +167,5 @@ async function refreshAppInstalls(inst: string, get: Getter, companyKey: string)
     await db`update cl3_app_installs set is_installed = false, seen_at = now() where installation_id = ${inst} and location_id = ${id}`.catch(() => undefined);
     await db`insert into cl3_history (installation_id, location_id, kind) values (${inst}, ${id}, 'app_removed')`.catch(() => undefined);
   }
+  await refreshPlanMonitor(inst, companyKey).catch(() => undefined);
 }

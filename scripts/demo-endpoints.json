@@ -312,6 +312,11 @@
  },
  {
   "module": "Clients",
+  "path": "clients3?part=plan-monitor",
+  "min": 1
+ },
+ {
+  "module": "Clients",
   "path": "clients3?part=money-history&size=20",
   "min": 1
  },

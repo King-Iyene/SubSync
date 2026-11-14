@@ -2,6 +2,7 @@ import { atOf } from "../analytics/window-time";
 import { attention, clientsCache, compare, exportCsv, list, options, overview, people, receipt, setup, trends, type Filters, type Links, type Scope } from "../analytics/clients3-queries";
 import { billing } from "../analytics/clients3-billing";
 import { money, moneyHistory } from "../analytics/cl3-money";
+import { planMonitor } from "../analytics/plan-monitor";
 import { clampSize, parseWindow } from "../analytics/clients3-intel";
 import { CL2_FLAGS } from "../analytics/clients2-types";
 import { WG_FLAGS } from "../analytics/wg-types";
@@ -21,7 +22,7 @@ type Ctx = AuthContext & { request: Request; url: URL; segments: string[] };
 export type Clients3Helpers = { allowed: () => Promise<string[] | null>; links: () => Promise<ReturnType<typeof deepLinks>> };
 
 const PART_FLAG: Record<Cl3Part, string> = {
-  overview: "cl_overview", "needs-attention": "cl_attention", trends: "cl_trends", compare: "cl_compare", receipt: "cl_reports", people: "cl_people", setup: "cl_setup", billing: "cl_billing", list: "cl_attention", options: "cl_overview", export: "cl_reports", money: "cl3_money", "money-history": "cl3_history",
+  overview: "cl_overview", "needs-attention": "cl_attention", trends: "cl_trends", compare: "cl_compare", receipt: "cl_reports", people: "cl_people", setup: "cl_setup", billing: "cl_billing", list: "cl_attention", options: "cl_overview", export: "cl_reports", money: "cl3_money", "money-history": "cl3_history", "plan-monitor": "cl3_plan_monitor",
 };
 const LEVELS = new Set(["ok", "watch", "act", "unknown"]);
 const int = (v: string | null, d: number) => { const n = Number(v); return v !== null && Number.isFinite(n) ? Math.floor(n) : d; };
@@ -36,6 +37,13 @@ export async function handleClients3(ctx: Ctx, h: Clients3Helpers): Promise<Resp
 
   const canSee = ctx.kind === "agency" && ctx.limitTo === null;
   const wrap = (body: object, cached = false, problem: string | null = null) => json({ ...body, generatedAt: new Date().toISOString(), cached, canSeeAccounts: canSee, flags, problem });
+  // Plan monitor is the one part a client account may open: its own row only. The account list comes from the verified session (limitTo), never from the address.
+  if (part === "plan-monitor") {
+    const own = ctx.limitTo;
+    const allowed = own ? (allowedAll === null || allowedAll.includes(own) ? [own] : []) : allowedAll;
+    const l: Links = { account: (x) => dl.account(x), contact: (x, c) => dl.contact(x, c) };
+    return wrap(await planMonitor({ inst: ctx.installationId, allowed }, l, { q: own ? null : text(sp.get("q"), 60) }), false, null);
+  }
   if (!canSee) return wrap({ rows: [], total: 0, page: 0, size: 20, pages: 1, truncated: false, accounts: [], industries: [], sides: [], points: [] });
 
   const links: Links = { account: (l) => dl.account(l), contact: (l, c) => dl.contact(l, c) };
