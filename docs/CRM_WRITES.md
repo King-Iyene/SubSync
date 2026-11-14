@@ -16,7 +16,7 @@ Common guardrails for every row below: the server switch `WRITE_GHL_LIVE` (off u
 | Mark do-not-disturb | contacts.write | `workbench.ts` | Preview | Yes |
 | Merge duplicate contacts | contacts.write | `ghl/crm-merge.ts` | Protected contacts skipped (do-not-contact, deals, payments, appointments); ticked box | No |
 | Delete a contact | contacts.write | `workbench.ts` | Owner side only; typed name | No |
-| Delete a conversation | conversations.write (not requested today) | `ghl/unanswered-gateway.ts` | Typed count; protected contacts skipped | No |
+| Delete a conversation | conversations.write (optional, requested since the 80-scope list) | `ghl/unanswered-gateway.ts` | Typed count; protected contacts skipped | No |
 | Update a deal (stage, status, value, owner), create a deal | opportunities.write | `ghl/pipeline-gateway.ts`, `workbench.ts` | Preview; confirm | Update yes, create no |
 | Book or update an appointment, set its status | calendars/events.write | `ghl/appointment-gateway.ts` | Preview; confirm | Status yes |
 | Add a contact to a workflow, create or change workflows | contacts.write, workflows.write, workflows.publish, workflows.delete | `workflow-module/`, `crm-writes.ts` | Preview; typed confirmation and a saved copy for delete | Delete: from saved copy |
