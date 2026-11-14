@@ -2,6 +2,7 @@
 
 import { useData } from "../../session";
 import type { DetailFacts } from "@/lib/dq/dupe-impact";
+import type { Health } from "@/lib/dq/health-core";
 
 // Clean-up v2: the shapes the /api/app/dq/... answers have, and the sample data behind ?cufx (labelled "Sample data" on screen). The real screens never read the sample unless the address carries ?cufx.
 
@@ -40,7 +41,16 @@ export type Counts = { leads: number; dups: number; junk: number; answered: numb
 export type SourceRow = { key: string; label: string } & Counts;
 export type FormRow = { kind: "form" | "survey"; id: string; name: string; locationId: string; locationName: string | null; submissions: number; people: number; repeat: number; dups: number; junk: number; answered: number; booked: number; won: number; wonValue: number; lastAt: string | null; first: string | null };
 export type AlertRow = { kind: "low_rate" | "dead" | "dup_heavy" | "junk_heavy"; key: string; label: string; severity: "info" | "warning"; title: string; numbers: Record<string, number>; locationId: string; locationName: string | null; muted: boolean };
+export type AreaState = "ok" | "needs_permission" | "never";
+export type HealthRes = {
+  settings: { dropPct: number; minBaseline: number; defaultDropPct: number; defaultMinBaseline: number; minDropPct: number; maxDropPct: number }; canChange: boolean; viewsNote: string;
+  forms: Array<{ kind: "form" | "survey"; id: string; name: string; locationId: string; locationName: string | null; health: Health; weeks: number[] }>;
+  funnels: Array<{ id: string; name: string; locationId: string; locationName: string | null; steps: number | null; pages: number | null; pageNames: string[]; views: null; viewsNote: string }>;
+  links: { rows: Array<{ kind: "redirect" | "trigger"; id: string; name: string; target: string | null; empty: boolean; locationId: string; locationName: string | null }>; total: number; empty: number };
+  status: Record<"forms" | "surveys" | "funnels" | "funnel_pages" | "redirects" | "links", AreaState> | null;
+};
 export type IntakeRes = {
+  health?: HealthRes;
   range: string; days: number; asOf: string | null; minLeads: number; total: number; sources: SourceRow[]; best: string | null; worst: string | null; line: string; note: string | null;
   forms: FormRow[]; funnels: Array<{ id: string; name: string; steps: number | null; locationId: string; locationName: string | null; leads: number }>; formsStatus: { forms: "ok" | "needs_permission" | "never"; at: string | null };
   alerts: AlertRow[]; mutes: Array<{ locationId: string; src: string; until: string | null }>; canMute: boolean; funnelNote: string; matchNote: string;
@@ -71,7 +81,23 @@ export const SAMPLE = {
   intake: { range: "30", days: 30, asOf: "2026-12-20T06:00:00Z", minLeads: 20, total: SOURCES.reduce((s, r) => s + r.leads, 0), sources: SOURCES, best: "Google Ads", worst: "Import", line: "Best: Google Ads (80% good leads, $28,900 won). Weakest: Import (13% good leads, 36% duplicates).", note: null,
     forms: [{ kind: "form", id: "f1", name: "Free quote", locationId: "s1", locationName: "Sample Roofing", submissions: 120, people: 96, repeat: 20, dups: 31, junk: 4, answered: 70, booked: 22, won: 6, wonValue: 9100, lastAt: "2026-12-19T10:00:00Z", first: "2026-11-20T10:00:00Z" }],
     funnels: [{ id: "u1", name: "Roof checklist", steps: 3, locationId: "s1", locationName: "Sample Roofing", leads: 40 }], formsStatus: { forms: "ok", at: "2026-12-20T05:30:00Z" }, alerts: [{ kind: "low_rate", key: "website form", label: "Website form", severity: "warning", title: "Website form sent 2 leads in 3 days, usually about 24", numbers: {}, locationId: "s1", locationName: "Sample Roofing", muted: false }],
-    mutes: [], canMute: true, funnelNote: "Views, opt-ins and conversion rates of funnels: Not available from the platform yet.", matchNote: "Money is counted from won deals linked to the person." } as IntakeRes,
+    mutes: [], canMute: true, funnelNote: "Views, opt-ins and conversion rates of funnels: Not available from the platform yet.", matchNote: "Money is counted from won deals linked to the person.",
+    health: {
+      settings: { dropPct: 50, minBaseline: 5, defaultDropPct: 50, defaultMinBaseline: 5, minDropPct: 10, maxDropPct: 90 }, canChange: true, viewsNote: "Page views are not available from the platform",
+      forms: [
+        { kind: "form", id: "f1", name: "Free quote", locationId: "s1", locationName: "Sample Roofing", weeks: [4, 10, 12, 9, 11], health: { verdict: "drop", recent: 4, usual: 10.5, dropPct: 62, line: "4 in the last 7 days, usually 10.5 a week: down 62%." } },
+        { kind: "survey", id: "f2", name: "Job fit survey", locationId: "s1", locationName: "Sample Roofing", weeks: [9, 10, 8, 11, 9], health: { verdict: "ok", recent: 9, usual: 9.5, dropPct: 5, line: "9 in the last 7 days, usually 9.5 a week." } },
+        { kind: "form", id: "f3", name: "Book a cleaning", locationId: "s2", locationName: "Sample Dental", weeks: [2, 1, 0, 3, 0], health: { verdict: "not_enough_data", recent: 2, usual: null, dropPct: null, line: "Not enough data yet" } },
+        { kind: "form", id: "f4", name: "Newsletter", locationId: "s2", locationName: "Sample Dental", weeks: [0, 2, 1, 3, 2], health: { verdict: "zero_baseline", recent: 0, usual: 2, dropPct: null, line: "A usual week is only 2 (under 5), too small to call a drop." } },
+      ],
+      funnels: [{ id: "u1", name: "Roof checklist", locationId: "s1", locationName: "Sample Roofing", steps: 3, pages: 3, pageNames: ["Landing", "Checklist", "Thank you"], views: null, viewsNote: "Page views are not available from the platform" }],
+      links: { total: 3, empty: 1, rows: [
+        { kind: "trigger", id: "k1", name: "Old promo", target: null, empty: true, locationId: "s1", locationName: "Sample Roofing" },
+        { kind: "trigger", id: "k2", name: "Book now", target: "https://example.com/book", empty: false, locationId: "s1", locationName: "Sample Roofing" },
+        { kind: "redirect", id: "k3", name: "/spring", target: "https://example.com/spring-offer", empty: false, locationId: "s2", locationName: "Sample Dental" },
+      ] },
+      status: { forms: "ok", surveys: "ok", funnels: "ok", funnel_pages: "ok", redirects: "ok", links: "ok" },
+    } } as IntakeRes,
   source: (key: string): SourceDetail => ({ key, label: SOURCES.find((s) => s.key === key)?.label ?? key, counts: SOURCES.find((s) => s.key === key) ?? SOURCES[0], trend: Array.from({ length: 35 }, (_, i) => ({ day: `d${i}`, leads: 6 + ((i * 7) % 9), dups: i % 4, junk: i % 6 === 0 ? 1 : 0 })), perAccount: [{ locationId: "s1", name: "Sample Roofing", ...SOURCES[0] }], alerts: [], days: 30 }),
   leads: { flag: "dup", label: "Duplicates", total: { n: 2, capped: false }, next: null, rows: [{ contactId: "s9", locationId: "s1", locationName: "Sample Roofing", name: "Eli Fox", email: "eli@example.org", phone: "555 0133", owner: null, source: "Website form", createdAt: "2026-12-19T10:00:00Z", dnd: false, flags: ["duplicate"], url: "#" }] } as LeadsRes,
   events: { rows: [{ id: 2, at: "2026-12-19T10:00:00Z", location: "Sample Roofing", kind: "dup_decided", ref: null, detail: { decision: "not_duplicate", size: 2 }, actor: "Sample" }], next: null },

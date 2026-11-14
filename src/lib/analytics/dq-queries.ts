@@ -554,9 +554,12 @@ export async function portfolioQuality(s: Scope): Promise<{ q: Quality; counts: 
 /** In-app alert drafts for the existing alert engine (bell, Today, digest, email only through the existing live switches): one per source whose rule fired and that is not muted. */
 export async function dqAlertDrafts(inst: string): Promise<Array<{ dedupeKey: string; kind: string; severity: "info" | "warning" | "critical"; locationId: string | null; title: string; detail: Record<string, unknown> }>> {
   const list = await intakeAlertList({ inst, allowed: null, location: null }).catch(() => []);
-  return list.filter((a) => !a.muted && a.kind !== "junk_heavy").slice(0, 60).map((a) => ({
-    dedupeKey: `dq:${a.kind}:${a.locationId}:${a.key}`.slice(0, 190), kind: "quality", severity: a.severity, locationId: a.locationId, title: `${a.locationName ?? "A client account"}: ${a.title}`, detail: { dq: a.kind, source: a.label, ...a.numbers },
+  const drafts = list.filter((a) => !a.muted && a.kind !== "junk_heavy").slice(0, 60).map((a) => ({
+    dedupeKey: `dq:${a.kind}:${a.locationId}:${a.key}`.slice(0, 190), kind: "quality", severity: a.severity, locationId: a.locationId, title: `${a.locationName ?? "A client account"}: ${a.title}`, detail: { dq: a.kind, source: a.label, ...a.numbers } as Record<string, unknown>,
   }));
+  // Low application alerts (a form or survey far below its own usual week), judged by dq-health-queries.ts.
+  const health = await (await import("./dq-health-queries")).healthAlertDrafts(inst).catch(() => []);
+  return [...drafts, ...health];
 }
 
 /** ONE open group by its address (account and key), with its people, for the duplicate judge. Same visibility and read-time name rule as the list. Null when it is not open or not visible. */
