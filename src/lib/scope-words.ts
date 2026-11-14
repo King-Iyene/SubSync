@@ -25,11 +25,6 @@ const WORDS: Record<string, string> = {
   "conversations/message.readonly": "read messages",
   "conversations/message.write": "send a text or email when you press Send",
   "opportunities.readonly": "read deals",
-  "conversations/reports.readonly": "read conversation reports (coming feature, not used yet)",
-  "locations/tasks.readonly": "read tasks (coming feature, not used yet)",
-  "locations/tasks.write": "create tasks (coming feature, not used yet)",
-  "locations/tags.write": "change tags (coming feature, not used yet)",
-  "locations/customFields.write": "change custom field values (coming feature, not used yet)",
 };
 
 /** "read your workflows" for "workflows.readonly"; an unknown name falls back to a generic phrase (never the raw name). */
