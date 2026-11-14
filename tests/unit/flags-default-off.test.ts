@@ -14,6 +14,9 @@ const REVIEWED_ALWAYS_ON_BASELINE = new Set([
   "data_health_pro", "data_health_fix",
   // Account setup: a read-only checklist (counts only), ON by default by King's decision of 14 Nov 2026 (rule 11: make everything live once tests pass). A database row still switches it off.
   "as_check",
+  "cl3_plan_monitor",
+  "pm_checks",
+  "safe_writes",
 ]);
 
 describe("new features default off", () => {
