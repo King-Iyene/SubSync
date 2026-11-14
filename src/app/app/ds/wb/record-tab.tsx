@@ -10,7 +10,7 @@ import { TaskActions } from "../../views/safe-writes-ui";
 // The rest of the contact record in one wide tab, in collapsible sections. Each part is read live from the CRM only when it is opened (notes, tasks, orders) or comes from the
 // panel's own live read (custom fields). Nothing is stored. A part that needs a permission says "Needs permission: reconnect"; nothing is ever faked.
 
-type Part<T> = { state: "ok" | "needs_permission" | "unavailable" | "off"; note: string | null; items: T[] };
+type Part<T> = { state: "ok" | "needs_permission" | "unavailable" | "off"; note: string | null; items: T[]; /** How many the platform says there are in all (orders only). */ total?: number | null };
 type Note = { id: string | null; text: string; by: string | null; at: string | null; ours: boolean };
 type Task = { id: string | null; title: string; due: string | null; done: boolean; by: string | null; deletable?: boolean };
 type Order = { id: string | null; title: string; amount: number | null; currency: string | null; status: string | null; at: string | null };
@@ -31,13 +31,13 @@ function Section({ title, tip, count, children, defaultOpen = false, testId }: {
   );
 }
 
-function Live<T>({ locationId, contactId, part, render, empty }: { locationId: string; contactId: string; part: string; render: (items: T[], reload: () => void) => React.ReactNode; empty: string }) {
+function Live<T>({ locationId, contactId, part, render, empty }: { locationId: string; contactId: string; part: string; render: (items: T[], total: number | null, reload: () => void) => React.ReactNode; empty: string }) {
   const d = useData<Part<T>>(`workbench/record?locationId=${encodeURIComponent(locationId)}&contactId=${encodeURIComponent(contactId)}&part=${part}`);
   if (d.loading && !d.data) return <div className="space-y-2" aria-label="Loading"><div className="h-10 animate-pulse rounded-lg bg-muted" /><div className="h-10 animate-pulse rounded-lg bg-muted" /></div>;
   if (d.error) return <p className="text-sm text-destructive" role="alert">Could not load this. <button type="button" className="cursor-pointer font-medium underline" onClick={() => void d.reload()}>Try again</button></p>;
   if (!d.data) return null;
   if (d.data.state !== "ok") return <p className="text-sm text-muted-foreground" data-testid={`record-${part}-state`}>{d.data.note}</p>;
-  return d.data.items.length === 0 ? <p className="text-sm text-muted-foreground">{empty}</p> : <>{render(d.data.items, () => void d.reload())}</>;
+  return d.data.items.length === 0 ? <p className="text-sm text-muted-foreground">{empty}</p> : <>{render(d.data.items, d.data.total ?? null, () => void d.reload())}</>;
 }
 
 function CopyValue({ value }: { value: string }) {
@@ -66,7 +66,7 @@ export function RecordTab({ locationId, contactId, name, account, fields }: { lo
         )}
       </Section>
       <Section title="Tasks" testId="record-tasks" tip="Tasks on this contact in your CRM, read live when you open this.">
-        {() => <Live<Task> locationId={locationId} contactId={contactId} part="tasks" empty="No tasks." render={(items, reload) => (
+        {() => <Live<Task> locationId={locationId} contactId={contactId} part="tasks" empty="No tasks." render={(items, _total, reload) => (
           <ul className="divide-y rounded-lg border">{items.map((t, i) => (
             <li key={t.id ?? i} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 text-[15px]"><span className={`min-w-0 flex-1 truncate ${t.done ? "text-muted-foreground line-through" : "font-medium"}`}>{t.title}</span>{t.by && <span className="text-xs text-muted-foreground">{t.by}</span>}{t.due && <span className="text-xs tabular-nums text-muted-foreground">Due {day(t.due)}</span>}<span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${t.done ? "bg-success/15 text-success" : "bg-primary/15 text-primary"}`}>{t.done ? "Done" : "Open"}</span>{t.id && <TaskActions locationId={locationId} contactId={contactId} taskId={t.id} done={t.done} ours={t.deletable === true} canDelete={t.deletable === true} onDone={reload} />}</li>))}</ul>
         )} />}
@@ -83,8 +83,11 @@ export function RecordTab({ locationId, contactId, name, account, fields }: { lo
         {() => <p className="text-sm text-muted-foreground" data-testid="record-workflows-state">Not available from your CRM yet: it does not let apps list the workflows a contact is in. Open the contact in your CRM to see them. Nothing is guessed here.</p>}
       </Section>
       <Section title="Orders and payments" testId="record-money" tip="Orders for this contact, read live and never stored. Needs the optional payments permission.">
-        {() => <Live<Order> locationId={locationId} contactId={contactId} part="money" empty="No orders." render={(items) => (
-          <ul className="divide-y rounded-lg border">{items.map((o, i) => <li key={o.id ?? i} className="flex flex-wrap items-center gap-x-3 px-3 py-2.5 text-[15px]"><span className="min-w-0 flex-1 truncate">{o.title}</span>{o.amount != null && <span className="tabular-nums">{o.currency ?? ""} {o.amount}</span>}{o.status && <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold">{o.status}</span>}<span className="text-xs text-muted-foreground">{day(o.at)}</span></li>)}</ul>
+        {() => <Live<Order> locationId={locationId} contactId={contactId} part="money" empty="No orders." render={(items, total) => (
+          <>
+            <p className="mb-2 text-xs text-muted-foreground" data-testid="record-money-count">{total != null && total > items.length ? `Latest ${items.length} of ${total.toLocaleString("en-US")} orders.` : `${items.length} ${items.length === 1 ? "order" : "orders"}.`} Amounts are as your CRM reports them.</p>
+            <ul className="divide-y rounded-lg border">{items.map((o, i) => <li key={o.id ?? i} className="flex flex-wrap items-center gap-x-3 px-3 py-2.5 text-[15px]"><span className="min-w-0 flex-1 truncate">{o.title}</span>{o.amount != null && <span className="tabular-nums">{o.currency ?? ""} {o.amount}</span>}{o.status && <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold">{o.status}</span>}<span className="text-xs text-muted-foreground">{day(o.at)}</span></li>)}</ul>
+          </>
         )} />}
       </Section>
     </div>
