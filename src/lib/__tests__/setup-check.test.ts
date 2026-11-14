@@ -174,7 +174,7 @@ test("a permission the install never granted is not even asked, and a refusal is
 
 test("the file storage read is allowed by either name of its permission (medias.readonly or the app's files.readonly)", async () => {
   const { fetchImpl, seen } = platform({ "/medias/files": { body: { files: [{}, {}] } } });
-  const only = ALL_SCOPES.filter((s) => s !== SCOPE_OF.files).concat("files.readonly");
+  const only: string[] = [...ALL_SCOPES.filter((s) => s !== SCOPE_OF.files), "files.readonly"];
   const r = await readAccountSetup({ token: "tok", locationId: "LOC1", granted: only, now: NOW, fetchImpl });
   assert.deepEqual(r.files, { state: "ok", value: { count: 2, capped: false } });
   assert.equal(seen.some((s) => s.url.includes("/medias/files")), true);
