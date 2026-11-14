@@ -153,6 +153,7 @@ import { handlePeople3 } from "./people3-routes";
 import { handleTeamRoles } from "./team-roles-routes";
 import { handleSettings2 } from "./settings2-routes";
 import { handleCqt, callQueueGuideFacts } from "./cqt-routes";
+import { handleSetupCheck } from "./setup-check-routes";
 import { handleSafeWrites } from "./safe-writes-routes";
 import { guideRowState } from "../call-queue-tags/check";
 import { handlePayments } from "./payments-routes";
@@ -2317,6 +2318,8 @@ async function dispatch(ctx: Ctx): Promise<Response> {
     // Settings, guides and What's new (stage ST): /api/app/st/<home|state|connections|progress>. Per-person marks only; never changes the CRM or a setting.
     if (a === "st" && ctx.segments.length === 2) return await handleSettings2(ctx);
     if (a === "cqt" && ctx.segments.length === 2) return await handleCqt(ctx, { allowed: () => allowedIds(ctx) });
+    // Account setup (read only): /api/app/setup-check, the checklist of one account. The account id is checked by ownedLocation inside; a client's staff have no rule for it (access.ts).
+    if (a === "setup-check" && method === "GET" && ctx.segments.length === 1) return await handleSetupCheck(ctx, { allowed: () => allowedIds(ctx) });
     // Safe CRM writes: /api/app/sw/<setup|tag|pipeline|sla|task>. Preview first, then a confirm; every change goes through src/lib/ghl/safe-writes-gateway.ts.
     if (a === "sw" && ctx.segments.length === 2) return await handleSafeWrites(ctx, { allowed: () => allowedIds(ctx), locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
     // Cash features: /api/app/cash?part=... (save this account, recover, deals; read only) and /api/app/cash/act/... (SubSync notes; the one CRM change, an owner change, goes through the safe gateway).

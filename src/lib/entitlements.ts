@@ -270,6 +270,8 @@ export const FEATURES = [
   "bf_recover",
   "bf_today",
   "cq_snapshot",
+  // Account setup: the read-only checklist of what is set up in each account (counts only). On by default.
+  "as_check",
   // Safe CRM writes (tag, standard pipeline, reply-target value, task done or delete), each behind a preview and a confirm. On by default; the writes themselves stay in practice mode until WRITE_GHL_LIVE and the account opt-in.
   "safe_writes",
 ] as const;
