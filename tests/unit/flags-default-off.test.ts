@@ -12,6 +12,8 @@ const REVIEWED_ALWAYS_ON_BASELINE = new Set([
   "workflows_pro", "workflows_write",
   // reachable only through the default-off "data_health" gate
   "data_health_pro", "data_health_fix",
+  // Account setup: a read-only checklist (counts only), ON by default by King's decision of 14 Nov 2026 (rule 11: make everything live once tests pass). A database row still switches it off.
+  "as_check",
 ]);
 
 describe("new features default off", () => {

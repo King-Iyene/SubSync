@@ -267,6 +267,8 @@ export const FEATURES = [
   "bf_recover",
   "bf_today",
   "cq_snapshot",
+  // Account setup: the read-only checklist of what is set up in each account (counts only). On by default.
+  "as_check",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

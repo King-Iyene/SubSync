@@ -788,5 +788,11 @@
   "module": "Getting started",
   "path": "st/progress",
   "min": 1
+ },
+ {
+  "module": "Clients",
+  "path": "setup-check",
+  "min": 1,
+  "note": "Account setup checklist (first account)"
  }
 ]

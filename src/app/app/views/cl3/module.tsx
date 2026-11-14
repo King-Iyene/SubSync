@@ -28,6 +28,7 @@ import { WalletTab } from "../wg/wallet";
 import { wgfxOn } from "../wg/data";
 import { AccountPage } from "../cl2/account-page";
 import { AccountsTab, type Filter as AcctFilter } from "../cl2/accounts";
+import { AccountSetupView } from "../account-setup";
 import { Plans as PlansTab, TodayPanel } from "../cl2/plans";
 import "../cl2/cl2.css";
 import { Compare, People, Reports, Setup, Trends } from "./sections";
@@ -38,12 +39,12 @@ import { ago, change, day, Find, LevelChip, Load, money, Pager, share } from "./
 // then the older Onboarding, Reviews (QBR) and Industries pages. Reads only; the only writes are SubSync's own quiet marks, reply targets and owner names (settings panel).
 // Every number is a count that opens its rows. Nothing here messages anyone or changes the CRM. Sample data appears ONLY with ?clfx=1 and is labelled "Sample data".
 type Drill = { title: string; reason: Cl3Reason; location: string | null; count: number } | null;
-type TabKey = "overview" | "money" | "wallet" | "accounts" | "plans" | "needs" | "trends" | "compare" | "reports" | "proof" | "people" | "setup" | "health" | "onboarding" | "reviews" | "industries" | "book" | "oldcompare" | "oldreports";
+type TabKey = "overview" | "money" | "wallet" | "accounts" | "plans" | "needs" | "trends" | "compare" | "reports" | "proof" | "people" | "setup" | "health" | "onboarding" | "reviews" | "industries" | "book" | "oldcompare" | "oldreports" | "acctsetup";
 // The pages are grouped under four plain names. Every page is in a group; none is removed.
 const GROUPS = [
   { label: "Overview", tip: "What to do today and who needs you.", keys: ["overview", "needs", "accounts", "trends", "compare", "oldcompare", "people", "industries", "book"] },
   { label: "Money and plans", tip: "Plans, who has not paid, credit balances.", keys: ["money", "plans", "wallet"] },
-  { label: "Health", tip: "Setup, health and onboarding.", keys: ["setup", "health", "onboarding"] },
+  { label: "Health", tip: "Setup, health and onboarding.", keys: ["setup", "acctsetup", "health", "onboarding"] },
   { label: "Reports and proof", tip: "What to show your clients.", keys: ["reports", "oldreports", "proof", "reviews"] },
 ];
 const TIPS: Record<TabKey, [string, string]> = {
@@ -51,6 +52,7 @@ const TIPS: Record<TabKey, [string, string]> = {
   wallet: ["Wallet", "Every client account's credit balance, lowest days left first, with alerts before it runs out."],
   trends: ["Trends", "Week on week or month on month, from our own record."], compare: ["Compare accounts", "Two accounts side by side."],
   reports: ["Reports", "A weekly proof for each client to show them."], proof: ["Proof", "One branded page and a monthly report for each client, to send them yourself."], people: ["People", "Who works in which account, and who has gone quiet."],
+  acctsetup: ["Account setup", "What is set up in one account (pipelines, templates, phone numbers, email and more), with a count and what to do next."],
   setup: ["Setup health", "Connection, permissions, how fresh the data is, and each client's plan."], health: ["Health and risk", "Overall health, who may be slipping, and the standard workflows each client has."],
   onboarding: ["Onboarding", "One checklist per client."], reviews: ["Reviews (QBR)", "The quarterly review of one client."], industries: ["Industries", "Clients grouped by industry, with playbooks and reply targets."],
   // Restored from the earlier Clients (a revamp adds, never removes).
@@ -190,7 +192,7 @@ function WithNames({ children }: { children: (a: Names["clients"]) => ReactNode 
   return data.clients.length === 0 ? <EmptyState title="No clients yet" body="Client accounts appear here once the first sync finishes." /> : <>{children(data.clients)}</>;
 }
 
-export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overview" }: { go: GoFn; features?: ClientsFeatures; initialTab?: "overview" | "onboarding" }) {
+export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overview", setupCheck = false }: { go: GoFn; features?: ClientsFeatures; initialTab?: "overview" | "onboarding"; /** Show the Account setup tab (the as_check flag). */ setupCheck?: boolean }) {
   const api = useApiClient(), sample = fixturesOn();
   const opt = useCl<Cl3Options>("options");
   const flags = (opt.data?.flags ?? null) as Record<string, boolean> | null;
@@ -201,15 +203,15 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
   const tabs = useMemo(() => {
     const all: TabKey[] = ["overview", "money", "wallet", "accounts", "plans", "needs", "trends", "compare", "reports", "proof", "people", "setup", "health"];
     const keep = all.filter((k) => (C2_FLAG_OF[k] ? flags?.[C2_FLAG_OF[k] as string] === true || (k === "wallet" && wgfxOn()) : k === "people" && flags?.cl2_team_move === true ? false : !FLAG_OF[k] || flags === null || flags[FLAG_OF[k] as string] !== false));
-    return [...keep, ...(f.onboarding ? (["onboarding"] as TabKey[]) : []), ...(f.clients && f.reports ? (["reviews"] as TabKey[]) : []), ...(f.clients ? (["industries"] as TabKey[]) : []), ...(f.health || f.clients ? (["book"] as TabKey[]) : []), ...(f.clients && f.reports ? (["oldcompare"] as TabKey[]) : []), ...(f.clients ? (["oldreports"] as TabKey[]) : [])];
-  }, [flags, f.onboarding, f.clients, f.reports, f.health]);
+    return [...keep, ...(setupCheck && !sample ? (["acctsetup"] as TabKey[]) : []), ...(f.onboarding ? (["onboarding"] as TabKey[]) : []), ...(f.clients && f.reports ? (["reviews"] as TabKey[]) : []), ...(f.clients ? (["industries"] as TabKey[]) : []), ...(f.health || f.clients ? (["book"] as TabKey[]) : []), ...(f.clients && f.reports ? (["oldcompare"] as TabKey[]) : []), ...(f.clients ? (["oldreports"] as TabKey[]) : [])];
+  }, [flags, f.onboarding, f.clients, f.reports, f.health, setupCheck, sample]);
   const [tab, setTab] = useState<TabKey>(() => wantedTab() ?? initialTab);
   // The dates are the date bar's (one range for the whole app); every read below asks for exactly them.
   const filters = useMemo<ClParams>(() => ({ from: bar.ready ? bar.from : undefined, to: bar.ready ? bar.to : undefined, industry: industry || undefined }), [bar.ready, bar.from, bar.to, industry]);
   const active = tabs.includes(tab) ? tab : tabs[0];
   const open = (d: NonNullable<Drill>) => { setDrill(d); setTimeout(() => document.getElementById("cl-drill")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50); };
   const goTab = (t: TabKey) => { setTab(t); setDrill(null); };
-  const readsAccounts = !["onboarding", "reviews", "industries", "health", "accounts", "plans", "money", "wallet", "proof", "book", "oldcompare", "oldreports"].includes(active);
+  const readsAccounts = !["acctsetup", "onboarding", "reviews", "industries", "health", "accounts", "plans", "money", "wallet", "proof", "book", "oldcompare", "oldreports"].includes(active);
   // A deep link (?account=<id>) opens that account's page. The server checks the id again; an id that is not yours shows "not found".
   const openAccount = (id: string | null) => { setOpenId(id); setDrill(null); try { const u = new URL(window.location.href); if (id) u.searchParams.set("account", id); else u.searchParams.delete("account"); window.history.replaceState(null, "", u.toString()); } catch { /* ignore */ } };
   const tileTo = (t: Cl2Today["tiles"][number]) => { setAcctPreset({ status: t.filter.status ?? "", level: t.filter.level ?? "", quiet: t.filter.quiet === true, plan: t.filter.plan ?? "" }); goTab("accounts"); };
@@ -243,6 +245,7 @@ export function ClientsModule({ go, features = ALL_FEATURES, initialTab = "overv
       case "people": return <People filters={filters} />;
       case "setup": return <Setup filters={filters} billingOn={(flags === null || flags.cl_billing !== false) && !on2("cl2_plans")} />;
       case "health": return <Health />;
+      case "acctsetup": return <AccountSetupView />;
       case "onboarding": return <OnboardingTab go={go} />;
       case "reviews": return <WithNames>{(a) => <ReviewsTab accounts={a} />}</WithNames>;
       case "industries": return <IndustriesTab go={go} showPlaybooks={f.playbooks} />;

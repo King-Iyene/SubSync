@@ -75,6 +75,7 @@ const DataHealthView = dynamic(() => import("./views/data-health").then((m) => m
 const PeopleModule = dynamic(() => import("./views/people-module").then((m) => m.PeopleModule), { ssr: false, loading: () => <ViewLoading /> });
 const ClientsView = dynamic(() => import("./views/clients").then((m) => m.ClientsView), { ssr: false, loading: () => <ViewLoading /> });
 const DealsView = dynamic(() => import("./views/deals").then((m) => m.DealsView), { ssr: false, loading: () => <ViewLoading /> });
+const AccountSetupView = dynamic(() => import("./views/account-setup").then((m) => m.AccountSetupView), { ssr: false, loading: () => <ViewLoading /> });
 const EmailHealthView = dynamic(() => import("./views/email-health").then((m) => m.EmailHealthView), { ssr: false, loading: () => <ViewLoading /> });
 const HelpView = dynamic(() => import("./views/help").then((m) => m.HelpView), { ssr: false, loading: () => <ViewLoading /> });
 const SettingsHub = dynamic(() => import("./views/settings-hub").then((m) => m.SettingsHub), { ssr: false, loading: () => <ViewLoading /> });
@@ -112,6 +113,7 @@ const PRELOAD: Record<string, () => Promise<unknown>> = {
   ClientsView: () => import("./views/clients"),
   DealsView: () => import("./views/deals"),
   EmailHealthView: () => import("./views/email-health"),
+  AccountSetupView: () => import("./views/account-setup"),
   HelpView: () => import("./views/help"),
   SettingsHub: () => import("./views/settings-hub"),
   GuidesView: () => import("./views/guides-view"),
@@ -488,7 +490,8 @@ export function Dashboard() {
   const peopleStart = view.id === "calls" ? 1 : view.id === "leads" ? 2 : 0;
   const pipeTabs = [{ label: "Forecast and stages", node: <PipelineView /> }, { label: "Stale deals and hygiene", node: <DealsView /> }];
   // A business or a client's staff keep the small Setup module (their own checklist and email sending). An agency has the Clients module instead.
-  const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }];
+  const setupCheckOn = auth.features.as_check === true && !auth.locked.includes("as_check") && auth.kind !== "client" && NAV_FOR[auth.kind].has("onboarding");
+  const setupTabs = [{ label: "Setup checklists", node: <OnboardingView go={go} /> }, { label: "Email sender health", node: <EmailHealthView /> }, ...(setupCheckOn ? [{ label: "Account setup", node: <AccountSetupView /> }] : [])];
   const clientFeatures: ClientsFeatures = { health: !off("health"), onboarding: !off("onboarding"), clients: !off("clients"), reports: !off("reports"), setupCompare: !off("setup_compare"), playbooks: !off("playbooks") };
 
   // Today (front page): the new module replaces the old hub when its flag is on; the older tabs stay reachable under Numbers > More numbers.
@@ -518,11 +521,11 @@ export function Dashboard() {
       case "speed": return <SpeedView go={go} unanswered={inboxTab} start={speedStart()} />;
       // Overview is merged into Today > Numbers: the old address opens Numbers with a one-line "Overview moved here" (the page itself stays in the code, behind the ov_screen flag).
       case "overview": return overviewMerged(auth.features) ? <ApiProvider value={baseApi}><TodayModule key="td3-ov" go={go} kind={auth.kind} initialTab="numbers" fromOverview /></ApiProvider> : <OverviewView go={go} />;
-      case "accounts": if ((auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample()) return <ClientsModule key="cl3" go={go} features={clientFeatures} />; return <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
+      case "accounts": if ((auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample()) return <ClientsModule key="cl3" go={go} features={clientFeatures} setupCheck={setupCheckOn} />; return <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
       case "account": return view.locationId ? <AccountDetailView key={view.locationId} locationId={view.locationId} go={go} agency={agency} /> : <ClientsView key="accounts" go={go} initialTab="health" features={clientFeatures} />;
       case "deals": return <ModuleTabs key="pipe" start={1} tabs={pipeTabs} />;
       case "inbox": return inboxTab ? <SpeedView go={go} unanswered start="unanswered" /> : <InboxView go={go} />;
-      case "onboarding": return limited ? <ModuleTabs key="setup" start={0} tabs={setupTabs} /> : (auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample() ? <ClientsModule key="cl3" go={go} features={clientFeatures} initialTab="onboarding" /> : <ClientsView key="onboarding" go={go} initialTab="onboarding" features={clientFeatures} />;
+      case "onboarding": return limited ? <ModuleTabs key="setup" start={0} tabs={setupTabs} /> : (auth.features.cl_module === true && !auth.locked.includes("cl_module")) || clSample() ? <ClientsModule key="cl3" go={go} features={clientFeatures} initialTab="onboarding" setupCheck={setupCheckOn} /> : <ClientsView key="onboarding" go={go} initialTab="onboarding" features={clientFeatures} />;
       case "email": return limited ? <ModuleTabs key="setup" start={1} tabs={setupTabs} /> : <EmailHealthView />;
       case "duplicates": case "cleanup": if (dqOn) return <DqModule key="dq" kind={auth.kind} start={viewId === "duplicates" ? "duplicates" : "overview"} duplicatesOn={dqFlag("dq_dupes")} intakeOn={dqFlag("dq_intake")} fixOn={auth.features.cu_fix === true && !auth.locked.includes("cu_fix")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} />;
         return <CleanupModule key={viewId} kind={auth.kind} start={viewId === "cleanup" ? "quality" : "duplicates"} duplicatesOn={!off("duplicates") && NAV_FOR[auth.kind].has("duplicates")} cleanupOn={!off("cleanup") && NAV_FOR[auth.kind].has("cleanup")} fixOn={auth.features.cu_fix === true && !auth.locked.includes("cu_fix")} healthOn={auth.features.cu_health === true && !auth.locked.includes("cu_health")} legacyHealth={auth.features.cu_health === true && !off("data_health") ? <ApiProvider value={baseApi}><DataHealthView go={go} kind={auth.kind} /></ApiProvider> : null} />;

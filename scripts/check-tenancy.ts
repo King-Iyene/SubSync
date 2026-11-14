@@ -544,6 +544,20 @@ async function main() {
       assert.ok(!(await (await fetch(`${BASE}/r/${"Z".repeat(32)}`)).text()).includes("Weekly proof"), "an unknown id shows nothing");
     }
 
+    // Account setup (read only, counts only): another company's account, an unknown id and a malformed id are all "not found" and never echo the id or the other company's name; a client's own staff are refused outright.
+    {
+      const tA = session(A, "agency");
+      for (const bad of [B.locs[0], B.locs[1], "nope-not-an-account", "x"]) {
+        const r = await call(`/api/app/setup-check?locationId=${encodeURIComponent(bad)}`, tA);
+        assert.equal(r.status, 404, `setup-check for ${bad} answered ${r.status}`);
+        assert.ok(!r.text.includes(B.marker) && !r.text.includes(B.locs[0]), "setup-check never echoes the other company or its account id");
+      }
+      assert.equal((await call(`/api/app/setup-check?locationId=${B.locs[0]}`, session(A, "business", A.locs[0]))).status, 404, "a business cannot ask for another company's account");
+      assert.equal((await call(`/api/app/setup-check?locationId=${A.locs[1]}`, session(A, "business", A.locs[0]))).status, 404, "a business cannot ask for a sibling account");
+      assert.equal((await call("/api/app/setup-check", session(A, "client", A.locs[0]))).status, 403, "a client's own staff cannot open Account setup");
+      assert.ok([404, 405].includes((await call("/api/app/setup-check", tA, { method: "POST", body: "{}" })).status), "it only reads");
+    }
+
     // The branded client Proof page (stage PR): each company prepares and shares a report only for its own accounts; the public page is opened by the token alone, shows that one account and nothing of
     // the other company, never names the product or the platform, and a forged, malformed, replaced or switched-off token finds nothing.
     {
@@ -632,7 +646,7 @@ async function main() {
         // not allowed for a client at all: each must be refused
         "/api/app/settings", "/api/app/clients", "/api/app/clients?part=home", "/api/app/clients?part=list", "/api/app/clients?part=names", `/api/app/clients?part=one&id=${me.locs[1]}`, "/api/app/clients/compare", `/api/app/qbr/${me.locs[1]}`, "/api/app/api-keys", "/api/app/connections", "/api/app/meetings", "/api/app/cleanup", "/api/app/team", "/api/app/goals", "/api/app/call-lists",
         "/api/app/call-queue", "/api/app/call-outcomes", "/api/app/exec-summary", "/api/app/daily", "/api/app/daily-brief", "/api/app/digest", "/api/app/export/stale", "/api/app/sync-status", "/api/app/freshness", "/api/app/segments", "/api/app/playbooks",
-        "/api/app/setup-compare", "/api/app/email", "/api/app/audit/shares", "/api/app/tickets", "/api/app/tickets/1", "/api/app/fees", "/api/app/notes",
+        "/api/app/setup-compare", "/api/app/email", "/api/app/setup-check", "/api/app/audit/shares", "/api/app/tickets", "/api/app/tickets/1", "/api/app/fees", "/api/app/notes",
       ];
       const allowedForClient = new Set(["overview", "accounts", "onboarding", "search", "stale", "hygiene", "inbox", "notifications", "pipelines", "duplicates", "alerts", "pipeline-intel", "contact-intel", "comms-intel", "deal-gaps", "deal-events", "start", "appointments", "appointment-insights", "audit", "speed", "roadmap", "freshness", "client-trends"]);
       let answered = 0;
