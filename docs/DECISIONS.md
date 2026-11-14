@@ -765,3 +765,6 @@ Choices: defaults are the tags the workflow templates really listen for (needs-f
 ## 2026-11-14: Money checks (live, read only, one account at a time)
 Who: an agency owner or account administrator who wants to see what an account has set up for money (invoices, estimates, orders, coupons, products, a payment provider, app charges) without opening the CRM. Next they chase the overdue invoices, notice an account with no payment provider or no products, or open the failed and upcoming tabs linked at the top. If it were missing they would say "I cannot tell whether this client can even take a payment".
 Choices: read live with the account's own key and store nothing (no migration; each optional money permission is shown in use by one honest screen); one account at a time so a 40-account agency does not trigger hundreds of calls; a permission that was not granted is never asked for; the custom payment provider read uses only the provider's name and never shows keys; overdue is its own invoice group (sent or partly paid, past the due date) so nothing is counted twice.
+
+## 14 Nov 2026: SubSync is a read and write app
+Who: agency owners, setters, client admins. What they do next: preview and confirm a change, or press Send. Missing: they could not act from SubSync. The old 'read-only by default' wording in CLAUDE.md section 1A is replaced.
