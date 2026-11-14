@@ -8,6 +8,8 @@ const WORDS: Record<string, string> = {
   "workflows.logs": "read what your workflows did",
   "emails/stats.readonly": "read how many emails were sent and opened",
   "wallet.readonly": "read your credit balance",
+  "saas/company.read": "read your clients' plans and payment status",
+  "oauth.readonly": "see which client accounts have SubSync installed",
   "contacts.write": "change contacts",
   "contacts.readonly": "read contacts",
   "payments/transactions.readonly": "read payments",

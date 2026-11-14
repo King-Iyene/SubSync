@@ -1,8 +1,12 @@
 // Reads which plan each client account is on, from the platform's SaaS API. Pure logic (no database) so it can be tested with mocked responses.
 // One paged call lists every account that is in SaaS mode: GET /saas/saas-locations/{companyId}?page=N (agency token, Version v3; the platform gives plan details to agency-level apps only, so for this app it normally answers 401/403).
-// Three honest states per account: "ok" (plan found), "no_plan" (the platform answered and the account is not on a plan), never "needs_permission": the permission for this read is agency-only and can never be granted to this app, so 401/403 means "not_available".
+// Honest states per account: "ok" (plan found), "no_plan" (answered, not on a plan), "needs_permission" (the platform said the token is not authorized for this scope: reconnect and allow it),
+// "not_available" (any other refusal: the platform does not give plan details to this app or account).
 
-export type SaasState = "ok" | "no_plan" | "needs_permission" | "not_available";
+import { accessState } from "./clients3-installs.ts";
+/** The permission the plan list needs (the platform's public API description: agency token, saas/company.read). Live probe 13 Nov 2026: refused with "not authorized for this scope" while it was not granted. */
+export const SAAS_SCOPE = "saas/company.read";
+export type SaasState ="ok" | "no_plan" | "needs_permission" | "not_available";
 export type PlanDetail = { title: string | null; trialDays: number | null; userLimit: number | null; contactLimit: number | null; prices: Array<{ id: string | null; amount: number; currency: string | null; interval: string | null }> };
 export type SaasRow = {
   state: SaasState; planId: string | null; planName: string | null; status: string | null;
@@ -17,6 +21,8 @@ const dig = (o: unknown, ...keys: string[]): unknown => { let c = o; for (const 
 
 /** Plain words shown wherever client plan details cannot be read (the platform gives them to agency-level apps only). */
 export const PLANS_AGENCY_ONLY = "Not available for this kind of app. The platform only gives plan details to company-level apps.";
+/** Plain words when the install never granted the plan permission: reconnecting is the fix. */
+export const PLANS_NEED_PERMISSION = "Needs permission: reconnect and allow plan access (saas/company.read).";
 export const SAAS_VERSION = "v3";
 const OLD_VERSION = "2021-07-28";
 const MAX_PAGES = 200;
@@ -39,14 +45,14 @@ export function planDetail(body: unknown): PlanDetail {
 }
 
 /** Fetch every page of the SaaS accounts list and map it to one row per account id. `failed` carries the real HTTP status when the call did not succeed. */
-export async function readSaasPlans(get: Getter, companyId: string): Promise<{ failed: number | null; rows: Map<string, SaasRow> }> {
+export async function readSaasPlans(get: Getter, companyId: string, granted: string[] | null = null): Promise<{ failed: number | null; access?: "needs_permission" | "not_available"; rows: Map<string, SaasRow> }> {
   const rows = new Map<string, SaasRow>();
   const plans = new Map<string, PlanDetail | null>();
   const priceIds = new Map<string, string | null>();
   const base = `/saas/saas-locations/${encodeURIComponent(companyId)}`;
   for (let page = 1; page <= MAX_PAGES; page++) {
     const r = await call(get, `${base}?page=${page}`);
-    if (r.status < 200 || r.status >= 300) return { failed: r.status, rows: page === 1 ? rows : rows };
+    if (r.status < 200 || r.status >= 300) { const a = accessState(r, granted, SAAS_SCOPE); return { failed: r.status, access: a === "needs_permission" ? a : "not_available", rows }; }
     const list = dig(r.body, "locations");
     for (const l of Array.isArray(list) ? list : []) {
       const id = str(dig(l, "locationId"));
@@ -75,9 +81,9 @@ export async function readSaasPlans(get: Getter, companyId: string): Promise<{ f
 }
 
 /** State for an account the list did not contain, or for every account when the call failed. */
-export function stateFor(result: { failed: number | null; rows: Map<string, SaasRow> }, locationId: string): SaasRow {
+export function stateFor(result: { failed: number | null; access?: "needs_permission" | "not_available"; rows: Map<string, SaasRow> }, locationId: string): SaasRow {
   if (result.failed !== null) {
-    return { state: "not_available", planId: null, planName: null, status: null };
+    return { state: result.access === "needs_permission" ? "needs_permission" : "not_available", planId: null, planName: null, status: null };
   }
   return result.rows.get(locationId) ?? { state: "no_plan", planId: null, planName: null, status: null };
 }

@@ -2,7 +2,9 @@ import { sql } from "../db";
 import { GHL_API } from "../ghl/client";
 import { ghlFetch } from "../ghl/http";
 import { getCompanyAccessToken } from "../ghl/installations";
-import { PLANS_AGENCY_ONLY, readSaasPlans, stateFor, type Getter } from "./clients3-saas";
+import { PLANS_AGENCY_ONLY, PLANS_NEED_PERMISSION, readSaasPlans, stateFor, type Getter } from "./clients3-saas";
+import { readInstalls } from "./clients3-installs";
+import { parseGranted } from "../scope-groups";
 import type { Cl3Billing } from "./clients3-types";
 import { accountsIn, type Scope } from "./clients3-queries";
 
@@ -22,20 +24,21 @@ async function get(token: string): Promise<Getter> {
 /** Read-only sweep step: one paged call lists every account on a plan; store what the platform says per account. Returns accounts written. Skips installs that have no agency token. */
 export async function refreshClientBilling(inst: string): Promise<number> {
   const db = sql();
-  const inRow = await db`select company_id from installations where id = ${inst}`;
+  const inRow = await db`select company_id, scope from installations where id = ${inst}`;
   const companyKey = inRow[0]?.company_id as string | undefined;
   if (!companyKey || companyKey.startsWith("loc:")) return 0;
+  const granted = typeof inRow[0]?.scope === "string" && (inRow[0].scope as string).trim() ? parseGranted(inRow[0].scope as string) : null;
   let token: string;
   try { token = await getCompanyAccessToken(companyKey); } catch { return 0; }
   const accts = await db`select location_id from locations where installation_id = ${inst} and not ignored`;
   const getter = await get(token);
-  const result = await readSaasPlans(getter, companyKey);
+  const result = await readSaasPlans(getter, companyKey, granted);
   let before = new Map<string, { status: string | null; since: Date | null; plan: string | null }>();
   try {
     const p = await db`select location_id, subscription_status, status_since, plan_name from client_billing where installation_id = ${inst}`;
     before = new Map(p.map((x) => [x.location_id as string, { status: (x.subscription_status as string | null) ?? null, since: (x.status_since as Date | null) ?? null, plan: (x.plan_name as string | null) ?? null }]));
   } catch { /* the Clients v2 columns are not there yet: the older write below still works */ }
-  const reason = result.failed === null ? null : result.failed === 401 || result.failed === 403 ? PLANS_AGENCY_ONLY : `The platform answered ${result.failed} when asked for plans.`;
+  const reason = result.failed === null ? null : result.access === "needs_permission" ? PLANS_NEED_PERMISSION : result.failed === 401 || result.failed === 403 ? PLANS_AGENCY_ONLY : `The platform answered ${result.failed} when asked for plans.`;
   let written = 0;
   for (const a of accts) {
     const id = a.location_id as string;
@@ -120,11 +123,11 @@ export async function billing(s: Scope, f: { q?: string | null; industry?: strin
   const out: Cl3Billing[] = accts.map((a) => {
     const r = by.get(a.id);
     const st = (r?.state as string | undefined) ?? "unknown";
-    const state: Cl3Billing["state"] = st === "ok" ? "ok" : st === "no_plan" ? "no_plan" : st === "unknown" ? "not_checked" : "not_available";
+    const state: Cl3Billing["state"] = st === "ok" ? "ok" : st === "no_plan" ? "no_plan" : st === "unknown" ? "not_checked" : st === "needs_permission" ? "needs_permission" : "not_available";
     return {
       locationId: a.id, name: a.name, state, plan: (r?.plan_name as string | null) ?? (r?.plan_id as string | null) ?? null, subscriptionStatus: (r?.subscription_status as string | null) ?? null,
       paymentFailing: null, nextPaymentAt: null, appsInstalled: null, fetchedAt: r?.fetched_at ? new Date(r.fetched_at as string).toISOString() : null,
-      message: state === "no_plan" ? NO_PLAN : state === "not_checked" ? "Not checked yet" : state === "not_available" ? PLANS_AGENCY_ONLY : null,
+      message: state === "no_plan" ? NO_PLAN : state === "not_checked" ? "Not checked yet" : state === "needs_permission" ? PLANS_NEED_PERMISSION : state === "not_available" ? PLANS_AGENCY_ONLY : null,
     };
   });
   out.sort((a, b) => Number(b.state === "needs_permission") - Number(a.state === "needs_permission") || a.name.localeCompare(b.name));
@@ -133,33 +136,28 @@ export async function billing(s: Scope, f: { q?: string | null; industry?: strin
   return { rows: out.slice(p * size, p * size + size), total: out.length, page: p, size, pages, truncated: out.length >= 1000, needPermission: out.filter((x) => x.state === "needs_permission").length, notActive: out.filter(bad).length };
 }
 
-const INSTALL_PAGES = 30;
-/** Whether SubSync is installed on each client account, from the platform installed list (agency token, optional permission oauth.readonly, Version v3, up to 100 a page). Only SubSync can be read:
- *  the platform has no list of other apps in an account. The page-token field name is read as nextPageToken (INFERENCE until scripts/saas-probe.mts is run); without it only the first 100 are stored. */
+/** Whether SubSync is installed on each client account, and its plan and trial flag, from the platform installed list (agency token, permission oauth.readonly, live-verified: GET /oauth/installedLocations).
+ *  Only SubSync can be read: the platform has no list of other apps in an account. After a full successful read, an account the list no longer holds is recorded as not installed. */
 async function refreshAppInstalls(inst: string, get: Getter, companyKey: string): Promise<void> {
   const appId = process.env.GHL_APP_ID;
   if (!appId) return;
   const db = sql();
   const prev = new Map<string, boolean>((await db`select location_id, is_installed from cl3_app_installs where installation_id = ${inst}`.catch(() => [])).map((r) => [r.location_id as string, r.is_installed === true]));
-  let token = "";
-  for (let i = 0; i < INSTALL_PAGES; i++) {
-    const q = `/oauth/installed-${"locations"}?companyId=${encodeURIComponent(companyKey)}&appId=${encodeURIComponent(appId)}&pageSize=100${token ? `&pageToken=${encodeURIComponent(token)}` : ""}`;
-    const r = await get(q, "v3").catch(() => ({ status: 0, body: null }));
-    if (r.status < 200 || r.status >= 300) return;
-    const body = (r.body && typeof r.body === "object" ? r.body : {}) as { items?: unknown; pagination?: { nextPageToken?: unknown; hasNextPage?: unknown } };
-    for (const it of Array.isArray(body.items) ? (body.items as Array<Record<string, unknown>>) : []) {
-      const id = typeof it._id === "string" ? it._id : null;
-      if (!id) continue;
-      const installed = it.isInstalled === true;
-      const at = typeof it.installedAt === "string" && !Number.isNaN(Date.parse(it.installedAt)) ? it.installedAt : null;
-      await db`insert into cl3_app_installs (installation_id, location_id, name, is_installed, version_id, installed_at, seen_at)
-        values (${inst}, ${id}, ${typeof it.name === "string" ? it.name.slice(0, 120) : null}, ${installed}, ${typeof it.versionId === "string" ? it.versionId : null}, ${at}, now())
-        on conflict (installation_id, location_id) do update set name = excluded.name, is_installed = excluded.is_installed, version_id = excluded.version_id, installed_at = excluded.installed_at, seen_at = now()`;
-      const was = prev.get(id);
-      if (was !== undefined && was !== installed) await db`insert into cl3_history (installation_id, location_id, kind) values (${inst}, ${id}, ${installed ? "app_installed" : "app_removed"})`.catch(() => undefined);
-    }
-    const nxt = body.pagination?.nextPageToken;
-    if (body.pagination?.hasNextPage !== true || typeof nxt !== "string" || !nxt) return;
-    token = nxt;
+  const res = await readInstalls(get, companyKey, appId);
+  if (res.failed) return;
+  const seen = new Set<string>();
+  for (const it of res.rows) {
+    seen.add(it.locationId);
+    await db`insert into cl3_app_installs (installation_id, location_id, name, is_installed, version_id, installed_at, plan_id, on_trial, seen_at)
+      values (${inst}, ${it.locationId}, ${it.name}, ${it.installed}, ${it.versionId}, ${it.installedAt}, ${it.planId}, ${it.onTrial}, now())
+      on conflict (installation_id, location_id) do update set name = excluded.name, is_installed = excluded.is_installed, version_id = excluded.version_id, installed_at = excluded.installed_at, plan_id = excluded.plan_id, on_trial = excluded.on_trial, seen_at = now()`;
+    const was = prev.get(it.locationId);
+    if (was !== undefined && was !== it.installed) await db`insert into cl3_history (installation_id, location_id, kind) values (${inst}, ${it.locationId}, ${it.installed ? "app_installed" : "app_removed"})`.catch(() => undefined);
+  }
+  // Accounts we knew as installed that the platform no longer lists: removed.
+  for (const [id, was] of prev) {
+    if (!was || seen.has(id)) continue;
+    await db`update cl3_app_installs set is_installed = false, seen_at = now() where installation_id = ${inst} and location_id = ${id}`.catch(() => undefined);
+    await db`insert into cl3_history (installation_id, location_id, kind) values (${inst}, ${id}, 'app_removed')`.catch(() => undefined);
   }
 }

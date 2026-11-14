@@ -92,7 +92,7 @@ The automations and campaigns in your client accounts, and how they are doing.
 | `campaigns.readonly` | read | optional | The list of campaigns in each client account (name, state, last change), to find stuck or failed ones. Read only: SubSync never starts or sends a campaign. |
 | `emails/campaigns.readonly` | read | optional | The email, bulk and workflow campaigns of each client account, read only, for the same list. |
 | `emails/stats.readonly` | read | optional | How many messages of each campaign were sent, delivered, opened, clicked, bounced or are still waiting, to find campaigns that looked sent but did not arrive. Totals only: SubSync never sees who received what. |
-| `saas/location.read` | read | optional | Optional. The platform only gives client plan details to company-level apps, so no screen depends on it today. |
+| `saas/location.read` | read | optional | Optional. Requested for the Plans and payments block on the Clients screen. Honest status: the platform's public API description lists no read that this permission unlocks (the plan reads ask for saas/company.read, agency level), so the block shows Needs permission or Not available until the platform confirms what it unlocks. |
 
 ## Payments and credit
 
@@ -104,7 +104,7 @@ Failed and late payments, so you can chase the money, and the credit balance of 
 | `payments/subscriptions.readonly` | read | optional | Whether a customer's repeat payment is active or past due, to list failed repeat payments. Read only. |
 | `invoices.readonly` | read | optional | Which invoices are sent, partly paid or paid and when they are due, to list late invoices. Read only: SubSync never sends or changes an invoice. |
 | `wallet.readonly` | read | optional | The credit balance of each client account, to warn you before it runs out. Read only. |
-| `marketplace-installer-details.readonly` | read | optional | Which plan each install is on, to double-check billing against our own records. Read only. |
+| `marketplace-installer-details.readonly` | read | optional | One record for the token that asks: the installer, the company and the plan id (no dates, no trial). Used only to cross-check the Marketplace installs block, whose dates, plan and trial flag come from the installed list. Read only. |
 
 ## Lead intake
 
