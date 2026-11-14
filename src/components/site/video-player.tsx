@@ -20,7 +20,7 @@ export function VideoPlayer() {
       <div className="vbox" id="tour">
         <video ref={ref} controls={started} preload="none" playsInline poster={VIDEO.poster} width={1280} height={720} aria-label={VIDEO.title} style={{ visibility: started ? "visible" : "hidden" }}>
           <source src={VIDEO.src720} type="video/mp4" />
-          <track kind="captions" src={VIDEO.captions} srcLang="en" label="English" default />
+          <track kind="captions" src={VIDEO.captions} srcLang="en" label="English" />
           Your browser cannot play this video. It is a four-minute tour of SubSync, and the same things are written out on the Support pages.
         </video>
         {!started && (
@@ -36,7 +36,7 @@ export function VideoPlayer() {
           </button>
         )}
       </div>
-      <p className="vcap">Captions are on. Press the CC button in the player to turn them off.</p>
+      <p className="vcap">Captions are built into the video.</p>
     </div>
   );
 }
