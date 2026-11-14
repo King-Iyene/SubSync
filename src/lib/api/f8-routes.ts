@@ -4,6 +4,8 @@
 import { personKey, parseFeedback, parseProblem, parseSuggestion } from "../feedback.ts";
 import { feedbackGivenBy, mySuggestions, saveFeedback, saveProblem, saveSuggestion, settingsHistory, type Who } from "../feedback-queries";
 import { json, type AuthContext } from "./auth";
+import { runAfter } from "../run-after";
+import { notifyOwnerOfFeedback } from "../notifications/feedback-alert-run";
 
 export const whoOf = (ctx: AuthContext): Who => ({
   installationId: ctx.installationId, kind: ctx.kind, limitTo: ctx.limitTo,
@@ -11,6 +13,12 @@ export const whoOf = (ctx: AuthContext): Who => ({
 });
 
 const TOO_MANY = "You have sent a lot of feedback today. Thank you. Please try again tomorrow, or email us.";
+
+/** Tell the platform owner, by the owner's own rules (default: only when someone is stuck). Runs after the answer is sent and can never fail the submission. */
+function tellOwner(ctx: AuthContext, item: { kind: "feedback" | "problem" | "suggestion"; severity: "idea" | "annoying" | "blocking"; page: string | null; id: string; text: string }): void {
+  if (ctx.demo) return;
+  runAfter(() => notifyOwnerOfFeedback({ ...item, installationId: ctx.installationId }));
+}
 
 async function body(request: Request): Promise<unknown> {
   return request.json().catch(() => null);
@@ -21,6 +29,7 @@ export async function giveFeedback(ctx: AuthContext, request: Request): Promise<
   if (!parsed.ok) return json({ error: parsed.error }, 400);
   const saved = await saveFeedback(whoOf(ctx), parsed.value);
   if (!saved.ok) return json({ error: TOO_MANY }, 429);
+  tellOwner(ctx, { kind: "feedback", severity: parsed.value.severity, page: parsed.value.page, id: saved.id, text: parsed.value.message });
   return json({ ok: true, reference: saved.reference });
 }
 
@@ -29,6 +38,7 @@ export async function reportProblem(ctx: AuthContext, request: Request): Promise
   if (!parsed.ok) return json({ error: parsed.error }, 400);
   const saved = await saveProblem(whoOf(ctx), parsed.value);
   if (!saved.ok) return json({ error: TOO_MANY }, 429);
+  tellOwner(ctx, { kind: "problem", severity: "blocking", page: parsed.value.page, id: saved.id, text: parsed.value.message });
   return json({ ok: true, reference: saved.reference });
 }
 
@@ -37,6 +47,7 @@ export async function suggest(ctx: AuthContext, request: Request): Promise<Respo
   if (!parsed.ok) return json({ error: parsed.error }, 400);
   const saved = await saveSuggestion(whoOf(ctx), parsed.value);
   if (!saved.ok) return json({ error: TOO_MANY }, 429);
+  tellOwner(ctx, { kind: "suggestion", severity: "idea", page: parsed.value.page, id: saved.id, text: parsed.value.title });
   return json({ ok: true, reference: saved.reference });
 }
 

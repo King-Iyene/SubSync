@@ -75,6 +75,7 @@ const HelpView = dynamic(() => import("./views/help").then((m) => m.HelpView), {
 const SettingsHub = dynamic(() => import("./views/settings-hub").then((m) => m.SettingsHub), { ssr: false, loading: () => <ViewLoading /> });
 const GuidesView = dynamic(() => import("./views/guides-view").then((m) => m.GuidesView), { ssr: false, loading: () => <ViewLoading /> });
 const NewsView = dynamic(() => import("./views/news-view").then((m) => m.NewsView), { ssr: false, loading: () => <ViewLoading /> });
+const OwnerFeedbackView = dynamic(() => import("./views/owner-feedback").then((m) => m.OwnerFeedbackView), { ssr: false, loading: () => <ViewLoading /> });
 const RoadmapView = dynamic(() => import("./views/roadmap").then((m) => m.RoadmapView), { ssr: false, loading: () => <ViewLoading /> });
 const InboxView = dynamic(() => import("./views/inbox").then((m) => m.InboxView), { ssr: false, loading: () => <ViewLoading /> });
 const OnboardingView = dynamic(() => import("./views/onboarding").then((m) => m.OnboardingView), { ssr: false, loading: () => <ViewLoading /> });
@@ -139,7 +140,7 @@ type Auth =
   | { status: "error"; message: string }
   | { status: "not_installed" }
   | { status: "maintenance"; message: string }
-  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean>; locked: string[]; kind: AccessKind; locationId: string | null; brand: { name: string | null; color: string | null; logoUrl?: string | null } };
+  | { status: "ready"; api: Api; demo: boolean; userName: string | null; features: Record<string, boolean>; locked: string[]; kind: AccessKind; locationId: string | null; owner: boolean; brand: { name: string | null; color: string | null; logoUrl?: string | null } };
 
 type SsoResponse = {
   error?: string;
@@ -148,6 +149,8 @@ type SsoResponse = {
   demo?: boolean;
   session?: string;
   kind?: AccessKind;
+  /** True only for the platform owner: shows the owner-only Feedback item. */
+  owner?: boolean;
   user?: { userName?: string | null; activeLocation?: string | null };
   entitlements?: { features: Record<string, boolean>; locked?: string[] };
   brand?: { name: string | null; color: string | null; logoUrl?: string | null };
@@ -216,7 +219,7 @@ export function Dashboard() {
       setAuth({
         status: "ready", api: makeApi(r.data.session, () => refreshRef.current(), demo), demo,
         userName: r.data.user?.userName ?? null, features: r.data.entitlements?.features ?? {}, locked: r.data.entitlements?.locked ?? [],
-        kind: r.data.kind ?? "agency", locationId: r.data.user?.activeLocation ?? null, brand: r.data.brand ?? { name: null, color: null },
+        kind: r.data.kind ?? "agency", locationId: r.data.user?.activeLocation ?? null, owner: r.data.owner === true, brand: r.data.brand ?? { name: null, color: null },
       });
       return r.data.session;
     }
@@ -344,6 +347,20 @@ export function Dashboard() {
   // The "show only" filter (client accounts, industry, owner, test accounts) narrows every page for agencies. It is part of the page address.
   const filterQuery = filterToQuery(filter);
   const baseApi = auth.status === "ready" ? auth.api : null;
+  // The owner-only Feedback inbox (platform owner only): an extra menu item with a count of new items. Nobody else gets the item, and the server answers 404 to anyone else.
+  const isOwner = auth.status === "ready" && auth.owner && !auth.demo;
+  // The inbox shows while the page is the one that was current when it was opened; going anywhere else (a new view object) closes it.
+  const [ownerAt, setOwnerAt] = useState<object | null>(() => (typeof window !== "undefined" && window.location.hash === "#feedback-owner" ? start.view : null));
+  const ownerOpen = ownerAt !== null && ownerAt === view;
+  const [ownerNew, setOwnerNew] = useState(0);
+  useEffect(() => {
+    if (!isOwner || !baseApi) return;
+    const load = () => { baseApi.get<{ count: number }>("owner/feedback/count", { fresh: true }).then((r) => setOwnerNew(r.count), () => undefined); };
+    load();
+    window.addEventListener("subsync-owner-feedback", load);
+    const t = window.setInterval(load, 120_000);
+    return () => { window.removeEventListener("subsync-owner-feedback", load); window.clearInterval(t); };
+  }, [isOwner, baseApi]);
   // Opened from inside one client account (the platform sends that account with the sign-in): start on it, with a way back to all of them.
   const launched = useRef(false);
   // Once Today is on screen and the browser is idle, load the code of the pages people open next, one at a time, so the first click on any of them has nothing left to download.
@@ -555,6 +572,13 @@ export function Dashboard() {
             {renderNav(mainMenu)}
           </nav>
           {footMenu.length > 0 && <nav className="mt-1 flex flex-col gap-0.5" aria-label="Settings and help">{renderNav(footMenu)}</nav>}
+          {isOwner && (
+            <button type="button" data-testid="owner-feedback-menu" onClick={() => { setOwnerAt(view); try { window.history.replaceState(null, "", "#feedback-owner"); } catch { /* a frame that forbids it */ } }} aria-current={ownerOpen ? "page" : undefined}
+              className={`mt-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-[0.86rem] transition-colors ${ownerOpen ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60"}`}>
+              <span className="flex-1">Feedback (owner)</span>
+              {ownerNew > 0 && <span className="rounded-full bg-sidebar-primary px-1.5 text-[10px] font-semibold text-sidebar-primary-foreground" aria-label={`${ownerNew} new`}>{ownerNew > 99 ? "99+" : ownerNew}</span>}
+            </button>
+          )}
           <div className="mt-3 flex items-center justify-between gap-2 px-1" role="group" aria-label="Appearance">
             {THEME_PREFS.map((p) => {
               const Icon = THEME_ICON[p];
@@ -608,7 +632,7 @@ export function Dashboard() {
                 <ApiProvider value={baseApi ?? api}><GlobalFilterBar view={view.id === "meetings" && auth.features.mn_list === true && !auth.locked.includes("mn_list") ? "meetings-list" : view.id} agency={auth.kind === "agency" && Boolean(baseApi)} value={filter} onChange={setFilter}
                   onAllClients={fromAccount ? () => { setFilter(EMPTY_FILTER); try { window.history.replaceState(null, "", withTodayAccounts(window.location.hash, [])); window.dispatchEvent(new Event("subsync-today-accounts")); } catch { /* the filter is cleared anyway */ } } : undefined} /></ApiProvider>
             {trailSection && <p data-testid="trail" className="mb-2 text-sm max-sm:hidden font-medium text-muted-foreground print:hidden">{trailSection} <span aria-hidden>&gt;</span><span className="sr-only">then</span> {NAV.find((n) => n.id === shown)?.label ?? ""}</p>}
-            {view.id !== "today" && strip}<BackProvider value={back}><TrailProvider value={trailSection}>{content}</TrailProvider></BackProvider>
+            {view.id !== "today" && strip}<BackProvider value={back}><TrailProvider value={trailSection}>{isOwner && ownerOpen ? <ApiProvider value={baseApi!}><OwnerFeedbackView /></ApiProvider> : content}</TrailProvider></BackProvider>
             <FeedbackBox page={view.id} />
           </main>
         </div>

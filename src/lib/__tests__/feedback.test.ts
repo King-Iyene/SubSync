@@ -64,12 +64,12 @@ test("a reference is short, readable, and made from the stored id", () => {
 
 test("the alert to King is a WOULD SEND line with ids only: no text, no title, no address, no name", () => {
   const d = wouldSendDetail("problem", { ref: "R-4F2A9C", errorId: "E-ABC123", page: "inbox" });
-  assert.match(String(d.outward), /^WOULD SEND to King/);
+  assert.match(String(d.outward), /^RECORDED for the owner inbox/);
   assert.equal(d.to, "king");
   assert.equal(d.event, "problem");
-  assert.equal(d.channel, "instant: email and Slack");
-  assert.equal(wouldSendDetail("vote", { item: "slack-alerts" }).channel, "daily digest");
-  assert.equal(wouldSendDetail("suggestion", { ref: "R-1" }).channel, "instant: email and Slack");
+  assert.equal(d.channel, "instant alert (someone is stuck)");
+  assert.equal(wouldSendDetail("vote", { item: "slack-alerts" }).channel, "inbox, and the optional daily summary");
+  assert.equal(wouldSendDetail("suggestion", { ref: "R-1" }).channel, "inbox, and the optional daily summary");
   assert.deepEqual(Object.keys(d).sort(), ["channel", "errorId", "event", "outward", "page", "ref", "to"]);
   const long = wouldSendDetail("feedback", { ref: "x".repeat(200) });
   assert.equal(String(long.ref).length, 64, "an id is never an excuse to smuggle text");

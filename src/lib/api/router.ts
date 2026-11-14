@@ -169,7 +169,8 @@ import { grantedOf } from "./workflows-api";
 import { handleClientActions } from "./clients-actions-routes";
 import { handlePeopleActions } from "./people-actions-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
-import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
+import { handleOwnerFeedback } from "./owner-feedback";
+import { changedSettingKeys,feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
 import { groupStatus, parseGranted } from "../scope-groups";
 import { NOTE_SCOPE } from "../meeting-wording";
 import { giveFeedback, history as settingsHistoryView, ownSuggestions, reportProblem, suggest, whoOf } from "./f8-routes";
@@ -2246,6 +2247,8 @@ async function dispatch(ctx: Ctx): Promise<Response> {
   if (blocked) return blocked;
 
   try {
+    // The platform owner's Feedback inbox: 404 for everyone else (checked in authenticate and again inside).
+    if (a === "owner") return await handleOwnerFeedback(ctx, request, segments);
     if (a === "data-health") return await handleDataHealth(ctx, { allowed: allowedIds, token: (c, loc) => locationAccessToken(c.session.companyId, loc), links: async () => (await scope(ctx)).links });
     if (a === "workflows") return await handleWorkflows(ctx, { allowed: allowedIds, token: (c, loc) => locationAccessToken(c.session.companyId, loc) });
     if (a === "people") {
