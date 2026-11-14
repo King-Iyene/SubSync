@@ -79,7 +79,8 @@ async function connections(ctx: Ctx) {
   const one = ctx.limitTo;
   const [slack] = await sql()`select count(*)::int n, max(label) label from connections where installation_id = ${inst} and provider = 'slack' and status = 'connected'`;
   const [webhook] = await sql()`select (coalesce(slack_webhook_url, '') <> '') set from settings where installation_id = ${inst}`;
-  const mine = ctx.session.userId ? await sql()`select status, last_event_at, saved_count, skipped_count from user_connections where installation_id = ${inst} and ghl_user_id = ${ctx.session.userId} and provider = 'fathom' limit 1` : [];
+  // "Waiting" is counted from the calls really waiting now (the old running tally never went down when a call was linked or added later).
+  const mine = ctx.session.userId ? await sql()`select status, last_event_at, saved_count, (select count(*)::int from meetings w where w.installation_id = ${inst} and w.owner_ghl_user_id = ${ctx.session.userId} and w.status = 'needs_contact') skipped_count from user_connections where installation_id = ${inst} and ghl_user_id = ${ctx.session.userId} and provider = 'fathom' limit 1` : [];
   const { level } = viewerOf(ctx);
   const [team] = level === "self" ? [null] : await sql()`select count(*)::int people, count(*) filter (where status = 'connected')::int working from user_connections where installation_id = ${inst} and provider = 'fathom'`;
   const [cal] = one

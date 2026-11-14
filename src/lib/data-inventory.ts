@@ -222,10 +222,10 @@ export const INVENTORY: Record<string, TableInfo> = {
   meetings: {
     noun: "meetings from connected tools", line: "meetings",
     personal: {
-      owner_ghl_user_id: "which team member recorded it", title: "the meeting title", attendee_emails: "who attended (email addresses)", summary: "the summary", action_items: "action items",
+      owner_ghl_user_id: "which team member recorded it", title: "the meeting title", attendee_emails: "who attended (email addresses)", attendee_names: "who attended (names)", summary: "the summary", action_items: "action items",
       recording_url: "a link to the recording", transcript_ref: "a reference to the full transcript at the tool that made it (SubSync does not keep the transcript text)",
     },
-    notPersonal: ["provider_meeting_id"],
+    notPersonal: ["provider_meeting_id", "invitee_stats", "rematched_at"],
   },
   notifications: {
     noun: "your notification centre", line: "accounts",

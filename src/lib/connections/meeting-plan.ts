@@ -1,4 +1,5 @@
 import { FIELD_FOR_ITEM, type FieldMapping } from "./contact-fields.ts";
+import { normEmail } from "./match-suggest.ts";
 import { accessibleAccounts, type InstalledAccount, type Person } from "./person.ts";
 import { clipChoices, DEFAULT_POLICY, effectiveChoices, ITEMS, matrixFor, type Clip, type Matrix, type PersonChoices, type PolicyFlags } from "./policy.ts";
 
@@ -15,10 +16,11 @@ export const MAX_CONTACTS_PER_MEETING = 5;
 
 export type Candidate = { locationId: string; contactId: string; email: string };
 
-export type InboxReason = "no_external_attendee" | "no_match" | "duplicate_contact" | "cross_account" | "writes_off" | "provider_not_allowed" | "over_daily_cap" | "needs_permission" | "preview_needed";
+export type InboxReason = "no_attendee_emails" | "no_external_attendee" | "no_match" | "duplicate_contact" | "cross_account" | "writes_off" | "provider_not_allowed" | "over_daily_cap" | "needs_permission" | "preview_needed";
 
 /** The plain sentence for each reason, as the Meeting inbox shows it. */
 export const INBOX_MESSAGE: Record<InboxReason, string> = {
+  no_attendee_emails: "The meeting tool did not send anyone's email for this call, so SubSync cannot tell who it was with. Search for the lead to add it.",
   no_external_attendee: "Everyone in this meeting works with you, so there is no contact to add it to.",
   no_match: "Nobody in this meeting is in your contacts. It is in your Meeting inbox for 14 days.",
   duplicate_contact: "Two contact records have the same email, so SubSync did not guess. Pick the right one.",
@@ -71,10 +73,11 @@ export type PlanTarget = {
 
 export type Plan =
   | { kind: "write"; targets: PlanTarget[]; leftOut: number }
-  | { kind: "inbox"; reason: InboxReason; message: string; retentionDays: number }
-  | { kind: "discard"; reason: "no_match" | "no_external_attendee" };
+  /** `matched`: the contacts that WERE matched with certainty when a rule or a limit stopped the write, so the inbox can say who the call will go to. */
+  | { kind: "inbox"; reason: InboxReason; message: string; retentionDays: number; matched?: Candidate[] }
+  | { kind: "discard"; reason: "no_match" | "no_external_attendee" | "no_attendee_emails" };
 
-const clean = (e: string) => e.trim().toLowerCase();
+const clean = normEmail;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** The days a meeting nobody could be matched to waits: the shortest retention among the accounts the person can reach (default 14). */
@@ -104,11 +107,13 @@ export function targetFor(c: Candidate, i: Pick<PlanInput, "policies" | "setting
 export function planMeeting(i: PlanInput): Plan {
   const accessible = accessibleAccounts(i.person, i.installed, i.provenAccess);
   const days = retentionDays(i.policies, accessible);
-  const unmatched = (reason: "no_match" | "no_external_attendee"): Plan =>
+  const unmatched = (reason: "no_match" | "no_external_attendee" | "no_attendee_emails"): Plan =>
     i.settings.unmatchedMode === "discard" ? { kind: "discard", reason } : { kind: "inbox", reason, message: INBOX_MESSAGE[reason].replace("14 days", `${days} days`), retentionDays: days };
 
   const internalEmails = new Set(i.internalEmails.map(clean));
   const internalDomains = new Set(i.internalDomains.map((d) => clean(d).replace(/^@/, "")));
+  // Nobody's email reached us at all (not the same as "everyone is on your side"): say so, because only the person can fix it, by searching.
+  if (![...new Set(i.attendeeEmails.map(clean))].some((e) => EMAIL.test(e))) return unmatched("no_attendee_emails");
   const external = [...new Set(i.attendeeEmails.map(clean))].filter((e) => EMAIL.test(e) && !internalEmails.has(e) && !internalDomains.has(e.split("@")[1]));
   if (external.length === 0) return unmatched("no_external_attendee");
 
@@ -143,7 +148,7 @@ export function planMeeting(i: PlanInput): Plan {
 
   if (targets.every((t) => !t.allowed)) {
     const reason = targets[0].blockedBecause as InboxReason;
-    return { kind: "inbox", reason, message: INBOX_MESSAGE[reason], retentionDays: days };
+    return { kind: "inbox", reason, message: INBOX_MESSAGE[reason], retentionDays: days, matched: chosen };
   }
   return { kind: "write", targets, leftOut: unique.length - chosen.length };
 }

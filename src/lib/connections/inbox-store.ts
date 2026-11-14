@@ -1,3 +1,4 @@
+import { findPeople } from "../analytics/people-find-queries";
 import { sql } from "../db";
 import type { Role } from "../identity";
 import type { ContactHit, InboxStore, StoredMeeting } from "./inbox";
@@ -24,9 +25,6 @@ function rowOf(r: Record<string, unknown>): StoredMeeting {
   };
 }
 
-/** A search term made safe for LIKE: the characters LIKE treats as wildcards are escaped. */
-const like = (q: string) => `%${q.toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-
 export function pgInboxStore(): InboxStore {
   const base = pgIngestStore();
   return {
@@ -45,22 +43,23 @@ export function pgInboxStore(): InboxStore {
     },
     async searchContacts(installationId, locationIds, q): Promise<ContactHit[]> {
       if (locationIds.length === 0) return [];
-      const pattern = like(q);
-      const digits = q.replace(/\D/g, "");
-      const rows = await sql()`
-        select location_id, contact_id, coalesce(nullif(full_name, ''), nullif(trim(coalesce(first_name, '') || ' ' || coalesce(last_name, '')), '')) name, email, phone
-        from cached_contacts
-        where installation_id = ${installationId} and location_id = any(${locationIds}::text[])
-          and (lower(coalesce(full_name, '') || ' ' || coalesce(first_name, '') || ' ' || coalesce(last_name, '')) like ${pattern} escape '\\'
-            or lower(coalesce(email, '')) like ${pattern} escape '\\'
-            ${digits.length >= 4 ? sql()`or coalesce(phone_digits, '') like ${"%" + digits + "%"}` : sql()``})
-        order by full_name nulls last limit 20`;
-      return rows.map((r) => ({ locationId: r.location_id as string, contactId: r.contact_id as string, name: (r.name as string | null) ?? null, email: (r.email as string | null) ?? null, phone: (r.phone as string | null) ?? null }));
+      // The same engine as "Search by name, phone or email" in Find a lead (one filter, the trigram and prefix indexes, exact email or full name first, then newest activity),
+      // limited in the query itself to the accounts given here (the ones this person can open). A word of a name, the start of an email, or a run of phone digits all find people.
+      const page = await findPeople(installationId, locationIds, { q: q.trim() }, null, [], 20);
+      return page.rows.map((r) => ({ locationId: r.locationId, contactId: r.contactId, name: r.name || null, email: r.email ?? null, phone: r.phone ?? null }));
+    },
+    async meetingHints(installationId, userId, ids): Promise<Record<string, { names: string[]; matchedLocationId: string | null; matchedContactId: string | null }>> {
+      if (ids.length === 0) return {};
+      try {
+        const rows = await sql()`select id, attendee_names, matched_location_id, matched_contact_id from meetings where id = any(${ids}::uuid[]) and installation_id = ${installationId} and owner_ghl_user_id = ${userId}`;
+        return Object.fromEntries(rows.map((r) => [r.id as string, { names: strings(r.attendee_names), matchedLocationId: (r.matched_location_id as string | null) ?? null, matchedContactId: (r.matched_contact_id as string | null) ?? null }]));
+      } catch { return {}; }
     },
     async scrub(installationId, userId, id, reason) {
       const rows = await sql()`
         update meetings set status = 'skipped', reason = ${reason}, title = null, started_at = null, attendee_emails = '[]'::jsonb, summary = null, action_items = '[]'::jsonb, recording_url = null, expires_at = null
         where id = ${id} and installation_id = ${installationId} and owner_ghl_user_id = ${userId} and status = 'needs_contact' returning id`;
+      if (rows.length === 1) await sql()`update meetings set attendee_names = '[]'::jsonb where id = ${id} and installation_id = ${installationId} and owner_ghl_user_id = ${userId}`.catch(() => undefined);
       if (rows.length === 1) await sql()`insert into audit_log (installation_id, actor, action, detail) values (${installationId}, ${userId}, ${"meeting_notes." + reason}, ${sql().json({ meetingId: id } as never)})`.catch(() => undefined);
       return rows.length === 1;
     },
