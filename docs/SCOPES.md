@@ -76,7 +76,7 @@ How your accounts label and follow up on contacts.
 | --- | --- | --- | --- |
 | `locations/tags.readonly` | read | optional | Tag names, for hot-lead and cold-list rules. |
 | `locations/customFields.readonly` | read | optional | The names of your custom fields, so a field shows its name instead of a code. Names only, never the values. |
-| `locations/tags.write` | change | optional | Only to create a missing call queue tag from Settings > Call queues (Create this tag), after a preview and a confirm. Optional. Without it the button says: Needs permission, reconnect. |
+| `locations/tags.write` | change | optional | Only to create a missing call queue tag from Settings > Targets > Call queues (Create this tag), after a preview and a confirm. Optional. Without it the button says: Needs permission, reconnect. |
 
 ## Workflows and campaigns
 
@@ -108,21 +108,21 @@ Failed and late payments, so you can chase the money, and the credit balance of 
 
 ## Money checks
 
-Orders, invoices, products and payment setup, shown in Money > Money checks (one client account at a time, read live, nothing stored). All read only. Optional.
+Orders, invoices, products and payment setup, shown in Money > Client payments > Money checks (one client account at a time, read live, nothing stored). All read only. Optional.
 
 | Permission | Kind | Required | Why we ask |
 | --- | --- | --- | --- |
-| `payments/orders.readonly` | read | optional | Orders and their payment status, for Money > Money checks (recent orders), to find orders that were never paid, and for the Orders and payments panel on a lead. Read only. Optional. |
-| `payments/coupons.readonly` | read | optional | The discount codes in each client account, for Money > Money checks, to find expired or unlimited ones. Read only. Optional. |
-| `payments/integration.readonly` | read | optional | Whether a payment provider is connected and in live or test mode, for Money > Money checks, so a client taking test payments is caught. Read only. Optional. |
-| `payments/custom-provider.readonly` | read | optional | Whether a custom payment provider is set up, for Money > Money checks. Only the provider name is used, never its keys. Read only. Optional. |
-| `charges.readonly` | read | optional | Charges apps made through the platform's billing meters, for Money > Money checks and for the last charge in the plan monitor (Clients > Money). Read only. Optional. SubSync has no billing meters, so an empty list is expected. |
-| `products.readonly` | read | optional | The products you sell, for Money > Money checks, to find a product without a price. Read only. Optional. |
-| `products/prices.readonly` | read | optional | The prices set on each product (the first 20 products), for Money > Money checks, to find a missing or zero price. Read only. Optional. |
-| `products/collection.readonly` | read | optional | Product collections, for Money > Money checks, to find an empty one. Read only. Optional. |
-| `invoices/schedule.readonly` | read | optional | Repeating invoice schedules, for Money > Money checks, to find one that stopped. Read only. Optional. |
-| `invoices/template.readonly` | read | optional | Invoice templates, for Money > Money checks, to find an account with none set up. Read only. Optional. |
-| `invoices/estimate.readonly` | read | optional | Estimates and whether they were accepted, for Money > Money checks, to find estimates nobody followed up. Read only. Optional. |
+| `payments/orders.readonly` | read | optional | Orders and their payment status, for Money > Client payments > Money checks (recent orders), to find orders that were never paid, and for the Orders and payments panel on a lead. Read only. Optional. |
+| `payments/coupons.readonly` | read | optional | The discount codes in each client account, for Money > Client payments > Money checks, to find expired or unlimited ones. Read only. Optional. |
+| `payments/integration.readonly` | read | optional | Whether a payment provider is connected and in live or test mode, for Money > Client payments > Money checks, so a client taking test payments is caught. Read only. Optional. |
+| `payments/custom-provider.readonly` | read | optional | Whether a custom payment provider is set up, for Money > Client payments > Money checks. Only the provider name is used, never its keys. Read only. Optional. |
+| `charges.readonly` | read | optional | Charges apps made through the platform's billing meters, for Money > Client payments > Money checks and for the last charge in the plan monitor (Clients > Money and plans). Read only. Optional. SubSync has no billing meters, so an empty list is expected. |
+| `products.readonly` | read | optional | The products you sell, for Money > Client payments > Money checks, to find a product without a price. Read only. Optional. |
+| `products/prices.readonly` | read | optional | The prices set on each product (the first 20 products), for Money > Client payments > Money checks, to find a missing or zero price. Read only. Optional. |
+| `products/collection.readonly` | read | optional | Product collections, for Money > Client payments > Money checks, to find an empty one. Read only. Optional. |
+| `invoices/schedule.readonly` | read | optional | Repeating invoice schedules, for Money > Client payments > Money checks, to find one that stopped. Read only. Optional. |
+| `invoices/template.readonly` | read | optional | Invoice templates, for Money > Client payments > Money checks, to find an account with none set up. Read only. Optional. |
+| `invoices/estimate.readonly` | read | optional | Estimates and whether they were accepted, for Money > Client payments > Money checks, to find estimates nobody followed up. Read only. Optional. |
 
 ## Account setup check
 
@@ -134,7 +134,7 @@ What each client account has set up, shown in Clients > Health > Account setup: 
 | `objects/schema.readonly` | read | optional | The names of custom record types, for Clients > Health > Account setup. Names only. Optional. |
 | `objects/record.readonly` | read | optional | How many records each custom record type holds, for Clients > Health > Account setup. A count only. Optional. |
 | `notes.readonly` | read | optional | Kept for a later feature, nothing uses it yet: the platform has no read for notes across an account (only per contact), so Account setup cannot show it. Optional. Not used yet. |
-| `locations/customValues.readonly` | read | optional | The names of the custom values (company name, links, hours) set in each client account, for Clients > Health > Account setup and to check the reply target in Settings > Call queues. Optional. |
+| `locations/customValues.readonly` | read | optional | The names of the custom values (company name, links, hours) set in each client account, for Clients > Health > Account setup and to check the reply target in Settings > Targets > Call queues. Optional. |
 | `locations/templates.readonly` | read | optional | The names of the text and email templates in each client account, for Clients > Health > Account setup. Names only. Optional. |
 | `locations/tasks.readonly` | read | optional | Open and overdue tasks, as counts, for Clients > Health > Account setup, to find tasks nobody is doing. Optional. |
 | `recurring-tasks.readonly` | read | optional | Kept for a later feature, nothing uses it yet: the platform has no read that lists repeating tasks, so Account setup cannot show them. Optional. Not used yet. |
@@ -152,12 +152,12 @@ Permissions for small, one-time set-up changes (a tag, a pipeline, a reply targe
 
 | Permission | Kind | Required | Why we ask |
 | --- | --- | --- | --- |
-| `locations/customValues.write` | change | optional | Only to save one value, the reply target (subsync_sla_minutes), from Settings > Call queues (Set up your CRM), after a preview and a confirm. Optional. |
+| `locations/customValues.write` | change | optional | Only to save one value, the reply target (subsync_sla_minutes), from Settings > Targets > Call queues (Set up your CRM), after a preview and a confirm. Optional. |
 | `locations/tasks.write` | change | optional | Kept for a later feature, nothing uses it yet: marking a task done or deleting one uses contacts.write, because the platform's description lists no endpoint for this permission. Optional. Not used yet. |
 | `recurring-tasks.write` | change | optional | Kept for a later feature, nothing uses it yet: creating or stopping a repeating task, after a preview. Optional. Not used yet. |
 | `notes.write` | change | optional | Kept for a later feature, nothing uses it yet: adding a note to a contact is done with contacts.write today. Optional. Not used yet. |
 | `pipelines.write` | change | optional | Kept for a later feature, nothing uses it yet: changing a pipeline or its stages, after a preview. Optional. Not used yet. |
-| `pipelines.create` | change | optional | Only to create the standard sales pipeline from Settings > Call queues (Set up your CRM), and only when the account has no pipeline, after a preview and a confirm. Optional. |
+| `pipelines.create` | change | optional | Only to create the standard sales pipeline from Settings > Targets > Call queues (Set up your CRM), and only when the account has no pipeline, after a preview and a confirm. Optional. |
 | `invoices.write` | change | optional | Kept for a later feature, nothing uses it yet: changing an invoice, after a preview and a typed confirmation. SubSync never sends an invoice on its own, and the resend button is switched off. Optional. Not used yet. |
 | `invoices/schedule.write` | change | optional | Kept for a later feature, nothing uses it yet: pausing or changing a repeating invoice, after a preview. Optional. Not used yet. |
 | `invoices/template.write` | change | optional | Kept for a later feature, nothing uses it yet: changing an invoice template, after a preview. Optional. Not used yet. |

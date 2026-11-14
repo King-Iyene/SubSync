@@ -50,13 +50,13 @@ export const CONCEPT_GUIDES: readonly Guide[] = [
     next: "Open Settings, Call queues, confirm your tag names and press Check that it worked." }),
   c({ id: "money-checks", title: "Money checks", tryView: "payments", shows: "A live look at one client account's invoices, orders, coupons, products and app charges, to catch money problems early.",
     read: [
-      "Open Money, then Money checks, and pick one client account. SubSync reads it live with that account's own key and stores nothing from it.",
+      "Open Money, then Client payments, then Money checks, and pick one client account. SubSync reads it live with that account's own key and stores nothing from it.",
       "Invoices are counted by status (draft, sent, partly paid, overdue, paid, void). Overdue means sent or partly paid with a due date that has passed. Press a count to open its invoices.",
       "Other parts: invoice schedules and templates, estimates by status, the newest 25 orders, coupons, whether a payment provider is connected, products with their prices (the first 20 products), product collections, and charges made by apps.",
       "Each part tells you plainly what happened: it shows the data, says Needs permission: reconnect (you or the account did not allow that read), or says Not available from the platform yet.",
       "SubSync only looks here. It does not send, change or charge anything from this screen.",
     ],
-    next: "Open Money, then Money checks, and pick the account with the most overdue invoices." }),
+    next: "Open Money, Client payments, Money checks, and pick the account with the most overdue invoices." }),
   c({ id: "intake-alerts", title: "Applications and funnel pages alerts", tryView: "cleanup", shows: "How Lead intake tells you a form or application stopped bringing leads, and what it checks on your funnels and links.",
     read: [
       "Open Clean-up, then Lead intake. Applications this week lists each form and survey with the last 7 days against its own usual week, in plain words, with five small bars for the weeks before.",
@@ -68,13 +68,13 @@ export const CONCEPT_GUIDES: readonly Guide[] = [
     next: "Open Clean-up, Lead intake, and look at any form marked as dropping." }),
   c({ id: "plan-monitor", title: "Plan monitor", tryView: "clients", shows: "Which SubSync plan each client account is on, and a warning when a trial is about to end or an account leaves.",
     read: [
-      "Open Clients, then Money. The plan monitor has one row per client account: the SubSync plan, days left in a trial, whether SubSync is still installed, the last charge, and a status.",
+      "Open Clients, then Money and plans. The plan monitor has one row per client account: the SubSync plan, days left in a trial, whether SubSync is still installed, the last charge, and a status.",
       "You get an alert when a trial ends in 3 days, when an account changes plan, and when an account uninstalls. Every plan change is written down, so you can see when it happened.",
       "The last charge comes from charges made through the platform's billing meters. SubSync has no meters, so an empty list is normal and reads No charge recorded, not a failure.",
       "Payments your clients owe you for their own plans need a company-level permission the platform does not give to this app. The screen says so plainly instead of showing a made-up number.",
       "A client account's own staff see only their own row.",
     ],
-    next: "Open Clients, then Money, and check any account marked as ending its trial." }),
+    next: "Open Clients, then Money and plans, and check any account marked as ending its trial." }),
   c({ id: "account-setup", title: "Account setup", tryView: "clients", shows: "A checklist of what one client account has set up, and what is still missing.",
     read: [
       "Open Clients, then Health, then Account setup (a business finds it under Setup). Pick one client account.",
