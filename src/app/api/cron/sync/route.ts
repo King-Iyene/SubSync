@@ -20,9 +20,11 @@ export async function GET(request: Request) {
     const scheduled = (await scheduleDailyRefresh()) + (await scheduleFastRefresh());
     const slice = await runSlice(240_000);
     const callQueue = await import("@/lib/dial/callqueue-run").then((m) => m.runAutoCallQueues()).catch(() => null);
+    // Fathom auto-match: calls waiting in a person's private inbox are looked at again once their accounts' contacts have synced (counts only; never fails the sync).
+    const rematch = await import("@/lib/connections/rematch-run").then((m) => m.runRematch({ onlyIfSynced: true, maxPeople: 20 })).catch(() => null);
     // Keep the de-duplication table small.
     await sql()`delete from webhook_events where received_at < now() - interval '3 days'`;
-    return NextResponse.json({ scheduled, ...slice, callQueue });
+    return NextResponse.json({ scheduled, ...slice, callQueue, rematch });
   } catch (error) {
     console.error("Cron sync failed", safeError(error));
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });

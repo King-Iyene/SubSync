@@ -1,0 +1,267 @@
+{
+ "note": "Caption timings of the tour video (seconds). Rebuild with node scripts/make-web-video.mjs --plan <plan.json>",
+ "total": 249.325,
+ "lines": [
+  {
+   "id": "P1",
+   "start": 0.5,
+   "dur": 8.5,
+   "chunks": [
+    "Whether you run one business or fifty,",
+    "it feels the same.",
+    "Your phone never stops buzzing,",
+    "and everyone wants an answer, right now."
+   ]
+  },
+  {
+   "id": "P2",
+   "start": 9.3,
+   "dur": 9.375,
+   "chunks": [
+    "A new lead comes in, and nobody answers.",
+    "A lead that waits an hour is far less likely to reply.",
+    "Three days later, they have gone elsewhere."
+   ]
+  },
+  {
+   "id": "P3",
+   "start": 18.975,
+   "dur": 6.45,
+   "chunks": [
+    "Appointments come and go,",
+    "and nobody marks what happened.",
+    "Was it a show, or a no-show? Nobody knows."
+   ]
+  },
+  {
+   "id": "P4",
+   "start": 25.725,
+   "dur": 5.05,
+   "chunks": [
+    "The no-shows never get a call back.",
+    "They just sit in the calendar,",
+    "and slip away."
+   ]
+  },
+  {
+   "id": "P5",
+   "start": 31.075000000000003,
+   "dur": 5.75,
+   "chunks": [
+    "Good deals sit untouched,",
+    "until they quietly turn grey,",
+    "and fall out of the pipeline."
+   ]
+  },
+  {
+   "id": "P6",
+   "start": 37.125,
+   "dur": 6.075,
+   "chunks": [
+    "Meanwhile, the same contact turns up again, and again,",
+    "and again, clogging your CRM."
+   ]
+  },
+  {
+   "id": "P7",
+   "start": 43.5,
+   "dur": 7.425,
+   "chunks": [
+    "And every month, you build the reports by hand.",
+    "You are not careless.",
+    "You just cannot watch every account, all day."
+   ]
+  },
+  {
+   "id": "P8",
+   "start": 51.225,
+   "dur": 6.225,
+   "chunks": [
+    "Then a customer comes back,",
+    "and tells you something you did not know.",
+    "And you find out when they tell you."
+   ]
+  },
+  {
+   "id": "W1",
+   "start": 58.550000000000004,
+   "dur": 2.4,
+   "chunks": [
+    "SubSync brings it all together."
+   ]
+  },
+  {
+   "id": "W2",
+   "start": 61.45,
+   "dur": 8.625,
+   "chunks": [
+    "It connects to every business you manage,",
+    "watches your leads and appointments,",
+    "finds what is going wrong,",
+    "and puts a dollar figure on it."
+   ]
+  },
+  {
+   "id": "W3",
+   "start": 70.575,
+   "dur": 4.45,
+   "chunks": [
+    "Then it shows you what to do first,",
+    "with all your accounts in one place."
+   ]
+  },
+  {
+   "id": "T1",
+   "start": 75.925,
+   "dur": 17.9,
+   "chunks": [
+    "Every morning, start with Today.",
+    "It shows which connected accounts need attention,",
+    "and what is at risk: about seven hundred",
+    "and fifty-one thousand dollars,",
+    "across eighty-seven quiet deals.",
+    "Below it are the accounts to save first.",
+    "Open one, and you know exactly where to focus."
+   ]
+  },
+  {
+   "id": "S0",
+   "start": 95.225,
+   "dur": 8.6,
+   "chunks": [
+    "Here is how a lead gets lost.",
+    "A new lead arrives.",
+    "Nobody replies.",
+    "The timer keeps growing,",
+    "and soon it is past your target."
+   ]
+  },
+  {
+   "id": "S1",
+   "start": 104.225,
+   "dur": 10.775,
+   "chunks": [
+    "Speed to lead catches it.",
+    "Thirteen new leads are past your target right now.",
+    "Each one shows how long it has waited,",
+    "so you know who to call first,",
+    "longest wait on top."
+   ]
+  },
+  {
+   "id": "A1",
+   "start": 116.5,
+   "dur": 15.7,
+   "chunks": [
+    "Appointments tell the truth.",
+    "Four have no outcome marked,",
+    "so your real show rate is fifty-seven percent.",
+    "Eight no-shows are waiting to be won back,",
+    "with a list to call.",
+    "And the flow tree shows which person,",
+    "or which calendar, is losing your bookings."
+   ]
+  },
+  {
+   "id": "F1",
+   "start": 133.7,
+   "dur": 13.3,
+   "chunks": [
+    "The funnel shows where every deal sits, step by step,",
+    "and where the biggest leak is.",
+    "Replay it day by day.",
+    "Click any step to open the deals there.",
+    "And deals with no value still show up,",
+    "so nothing hides."
+   ]
+  },
+  {
+   "id": "D1",
+   "start": 148.5,
+   "dur": 10.45,
+   "chunks": [
+    "Need one lead? Find a lead searches",
+    "every connected account at once.",
+    "It shows leads that never had a reply,",
+    "leads going cold, and ready-made call lists."
+   ]
+  },
+  {
+   "id": "C1",
+   "start": 160.45,
+   "dur": 19.3,
+   "chunks": [
+    "Duplicates clog the CRM,",
+    "and merging by hand is scary.",
+    "Clean-up found one hundred and",
+    "sixty-three duplicate groups,",
+    "sorted by how sure it is: certain, likely, or possible.",
+    "You preview every change first,",
+    "bigger changes ask you to type a confirmation,",
+    "and you can undo.",
+    "You stay in control."
+   ]
+  },
+  {
+   "id": "M1",
+   "start": 181.25,
+   "dur": 10,
+   "chunks": [
+    "Clients puts all your connected accounts on one screen.",
+    "Five need you now, and two paid plans are past due.",
+    "Payments are right there too,",
+    "with the money at risk."
+   ]
+  },
+  {
+   "id": "U1",
+   "start": 192.75,
+   "dur": 16.95,
+   "chunks": [
+    "The account audit checks every account today.",
+    "It estimates what you are losing,",
+    "about two hundred and fifty-eight",
+    "thousand dollars a month here,",
+    "with the working one tap away,",
+    "and lists what to fix first.",
+    "You can copy a summary, print it,",
+    "or see a sample to send a client."
+   ]
+  },
+  {
+   "id": "Y1",
+   "start": 211.2,
+   "dur": 9.8,
+   "chunks": [
+    "Team shows who follows up fast,",
+    "and who is overloaded.",
+    "Here, three things need you today,",
+    "and one person has four leads waiting more than two hours."
+   ]
+  },
+  {
+   "id": "N1",
+   "start": 222.5,
+   "dur": 11.825,
+   "chunks": [
+    "And you do not have to keep checking.",
+    "Alerts reach you in the app, in Slack, or by email.",
+    "Each one says what is wrong,",
+    "what to do next,",
+    "and links straight to the right account in your CRM."
+   ]
+  },
+  {
+   "id": "X1",
+   "start": 235.825,
+   "dur": 10.1,
+   "chunks": [
+    "Bring your connected accounts together.",
+    "Know what's happening,",
+    "see what needs attention and take action with SubSync.",
+    "Install once.",
+    "Free for 14 days."
+   ]
+  }
+ ]
+}

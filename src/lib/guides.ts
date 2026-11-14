@@ -1,8 +1,9 @@
+import { CONCEPT_GUIDES } from "./concept-guides.ts";
 // Short guides, one per page: what it shows, how to read it, what to do next. About 60 seconds each. Plain words for agency owners, setters and business owners.
 // Pure data. `view` is the menu page the guide belongs to (the ? button and the empty-state link find it from the address).
-export type Guide = { id: string; view: string; title: string; shows: string; read: string[]; next: string; tabs?: string[]; more?: { title: string; read: string[] } };
+export type Guide = { id: string; view: string; title: string; shows: string; read: string[]; next: string; tabs?: string[]; more?: { title: string; read: string[] }; /** The page the "Try it now" button opens (a menu id). */ tryView?: string; /** Pictures for the guide: a path under /guides and the caption that says what the picture shows. A picture that is not there yet is simply not drawn. */ shots?: { src: string; caption: string }[] };
 
-export const GUIDES: readonly Guide[] = [
+const PAGE_GUIDES: readonly Guide[] = [
   { id: "today", view: "today", title: "Today", shows: "What needs you first, ranked, with the reason and a link to the person or deal.", tabs: ["Today", "Proof", "Numbers"],
     read: ["Start at the top row: it is the most urgent.", "Each line says why it is there, for example a lead nobody has answered for 3 hours.", "Proof lists what you cleared, so you can show it to a client."], next: "Open the first item, deal with it, and it moves to Proof." },
   { id: "speed", view: "speed", title: "Speed to lead", shows: "How long each new lead waited for the first reply from a person.", tabs: ["Speed to lead", "Waiting on the client", "Unanswered"],
@@ -50,6 +51,8 @@ export const GUIDES: readonly Guide[] = [
     next: "Connect your AI account, then switch on the helpers you want." },
 ];
 
+/** The page guides first (one per menu page), then the guides for ideas and Settings sections (src/lib/concept-guides.ts). The public /support pages are built from this same list. */
+export const GUIDES: readonly Guide[] = [...PAGE_GUIDES, ...CONCEPT_GUIDES];
 export const GUIDE_IDS: ReadonlySet<string> = new Set(GUIDES.map((g) => g.id));
 export const guideForView = (view: string): Guide | null => GUIDES.find((g) => g.view === view) ?? (view === "duplicates" ? GUIDES.find((g) => g.id === "cleanup")! : view === "inbox" ? GUIDES.find((g) => g.id === "speed")! : null);
 

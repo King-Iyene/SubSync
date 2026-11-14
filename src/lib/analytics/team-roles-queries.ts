@@ -11,7 +11,7 @@ const isMissing = (e: unknown) => /relation .* does not exist|42P01|column .* do
 const DAY = 86_400_000;
 
 export type RolePerson = {
-  userId: string; name: string; crmRole: string; role: RoleId | null; everywhere: RoleId | null; overrides: number; suggestion: RoleSuggestion | null; setBy: string | null; setAt: string | null;
+  userId: string; name: string; crmRole: string; role: RoleId | null; everywhere: RoleId | null; overrides: number; suggestion: RoleSuggestion | null; /** Appointments booked or taken in the last 90 days: how far this person is from the minimum a suggestion needs. */ actions: number; setBy: string | null; setAt: string | null;
 };
 export type RoleCounts = Record<RoleId | "none", number> & { total: number };
 
@@ -67,7 +67,7 @@ export async function listPeopleRoles(s: Scope, ids: string[], one: string | nul
         const id = r.user_id as string, ev = evidence.get(id);
         return {
           userId: id, name: (r.name as string) || "Not named yet", crmRole: (r.crm_role as string) ?? "unknown", role: isRoleId(r.role) ? r.role : null, everywhere: isRoleId(r.everywhere) ? r.everywhere : null,
-          overrides: Number(r.overrides ?? 0), suggestion: !r.role && ev ? suggestRole({ ...ev, days: 90 }) : null, setBy: (r.set_by as string | null) ?? null, setAt: r.set_at ? new Date(r.set_at as string).toISOString() : null,
+          overrides: Number(r.overrides ?? 0), suggestion: !r.role && ev ? suggestRole({ ...ev, days: 90 }) : null, actions: ev ? ev.booked + ev.attended : 0, setBy: (r.set_by as string | null) ?? null, setAt: r.set_at ? new Date(r.set_at as string).toISOString() : null,
         };
       }),
     };

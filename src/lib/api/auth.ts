@@ -17,6 +17,9 @@ export type AuthContext = {
   limitTo: string | null;
 };
 
+/** True only for a real (not demo) agency session that sign-in marked as the platform owner. */
+export const ownerSession = (s: Session): boolean => s.platformOwner === true && !s.demo && (s.kind === undefined || s.kind === "agency");
+
 export const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
@@ -34,6 +37,8 @@ export async function authenticate(request: Request, segments: string[] = []): P
     return json({ error: "Sign-in is not configured" }, 503);
   }
   if (!session) return json({ error: "Please sign in again" }, 401);
+  // The owner-only pages (the Feedback inbox) do not exist for anyone else: 404, never 403, and before any other rule runs.
+  if (segments[0] === "owner" && !ownerSession(session)) return json({ error: "Not found" }, 404);
 
   const kind: AccessKind = session.kind === "business" || session.kind === "client" ? session.kind : "agency";
   const limitTo = kind === "agency" ? null : session.locationId ?? null;

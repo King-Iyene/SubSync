@@ -136,6 +136,8 @@ export async function markDuplicates(installationId: string, userId: string, ids
   await sql()`
     update meetings set status = 'duplicate', reason = ${reason}, title = null, started_at = null, attendee_emails = '[]'::jsonb, summary = null, action_items = '[]'::jsonb, recording_url = null, expires_at = null
     where id = any(${ids}::uuid[]) and installation_id = ${installationId} and owner_ghl_user_id = ${userId} and status = 'needs_contact'`;
+  // The names kept as hints go with the rest of the content (best effort: a database not updated yet has no such column).
+  await sql()`update meetings set attendee_names = '[]'::jsonb where id = any(${ids}::uuid[]) and installation_id = ${installationId} and owner_ghl_user_id = ${userId} and status = 'duplicate'`.catch(() => undefined);
 }
 
 // ---------------- the person's saved layout ----------------

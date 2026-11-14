@@ -111,7 +111,7 @@ import { MIN_CLOSED_DEALS as MIN_CLOSED, OUTLIER_MIN_DEALS, OUTLIER_SHARE, outli
 import { parsePickedAccounts } from "../design/filters";
 import { myConnectionRemove, myConnectionsView, myConnectionStart, myConnectionTest, policySave, teamConnectionRevoke, teamConnectionsView } from "./connections-api";
 import { bellAction, bellView, copyPreview, copyReset, copySave, destinationAdvanced, destinationRemove, destinationsView, destinationStart, destinationTest, prefSave, prefsView, prefTest } from "./notifications-api";
-import { meetingConfirm, meetingContactSearch, meetingDismiss, meetingIgnore, meetingInboxView, meetingLink, meetingSettingsSave } from "./meetings-api";
+import { meetingConfirm, meetingContactSearch, meetingDismiss, meetingIgnore, meetingInboxView, meetingLink, meetingRecheck, meetingSettingsSave } from "./meetings-api";
 import { meetingLoggedView } from "./meeting-logged-api";
 import { meetingSetupAccountView, meetingSetupFieldsSave, meetingSetupFieldsView, meetingSetupPreview, meetingSetupSaveMine, meetingSetupView } from "./meeting-setup-api";
 import { can, personFromSession } from "../connections/person";
@@ -152,8 +152,11 @@ import { handleClients2 } from "./clients2-routes";
 import { handlePeople3 } from "./people3-routes";
 import { handleTeamRoles } from "./team-roles-routes";
 import { handleSettings2 } from "./settings2-routes";
+import { handleCqt, callQueueGuideFacts } from "./cqt-routes";
+import { guideRowState } from "../call-queue-tags/check";
 import { handlePayments } from "./payments-routes";
 import { handleToday3, handleToday3Act } from "./today3-routes";
+import { handleReportShare } from "./report-share-routes";
 import { handleCash, handleCashAct } from "./cash-routes";
 import { handleWg, handleWgAct } from "./wg-routes";
 import { handleBr } from "./br-routes";
@@ -168,7 +171,8 @@ import { grantedOf } from "./workflows-api";
 import { handleClientActions } from "./clients-actions-routes";
 import { handlePeopleActions } from "./people-actions-routes";
 import { buildSteps, guideRoleOf } from "../getting-started";
-import { changedSettingKeys, feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
+import { handleOwnerFeedback } from "./owner-feedback";
+import { changedSettingKeys,feedbackGivenBy, logAccountFlags, logKeyChange, logSettingsChange, recordVote } from "../feedback-queries";
 import { groupStatus, parseGranted } from "../scope-groups";
 import { NOTE_SCOPE } from "../meeting-wording";
 import { giveFeedback, history as settingsHistoryView, ownSuggestions, reportProblem, suggest, whoOf } from "./f8-routes";
@@ -901,6 +905,7 @@ async function startView(ctx: Ctx) {
     ? (status.pending > 0 ? "Looking for your accounts..." : "No accounts found yet. The platform can take a minute after an install: press Sync now on the home page.")
     : synced ? `${locs.total} account${locs.total === 1 ? "" : "s"} read. ${(await freshnessFor(ctx.installationId, { limitTo: ctx.limitTo })).text}.`
     : `${locs.synced} of ${locs.total} account${locs.total === 1 ? "" : "s"} read, ${status.pending} job${status.pending === 1 ? "" : "s"} left.`;
+  const cqFacts = await callQueueGuideFacts(ctx.installationId, await allowedIds(ctx)).catch(() => ({ accounts: 0, checks: [] }));
   const role = guideRoleOf(ctx.kind, ctx.session.role);
   const steps = buildSteps(role, {
     synced, syncDetail, seen: new Set(views.map((v) => v.view as string)), companyUsage: ctx.kind !== "client",
@@ -909,6 +914,7 @@ async function startView(ctx: Ctx) {
     changedKeys: changed, sharedAudits: shares?.n ?? 0, feedbackGiven: given,
     meetingsPage: ctx.entitlements.features.meetings !== false, zoomOn: zoomOn(ctx),
     clientFees: feeOn?.n ?? 0, clientsPage: ctx.entitlements.features.clients !== false,
+    callQueues: guideRowState(cqFacts.checks, cqFacts.accounts),
     dealAi: { on: ctx.kind !== "client" && ctx.entitlements.features.ai_byo === true && (["ai_deal_health", "ai_deal_followup", "ai_deal_winloss", "ai_deal_forecast"] as const).some((k) => ctx.entitlements.features[k] === true), connected: ((await sql()`select count(*)::int n from ai_connections where installation_id = ${ctx.installationId} and status = 'connected'`.catch(() => []))[0]?.n ?? 0) > 0 },
   });
   // A client's staff never receive what the company set up in Settings (N84): their guide has no such step, and the facts above for it are empty.
@@ -2245,6 +2251,8 @@ async function dispatch(ctx: Ctx): Promise<Response> {
   if (blocked) return blocked;
 
   try {
+    // The platform owner's Feedback inbox: 404 for everyone else (checked in authenticate and again inside).
+    if (a === "owner") return await handleOwnerFeedback(ctx, request, segments);
     if (a === "data-health") return await handleDataHealth(ctx, { allowed: allowedIds, token: (c, loc) => locationAccessToken(c.session.companyId, loc), links: async () => (await scope(ctx)).links });
     if (a === "workflows") return await handleWorkflows(ctx, { allowed: allowedIds, token: (c, loc) => locationAccessToken(c.session.companyId, loc) });
     if (a === "people") {
@@ -2295,6 +2303,8 @@ async function dispatch(ctx: Ctx): Promise<Response> {
     if (a === "clients2" && ((method === "GET" && !b && ctx.url.searchParams.has("part")) || (method === "POST" && b && ctx.segments.length === 2))) {
       return await handleClients2(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
     }
+    // Share a report: /api/app/report-share (list, make a link) and /api/app/report-share/revoke. Owners and administrators only (checked inside); the company is the signed session's.
+    if (a === "report-share" && ((method === "GET" && !b) || (method === "POST" && (!b || (b === "revoke" && ctx.segments.length === 2))))) return await handleReportShare(ctx);
     // Today (front page): /api/app/today3?part=... (today, list, proof, numbers, settings, export; read only) and /api/app/today3/act/... (SubSync-only notes).
     if (a === "today3" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleToday3(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links });
@@ -2304,6 +2314,7 @@ async function dispatch(ctx: Ctx): Promise<Response> {
     }
     // Settings, guides and What's new (stage ST): /api/app/st/<home|state|connections|progress>. Per-person marks only; never changes the CRM or a setting.
     if (a === "st" && ctx.segments.length === 2) return await handleSettings2(ctx);
+    if (a === "cqt" && ctx.segments.length === 2) return await handleCqt(ctx, { allowed: () => allowedIds(ctx) });
     // Cash features: /api/app/cash?part=... (save this account, recover, deals; read only) and /api/app/cash/act/... (SubSync notes; the one CRM change, an owner change, goes through the safe gateway).
     if (a === "cash" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleCash(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; }, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
@@ -2523,6 +2534,7 @@ async function dispatch(ctx: Ctx): Promise<Response> {
       if (a === "my-connections" && b && c === "start") return await myConnectionStart(ctx, b);
       if (a === "my-connections" && b && c === "test") return await myConnectionTest(ctx, b);
       if (a === "meeting-inbox" && b === "confirm") return await meetingConfirm(ctx);
+      if (a === "meeting-inbox" && b === "recheck") return await meetingRecheck(ctx);
       if (a === "meeting-setup" && b === "preview" && !c) return await meetingSetupPreview(ctx);
       if (a === "meeting-inbox" && b && c === "link") return await meetingLink(ctx, b);
       if (a === "meeting-inbox" && b && c === "dismiss") return await meetingDismiss(ctx, b);

@@ -9,11 +9,11 @@ export const COMPANY = {
   product: "SubSync",
   supportEmail: "code@kdsquares.com",
   /** What the support page and the help page both promise. A commitment, not something software can check. */
-  supportReply: "one business day",
+  supportReply: "24 hours",
 } as const;
 
 /** The outside services that process data, and why. The Trust page lists exactly these; a test checks each one against the code or the config. */
-export type Processor = { id: "hosting" | "database" | "email" | "slack" | "fathom" | "crm" | "ai"; name: string; role: string; whenUsed: string };
+export type Processor = { id: "hosting" | "database" | "email" | "slack" | "fathom" | "crm" | "ai" | "video"; name: string; role: string; whenUsed: string };
 export const PROCESSORS: readonly Processor[] = [
   { id: "hosting", name: "Vercel", role: "Runs the SubSync app and its scheduled jobs.", whenUsed: "Always." },
   { id: "database", name: "Supabase", role: "Holds the database (everything listed under what we store).", whenUsed: "Always." },
@@ -22,4 +22,5 @@ export const PROCESSORS: readonly Processor[] = [
   { id: "slack", name: "Slack", role: "Receives the alerts and the daily brief, in the channel you choose.", whenUsed: "Only if you connect it." },
   { id: "fathom", name: "Fathom", role: "Sends meeting summaries to SubSync.", whenUsed: "Only if you connect it." },
   { id: "ai", name: "Your own AI provider", role: "Receives the short summary of counts that SubSync sends to write the 7 am brief wording, under your own account and terms.", whenUsed: "Only if an administrator connects their own AI account (OpenRouter, Anthropic, OpenAI, Google or a compatible service)." },
+  { id: "video", name: "YouTube", role: "Plays the tour and welcome videos on our website pages.", whenUsed: "Only when a visitor presses Play." },
 ];

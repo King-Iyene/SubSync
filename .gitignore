@@ -56,3 +56,7 @@ backups/
 .next-int
 .next-*/
 .claude/worktrees/
+
+# Preview video output (large, not committed). See docs/VIDEO_SCRIPT.md.
+assets/video-out/
+public/video/subsync-tour-1080.mp4

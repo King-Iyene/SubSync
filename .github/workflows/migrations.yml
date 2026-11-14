@@ -2,8 +2,8 @@
 #
 # 1. "Check" runs on every push and pull request: it applies ALL migrations to a brand-new throwaway Postgres, then typechecks and runs the unit tests.
 #    A migration that does not apply cleanly from scratch, or that drops/truncates/deletes, fails here before it can reach production.
-# 2. "Apply to Supabase" runs only on a push to main that changes supabase/migrations (or by hand), after "Check" passes AND a person approves it
-#    (GitHub Environment "production" with required reviewers). It applies only the migrations not yet recorded, once each, in order.
+# 2. "Apply to Supabase" runs only on a push to main that changes supabase/migrations (or by hand), after "Check" passes (no approval wait)
+#    (GitHub Environment "production", no required reviewers). It applies only the migrations not yet recorded, once each, in order.
 #
 # One-time setup (King): see docs/MERGE_AND_MIGRATE.md, section "Automatic migrations".
 name: migrations
@@ -109,6 +109,22 @@ jobs:
           GHL_APP_SHARED_SECRET: ci-shared
           GHL_REDIRECT_URI: http://localhost:3102/api/oauth/callback
         run: npx vitest run tests/unit/ignored-leads-db.test.ts --disableConsoleIntercept
+      - name: Share a report (link ids, names hidden by default, another company never sees or switches off a link, expiry and switch-off open nothing)
+        env:
+          DATABASE_URL: postgresql://postgres:ci@localhost:5432/postgres
+          DATABASE_SSL: "off"
+          DB_POOL_MAX: "2"
+          TOKEN_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+          NEXT_PUBLIC_APP_URL: http://localhost:3102
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon
+          SUPABASE_SERVICE_ROLE_KEY: ci-service
+          GHL_APP_ID: ci-app
+          GHL_CLIENT_ID: ci-client
+          GHL_CLIENT_SECRET: ci-secret
+          GHL_APP_SHARED_SECRET: ci-shared
+          GHL_REDIRECT_URI: http://localhost:3102/api/oauth/callback
+        run: npx vitest run tests/unit/report-share-db.test.ts --disableConsoleIntercept
       - name: Generate the framework types (a clean checkout does not have them)
         run: npx next typegen
       - run: npx tsc --noEmit
@@ -136,7 +152,7 @@ jobs:
     if: >-
       ((github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.migrations == 'true') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
-    # Required reviewers on this environment make the job wait for a click from King.
+    # No required reviewers on this environment: the job runs by itself once Check passes.
     environment: production
     env:
       # The database connection address (Supabase, Connect, Session pooler, with the database password filled in). The workflow talks to the

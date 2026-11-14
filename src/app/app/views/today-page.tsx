@@ -23,6 +23,8 @@ import {
   RaisedClearedStrip, ReplyNowList, SinceStrip, ViewsMenu, type KindRow, type MenuItem,
 } from "../ds";
 import { Btn, fmtInt, fmtMoney } from "../ui";
+import { PrintPdfButton, ShareReport } from "../ds/share-report";
+import { todayDoc } from "../ds/report-docs";
 import type { TodayMode } from "./today";
 import { TodayDashboard } from "./today-dash";
 import { Block, MoreDetail, PrimaryButton, TodayHeader, TodayHeadline, type Primary } from "./today-chrome";
@@ -248,6 +250,7 @@ export function TodayPage({ mode = "full", go, t, kind, reload, sync, syncing, o
     <div data-testid="page" className="ds-enter t-root">
       <PrintReport r={report} now={m.now} />
       <div className="print:hidden">
+        {kind !== "client" && <div className="mb-2 flex flex-wrap items-center justify-end gap-2"><PrintPdfButton /><ShareReport kind="today" build={() => todayDoc(report, m.now)} /></div>}
         <TodayHeader more={moreItems} dateText={dateText} hideTitle={mode === "below"} />
         {error && <InlineAlert tone="danger" className="mb-4" action={<Btn onClick={() => void reload()}>Try again</Btn>}>{error}</InlineAlert>}
 

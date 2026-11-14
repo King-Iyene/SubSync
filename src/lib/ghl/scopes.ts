@@ -13,24 +13,18 @@ export const GHL_SCOPES = [
   // when it was declined. Read access first, then change access, which is only ever used after a preview
   // and a typed confirmation (see docs/SCOPE_PLAN.md).
   "conversations/message.readonly",
-  "conversations/reports.readonly",
   "locations/tags.readonly",
   "locations/customFields.readonly",
-  "locations/tasks.readonly",
   "calendars/groups.readonly",
   "calendars/resources.readonly",
   "calendars/events.write",
   "contacts.write",
   "opportunities.write",
-  "locations/tags.write",
-  "locations/tasks.write",
-  // Release 1.1.0, OPTIONAL, for coming features (AI data cleaning changes custom field values after a preview). Not used yet. Together with
-  // conversations/reports.readonly, locations/tasks.readonly, locations/tasks.write and locations/tags.write above, asked for now so no install has to approve again later.
+  // Five permissions that no feature used were removed on 14 Nov 2026 (conversations/reports.readonly, locations/tasks.readonly, locations/tasks.write, locations/tags.write, locations/customFields.write); add one back only together with the feature that needs it.
   // NEVER add invoices.write or conversations.write (delete): see NOT_REQUESTED in scope-groups.ts.
   // conversations/message.write is added by King's decision of 13 Nov 2026 (SubSync sends a text or email only when a person presses Send), OPTIONAL in the listing:
   // King must tick it as optional in the developer portal (release 2.3.0) before an install asks for it. Without it the composer says "Needs permission: reconnect".
   "conversations/message.write",
-  "locations/customFields.write",
   // Workflows module (optional): read the list and history, then change after a preview. Campaigns are read only.
   "workflows.readonly",
   "workflows.logs",

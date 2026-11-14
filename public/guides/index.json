@@ -1,0 +1,11 @@
+{
+  "guide": "set-up-call-queues",
+  "note": "Screenshots still to capture for the guide Set up your call queues. A missing file is simply not drawn, so the guide works without them. Save each as a PNG, about 1200 px wide, in this folder with exactly this name.",
+  "shots": [
+    { "file": "call-queue-1.png", "from": "CRM", "caption": "Your CRM, Settings, Tags: the call queue tags created.", "capture": "Open your CRM, Settings, Tags. Show needs-first-reply, no-show-follow-up, call-now and subsync-call-follow-up (or your own names) in the list." },
+    { "file": "call-queue-2.png", "from": "CRM", "caption": "Your CRM, Workflows: the three call workflows, published.", "capture": "Open Automation, Workflows. Show Call queue, No-show follow-up call and Slow first reply call, all Published." },
+    { "file": "call-queue-3.png", "from": "SubSync", "caption": "SubSync, Settings, Call queues: the four tag names with the preview.", "capture": "Settings, Call queues. Type one changed tag and press Review change so the preview box shows." },
+    { "file": "call-queue-4.png", "from": "SubSync", "caption": "SubSync, Settings, Call queues: the result of Check that it worked.", "capture": "Press Check that it worked and capture the result list." },
+    { "file": "call-queue-5.png", "from": "CRM", "caption": "Your CRM, a workflow open: trigger Contact Tag (Tag added), then Manual Action Call, then Remove Contact Tag with the same tag.", "capture": "Optional, for the hand-built steps: open the Call queue workflow and capture the whole canvas." }
+  ]
+}

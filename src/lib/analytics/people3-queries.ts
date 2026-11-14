@@ -6,6 +6,9 @@ import {
 } from "./people3-intel";
 import { dailyFrom, NO_OWNER, workItems, waitingFrom, waitingOwner, type Frag, type Work } from "./people3-rollup";
 import { properCase, safePhotoUrl } from "./people-labels";
+import { roleSetCond } from "./people3-roleset";
+import type { RoleFilter } from "../people/roles";
+import { todaySentence } from "../people/team-empty";
 import type {
   Pp3AccessRow, Pp3Access, Pp3AccountRef, Pp3AccountRisk, Pp3Coaching, Pp3Move, Pp3Note, Pp3Options, Pp3Person, Pp3PersonPanel, Pp3Role, Pp3Scorecard, Pp3Scorecards, Pp3Sort, Pp3Target,
   Pp3Today, Pp3Week, Pp3Workload, Pp3WorkloadRow,
@@ -195,7 +198,7 @@ const SORTS: Record<Pp3Sort, SortSpec> = {
 };
 const DEFAULT_DIR: Record<Pp3Sort, "asc" | "desc"> = { name: "asc", answered: "desc", reply: "asc", in_time: "desc", appts: "desc", showed: "desc", won: "desc", waiting: "desc" };
 
-export type CardFilters = { from: Date; to: Date; location?: string | null; q?: string | null; role?: "setter" | "closer" | null; only?: string | null };
+export type CardFilters = { from: Date; to: Date; location?: string | null; q?: string | null; role?: "setter" | "closer" | null; only?: string | null; /** Only people the agency labelled this way (Setters, Closers, Managers...). */ roleset?: RoleFilter | null };
 
 /** The per-person aggregate: current and previous period sums from the daily rows (rollup, or the live twin), grouped by person. Sentinel rows ('~') are not people. */
 function aggFrom(daily: Frag, f: CardFilters, prevFrom: Date): Frag {
@@ -234,6 +237,7 @@ function cardBase(s: Scope, ids: string[], agg: Frag, f: CardFilters, sort: Pp3S
       and (m.deleted is not true or a.uid is not null)
       and p.user_id not like '~%'
       ${f.role === "setter" ? db`and coalesce(a.c_first_replies, 0) > 0` : f.role === "closer" ? db`and coalesce(a.c_held + a.c_no_show + a.c_deals_won + a.c_deals_lost, 0) > 0` : db``}
+      ${f.roleset ? db`and ${roleSetCond(s.inst, cleanId(f.location), f.roleset, db`p.user_id`)}` : db``}
       ${q ? db`and coalesce(nullif(tn.name, ''), nullif(m.name, ''), '') ilike ${like(q)}` : db``}`;
 }
 
@@ -462,7 +466,8 @@ export async function today(s: Scope, f: { location?: string | null }, flags: Fl
   return {
     lines, button: top ? { label: top.kind === "waiting" ? "See who is waiting" : top.kind === "idle" ? "See the leads waiting" : top.kind === "new_person" ? "Name them" : "Take a look", userId: top.userId, locationId: top.locationId, reason: top.reason, count: top.count } : null,
     people: new Set(rows.map((r) => r.person.userId)).size, accounts: accts.length, waitingOld, idleCount: mine.filter((r) => r.idle).length, overCount: mine.filter((r) => r.load === "over").length,
-    headline: lines.length ? `${lines.length === 1 ? "One thing needs" : `${lines.length} things need`} ${s.level === "self" ? "you" : "you today"}.` : "Nothing needs you right now.", historyStarts: hist,
+    headline: todaySentence({ things: lines.length, people: new Set(rows.map((r) => r.person.userId)).size, accounts: accts.length, self: s.level === "self" }).text, historyStarts: hist,
+    usersState: accts.some((a) => a.usersAccess === "needs_permission") ? "needs_permission" : accts.length > 0 && accts.every((a) => a.usersAccess === "ok") ? "ok" : "unknown",
   };
 }
 

@@ -1,6 +1,7 @@
 import { isLive } from "../live-flags.ts";
 import { composeDelivery, previewSections, previewText, type PreviewSection } from "./delivery.ts";
 import { choicesOf, deliverNotes, planFor, settle, toolName, type IngestStore, type PersonalConnection, type Writer } from "./ingest.ts";
+import { isEmail, normEmail, suggest, usableNames, type Suggestion } from "./match-suggest.ts";
 import { INBOX_MESSAGE, targetFor, type InboxReason } from "./meeting-plan.ts";
 import { SAMPLE_NOTE_INPUT, type NoteInput } from "./note-template.ts";
 import { accessibleAccounts, type Person } from "./person.ts";
@@ -14,6 +15,8 @@ import { DUPLICATE_WORDS } from "./source-priority.ts";
 export type StoredMeeting = {
   id: string; ownerUserId: string; connectionId: string | null; installationId: string; provider: "fathom" | "zoom" | "google_meet"; title: string | null; startedAt: string | null;
   attendeeEmails: string[]; summary: string | null; actionItems: string[]; recordingUrl: string | null; status: string; reason: string | null; expiresAt: number | null; createdAt: number;
+  /** Fathom auto-match extras (read best effort): the outside invitees' names, and the contact a held call was matched to with certainty. */
+  attendeeNames?: string[]; matchedLocationId?: string | null; matchedContactId?: string | null;
 };
 
 export type ContactHit = { locationId: string; contactId: string; name: string | null; email: string | null; phone: string | null };
@@ -34,6 +37,8 @@ export type InboxStore = IngestStore & {
   claimHeld: (installationId: string, userId: string, id: string) => Promise<boolean>;
   confirmPreview: (installationId: string, person: Person) => Promise<void>;
   getConnection: (installationId: string, userId: string) => Promise<PersonalConnection | null>;
+  /** Names kept as hints and the contact a held call was matched to, for this person's own calls (read best effort). Optional. */
+  meetingHints?: (installationId: string, userId: string, ids: string[]) => Promise<Record<string, { names: string[]; matchedLocationId: string | null; matchedContactId: string | null }>>;
 };
 
 export type ReasonKind = "unmatched" | "held" | "permission";
@@ -55,7 +60,7 @@ export const daysLeft = (expiresAt: number | null, now: number): number | null =
 /** The note input for a stored call. Names and duration were not kept, so the header lists email addresses. */
 export function noteInputOf(m: StoredMeeting, repName: string | null): NoteInput {
   return {
-    title: m.title, startedAt: m.startedAt, durationMinutes: null, attendeeNames: m.attendeeEmails, rep: repName, tool: toolName(m.provider),
+    title: m.title, startedAt: m.startedAt, durationMinutes: null, attendeeNames: m.attendeeNames?.length ? m.attendeeNames : m.attendeeEmails, rep: repName, tool: toolName(m.provider),
     summary: m.summary, actionItems: m.actionItems, recordingUrl: m.recordingUrl,
   };
 }
@@ -98,13 +103,21 @@ export type LinkResult =
 
 export type LinkPick = { locationId: string; contactId: string };
 
+/** The calls with their name hints and the contact they were matched to (when the store keeps them). A store without them returns the calls as they are. */
+export async function withHints(store: InboxStore, installationId: string, userId: string, meetings: StoredMeeting[]): Promise<StoredMeeting[]> {
+  if (!store.meetingHints || meetings.length === 0) return meetings;
+  const hints = await store.meetingHints(installationId, userId, meetings.map((m) => m.id)).catch(() => ({}) as Record<string, never>);
+  return meetings.map((m) => { const h = (hints as Record<string, { names: string[]; matchedLocationId: string | null; matchedContactId: string | null }>)[m.id]; return h ? { ...m, attendeeNames: h.names, matchedLocationId: h.matchedLocationId, matchedContactId: h.matchedContactId } : m; });
+}
+
 /**
  * The person picked an account and a contact for a waiting call. The pick is checked again here: the account must be one the person can open, the contact
  * must be in that account, the call must be the person's own and still waiting. The note then goes through the same rules and the same dry-run client as an
  * automatic one (the account's policy, the daily limit, the permission).
  */
 export async function linkMeeting(store: InboxStore, person: Person, installationId: string, meetingId: string, pick: LinkPick, write: Writer): Promise<LinkResult> {
-  const row = await store.getMeeting(installationId, person.userId, meetingId);
+  const found = await store.getMeeting(installationId, person.userId, meetingId);
+  const row = found ? (await withHints(store, installationId, person.userId, [found]))[0] : null;
   if (!row || row.status !== "needs_contact") return { ok: false, code: "not_found", message: "That call is not in your inbox any more." };
   if (kindOf(row.reason) === "held") return { ok: false, code: "confirm_first", message: "Check how the first note looks and confirm it first. Then this call is added by itself." };
   const installed = await store.installed(installationId);
@@ -151,6 +164,23 @@ export async function alwaysIgnore(store: InboxStore, person: Person, installati
   if (!row || row.status !== "needs_contact" || !row.attendeeEmails.some((e) => e.toLowerCase() === wanted)) return false;
   await store.addIgnored(installationId, person.userId, wanted);
   return store.scrub(installationId, person.userId, meetingId, "ignored");
+}
+
+/**
+ * People who MAY be who this call was with, with the evidence, for the "Possible matches" list. Only inside the accounts this person can open. Nothing here is certain and nothing is
+ * written: the person confirms one with a click, and that goes through `linkMeeting` like any manual pick.
+ */
+export async function suggestionsFor(store: InboxStore, person: Person, installationId: string, m: StoredMeeting): Promise<Suggestion[]> {
+  if (!store.similarContacts) return [];
+  const installed = await store.installed(installationId);
+  const proven = await store.provenAccess(installationId, person.userId);
+  const accounts = accessibleAccounts(person, installed, proven);
+  if (accounts.length === 0) return [];
+  const emails = [...new Set(m.attendeeEmails.map(normEmail).filter(isEmail))];
+  const names = usableNames(m.attendeeNames ?? []);
+  if (emails.length === 0 && names.length === 0) return [];
+  const hits = await store.similarContacts(installationId, accounts, { emails, names });
+  return suggest({ emails, names, hits, reachable: accounts });
 }
 
 /** A search for a contact, only inside the accounts this person can open (and, if they chose one, only that one). */

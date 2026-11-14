@@ -97,6 +97,7 @@ test("pilot modules are on by default and a database row can still override the 
     "cl_setup",
     "cl_trends",
     "cl_workflows",
+    "cq_snapshot",
     "cu_bulk",
     "cu_confirm",
     "cu_fix",

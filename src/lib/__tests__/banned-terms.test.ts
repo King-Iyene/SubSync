@@ -14,7 +14,8 @@ import { CODE_LIKE, visibleText } from "../../../tests/fixtures/visible-text.ts"
 const ROOT = join(process.cwd(), "src");
 const PLATFORM = /gohighlevel|highlevel|leadconnector|\bghl\b/i;
 const INTERNAL = /\b(agenc(y|ies)|sub-?accounts?|locations?)\b/i;
-const AUDIENCE_PAGES = /\/src\/app\/(page|privacy\/page|terms\/page|support\/page)\.tsx$/;
+// The new public site (home, support and its pages, trust, install page, and the site's data and components) speaks to agencies too.
+const AUDIENCE_PAGES = /\/src\/(app\/(page|pricing\/page|privacy\/page|terms\/page|trust\/page|installed\/page|installed\/error\/page|support\/.+)|components\/site\/.+|lib\/site\/.+)\.tsx?$/;
 
 // Only these never reach a screen as text: the default address constant, the guard table (our own documentation of each route), and files of
 // pure constants. The code that talks to the platform (src/lib/ghl, src/lib/sync) IS scanned: an error message or status text written there
@@ -77,7 +78,7 @@ test("the scanner catches the platform's name and our internal words in text, an
 
 test("public pages that speak to agencies may say agency, but never name the platform or say sub-account or location", () => {
   assert.equal(violations("export default () => <p>For agencies that book appointments</p>;", "src/app/page.tsx").length, 0);
-  assert.equal(violations("export default () => <p>For agencies that book appointments</p>;", "src/app/installed/page.tsx").length, 1);
+  assert.equal(violations("export default () => <p>For agencies that book appointments</p>;", "src/app/app/dashboard.tsx").length, 1);
   assert.equal(violations("export default () => <p>Works in every sub-account</p>;", "src/app/page.tsx").length, 1);
   assert.equal(violations("export default () => <p>Built on GoHighLevel</p>;", "src/app/privacy/page.tsx").length, 1);
 });

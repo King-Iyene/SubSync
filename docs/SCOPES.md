@@ -2,7 +2,7 @@
 
 This file is generated from `src/lib/scope-groups.ts` (run `scripts/gen-scopes-doc.ts`). A test fails when it is stale, when a permission the app asks for is missing from it, or when it lists one the app does not ask for. Do not edit it by hand.
 
-SubSync asks for 40 permissions: 7 required and 33 optional. Fewer permissions is a trust advantage, and every permission added later makes every installed company approve again, so each one below has a reason. An optional permission can be declined: the feature that needs it then says "Needs permission: reconnect" and everything else keeps working.
+SubSync asks for 35 permissions: 7 required and 28 optional. Fewer permissions is a trust advantage, and every permission added later makes every installed company approve again, so each one below has a reason. An optional permission can be declined: the feature that needs it then says "Needs permission: reconnect" and everything else keeps working.
 
 Wording rule: the screen says one of three things. **Needs permission: reconnect** (the app asked and this install declined, or the app has not asked yet), **Not available from the platform yet** (the platform refuses even with the permission, or has no such data), or it simply shows the data. See `docs/CAPABILITIES.md` for which data point is which.
 
@@ -32,7 +32,7 @@ Your pipelines and the money in them.
 | Permission | Kind | Required | Why we ask |
 | --- | --- | --- | --- |
 | `opportunities.readonly` | read | required | Deals, pipelines and stages, for open pipeline, stale deals and the account audit. |
-| `opportunities.write` | change | optional | Reserved for a later, previewed action on deals. Nothing in SubSync uses it today. |
+| `opportunities.write` | change | optional | Only to change a deal (stage, status, value, owner, name) or delete one from the Pipeline screen, after a preview. A delete also needs a typed confirmation. Optional. |
 
 ## Conversations and calls
 
@@ -43,7 +43,6 @@ Who wrote to a lead, when, and whether a person or an automation did.
 | `conversations.readonly` | read | required | The conversation list: last message, direction, channel and unread count, for unanswered messages. Message text is never copied. |
 | `conversations/message.readonly` | read | optional | The messages inside a conversation, only to see who sent each one and when (a person or an automation, a call or a text). This is the only way to measure true speed to lead. The text of a message is never stored. |
 | `conversations/message.write` | change | optional | Only to send a text or an email to one lead when a person presses Send, after a preview. Optional. SubSync never sends on its own and never to a contact who asked not to be contacted. Without it the message box says: Needs permission, reconnect. |
-| `conversations/reports.readonly` | read | optional | For coming, richer response-time numbers (conversation reports). Not used yet: nothing in SubSync uses it today, and skipping it changes nothing. |
 
 ## Appointments
 
@@ -55,7 +54,7 @@ Bookings and what happened to them.
 | `calendars/events.readonly` | read | optional | Appointments and their status (showed, no-show, never marked), for the appointment checks and the no-show list. |
 | `calendars/groups.readonly` | read | optional | Calendar groups, so every calendar can be listed under its group, even one with no bookings. |
 | `calendars/resources.readonly` | read | optional | Reserved for rooms and equipment. Not used yet. |
-| `calendars/events.write` | change | optional | Reserved for marking an appointment showed or no-show after a preview. Nothing in SubSync uses it today. |
+| `calendars/events.write` | change | optional | Only to create, change (status, time, owner, calendar, title) or delete an appointment from the Appointments screen, after a preview. A delete also needs a typed confirmation. Optional. |
 
 ## Team
 
@@ -72,11 +71,7 @@ How your accounts label and follow up on contacts.
 | Permission | Kind | Required | Why we ask |
 | --- | --- | --- | --- |
 | `locations/tags.readonly` | read | optional | Tag names, for hot-lead and cold-list rules. |
-| `locations/customFields.readonly` | read | optional | Reserved for lead-source detail. Not used yet. |
-| `locations/tasks.readonly` | read | optional | For coming follow-up checks on your team's tasks. Not used yet: nothing in SubSync uses it today, and skipping it changes nothing. |
-| `locations/customFields.write` | change | optional | For coming data cleaning that fixes custom field values, always after a preview. Not used yet: nothing in SubSync uses it today, and skipping it changes nothing. |
-| `locations/tags.write` | change | optional | For coming tagging help, always after a preview. Not used yet: nothing in SubSync uses it today, and skipping it changes nothing. |
-| `locations/tasks.write` | change | optional | For coming follow-up tasks created for your team, always after a preview. Not used yet: nothing in SubSync uses it today, and skipping it changes nothing. |
+| `locations/customFields.readonly` | read | optional | The names of your custom fields, so a field shows its name instead of a code. Names only, never the values. |
 
 ## Workflows and campaigns
 
@@ -92,7 +87,7 @@ The automations and campaigns in your client accounts, and how they are doing.
 | `campaigns.readonly` | read | optional | The list of campaigns in each client account (name, state, last change), to find stuck or failed ones. Read only: SubSync never starts or sends a campaign. |
 | `emails/campaigns.readonly` | read | optional | The email, bulk and workflow campaigns of each client account, read only, for the same list. |
 | `emails/stats.readonly` | read | optional | How many messages of each campaign were sent, delivered, opened, clicked, bounced or are still waiting, to find campaigns that looked sent but did not arrive. Totals only: SubSync never sees who received what. |
-| `saas/location.read` | read | optional | Optional. The platform only gives client plan details to company-level apps, so no screen depends on it today. |
+| `saas/location.read` | read | optional | Optional. Requested for the Plans and payments block on the Clients screen. Honest status: the platform's public API description lists no read that this permission unlocks (the plan reads ask for saas/company.read, company level), so the block shows Needs permission or Not available until the platform confirms what it unlocks. |
 
 ## Payments and credit
 
@@ -104,7 +99,7 @@ Failed and late payments, so you can chase the money, and the credit balance of 
 | `payments/subscriptions.readonly` | read | optional | Whether a customer's repeat payment is active or past due, to list failed repeat payments. Read only. |
 | `invoices.readonly` | read | optional | Which invoices are sent, partly paid or paid and when they are due, to list late invoices. Read only: SubSync never sends or changes an invoice. |
 | `wallet.readonly` | read | optional | The credit balance of each client account, to warn you before it runs out. Read only. |
-| `marketplace-installer-details.readonly` | read | optional | Which plan each install is on, to double-check billing against our own records. Read only. |
+| `marketplace-installer-details.readonly` | read | optional | One record for the token that asks: the installer, the company and the plan id (no dates, no trial). Used only to cross-check the Marketplace installs block, whose dates, plan and trial flag come from the installed list. Read only. |
 
 ## Lead intake
 

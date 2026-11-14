@@ -9,6 +9,7 @@ import { businessInstalled, clientViewOn, getInstallation } from "@/lib/ghl/inst
 import { decryptSsoPayload, parseSsoUser } from "@/lib/ghl/sso";
 import { resolveBrand } from "@/lib/brand-resolve";
 import { signSession } from "@/lib/session";
+import { isPlatformOwner } from "@/lib/feedback-alert";
 import { MAINTENANCE_MESSAGE, maintenanceOn } from "@/lib/runtime-guards";
 import { safeError } from "@/lib/safe-log";
 import { sql } from "@/lib/db";
@@ -63,8 +64,12 @@ export async function POST(request: Request) {
 
   let user;
   let identity;
+  // The sign-in email, read only to compare with PLATFORM_OWNER_EMAILS; it is never stored and never sent back to the browser.
+  let ownerEmail: string | null = null;
   try {
     const decrypted = decryptSsoPayload(body.payload, sharedSecret);
+    const rawEmail = (decrypted as { email?: unknown } | null)?.email;
+    ownerEmail = typeof rawEmail === "string" ? rawEmail : null;
     user = parseSsoUser(decrypted);
     identity = deriveIdentity(decrypted);
   } catch {
@@ -116,9 +121,11 @@ export async function POST(request: Request) {
   // Perf round: only the plan and the brand are needed for the answer; the sign-in log, the saved role and the captured domain and logo are written after the response is sent (they never failed a sign-in anyway).
   runAfter(async () => { await Promise.all([saveRole, logIdentity(installationId, identity, "ok"), user.whitelabelDomain ? captureWhitelabelDomain(installationId, user.whitelabelDomain, "sso").catch(() => undefined) : Promise.resolve(), user.whitelabelLogoUrl ? captureWhitelabelLogo(installationId, user.whitelabelLogoUrl).catch(() => undefined) : Promise.resolve()]); });
   const [entitlements, brand] = await Promise.all([resolveEntitlements(installation.plan, installationId), brandOf(installationId)]);
+  const owner = isPlatformOwner({ kind: decision.kind, companyId: decision.companyKey, email: ownerEmail }, process.env);
   const session = signSession({
     companyId: decision.companyKey, userId: user.userId, role: user.role, userName: user.userName, demo: false,
     kind: decision.kind, locationId: decision.locationId, dataOwner: mayDeleteData(identity, decision.kind), personRole: identity.role,
+    platformOwner: owner,
   });
-  return NextResponse.json({ user, installed: true, kind: decision.kind, session, entitlements, brand });
+  return NextResponse.json({ user, installed: true, kind: decision.kind, session, entitlements, brand, ...(owner ? { owner: true } : {}) });
 }
