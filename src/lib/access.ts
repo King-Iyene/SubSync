@@ -132,10 +132,12 @@ const WORKBENCH_RULES: Rule[] = [["GET", "workbench"], ["POST", "workbench"]];
 const DIAL_RULES: Rule[] = [["GET", "dial"], ["POST", "dial"]];
 // Call queue tags: an account may read and change its own tags and run the read-only check. The snapshot address (cqt/snapshot) and the owner switch are in no list on purpose.
 const CQT_READ_RULES: Rule[] = [["GET", "cqt", "tags"], ["GET", "cqt", "accounts"], ["GET", "cqt", "check"], ["POST", "cqt", "check"]];
-const CLIENT_RULES: Rule[] = [...CQT_READ_RULES, ...WORKBENCH_RULES, ...DIAL_RULES, ...BELL_RULES, ...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "sync", "auto"], ["POST", "today", "action"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "inbox", "outcome"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PEOPLE_DAILY_RULES, ["POST", "duplicates"], ["POST", "dq"], ...PERSONAL_RULES, ...APPT_ACTION_RULES, ...PIPELINE_ACTION_RULES, ...PEOPLE3_ACTION_RULES, ...CASH_ACTION_RULES];
+// Safe CRM writes (preview, then confirm): an account administrator may do all of them; a client's staff may only mark a task done (the handler refuses a delete and every other part).
+const SW_RULES: Rule[] = [["GET", "sw", "setup"], ["POST", "sw"]];
+const CLIENT_RULES: Rule[] = [["POST", "sw", "task"], ...CQT_READ_RULES, ...WORKBENCH_RULES, ...DIAL_RULES, ...BELL_RULES, ...GET_VIEWS.map((a) => ["GET", a] as Rule), ["POST", "usage"], ["POST", "sync", "auto"], ["POST", "today", "action"], ["POST", "roadmap"], ["POST", "feedback"], ["POST", "problem"], ["POST", "inbox", "views"], ["DELETE", "inbox", "views"], ["POST", "inbox", "outcome"], ["POST", "people", "lists"], ["DELETE", "people", "lists"], ["PUT", "people", "dialer"], ...PEOPLE_DAILY_RULES, ["POST", "duplicates"], ["POST", "dq"], ...PERSONAL_RULES, ...APPT_ACTION_RULES, ...PIPELINE_ACTION_RULES, ...PEOPLE3_ACTION_RULES, ...CASH_ACTION_RULES];
 
 const BUSINESS_RULES: Rule[] = [
-  ...CQT_READ_RULES, ["PUT", "cqt", "tags"],
+  ...CQT_READ_RULES, ["PUT", "cqt", "tags"], ...SW_RULES,
   ...WORKBENCH_RULES, ...DIAL_RULES, ["PUT", "dial", "script"], ...GET_VIEWS.map((a) => ["GET", a] as Rule), ...PERSONAL_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES, ...BELL_RULES, ...NOTIFY_ADMIN_RULES,
   ["GET", "email"], ["GET", "sync-run"], ["GET", "daily"], ["GET", "cleanup"], ["POST", "cleanup"], ["GET", "meetings"], ["POST", "meetings"], ["PUT", "meetings"], ["GET", "connections"], ["POST", "connections"], ["DELETE", "connections"], ["GET", "settings"], ["GET", "api-keys"], ["GET", "sync-status"], ["GET", "call-queue"],
   ["GET", "call-lists"], ["GET", "call-outcomes"], ["GET", "goals"], ["GET", "exec-summary"], ["GET", "daily-brief"], ["GET", "digest"],

@@ -5,13 +5,14 @@ import { useState } from "react";
 import { useData } from "../../session";
 import { InfoTip } from "../info-tip";
 import { NoteToSelf } from "../lead-parts";
+import { TaskActions } from "../../views/safe-writes-ui";
 
 // The rest of the contact record in one wide tab, in collapsible sections. Each part is read live from the CRM only when it is opened (notes, tasks, orders) or comes from the
 // panel's own live read (custom fields). Nothing is stored. A part that needs a permission says "Needs permission: reconnect"; nothing is ever faked.
 
 type Part<T> = { state: "ok" | "needs_permission" | "unavailable" | "off"; note: string | null; items: T[]; /** How many the platform says there are in all (orders only). */ total?: number | null };
 type Note = { id: string | null; text: string; by: string | null; at: string | null; ours: boolean };
-type Task = { id: string | null; title: string; due: string | null; done: boolean; by: string | null };
+type Task = { id: string | null; title: string; due: string | null; done: boolean; by: string | null; deletable?: boolean };
 type Order = { id: string | null; title: string; amount: number | null; currency: string | null; status: string | null; at: string | null };
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "");
 
@@ -30,13 +31,13 @@ function Section({ title, tip, count, children, defaultOpen = false, testId }: {
   );
 }
 
-function Live<T>({ locationId, contactId, part, render, empty }: { locationId: string; contactId: string; part: string; render: (items: T[], total: number | null) => React.ReactNode; empty: string }) {
+function Live<T>({ locationId, contactId, part, render, empty }: { locationId: string; contactId: string; part: string; render: (items: T[], total: number | null, reload: () => void) => React.ReactNode; empty: string }) {
   const d = useData<Part<T>>(`workbench/record?locationId=${encodeURIComponent(locationId)}&contactId=${encodeURIComponent(contactId)}&part=${part}`);
   if (d.loading && !d.data) return <div className="space-y-2" aria-label="Loading"><div className="h-10 animate-pulse rounded-lg bg-muted" /><div className="h-10 animate-pulse rounded-lg bg-muted" /></div>;
   if (d.error) return <p className="text-sm text-destructive" role="alert">Could not load this. <button type="button" className="cursor-pointer font-medium underline" onClick={() => void d.reload()}>Try again</button></p>;
   if (!d.data) return null;
   if (d.data.state !== "ok") return <p className="text-sm text-muted-foreground" data-testid={`record-${part}-state`}>{d.data.note}</p>;
-  return d.data.items.length === 0 ? <p className="text-sm text-muted-foreground">{empty}</p> : <>{render(d.data.items, d.data.total ?? null)}</>;
+  return d.data.items.length === 0 ? <p className="text-sm text-muted-foreground">{empty}</p> : <>{render(d.data.items, d.data.total ?? null, () => void d.reload())}</>;
 }
 
 function CopyValue({ value }: { value: string }) {
@@ -65,9 +66,9 @@ export function RecordTab({ locationId, contactId, name, account, fields }: { lo
         )}
       </Section>
       <Section title="Tasks" testId="record-tasks" tip="Tasks on this contact in your CRM, read live when you open this.">
-        {() => <Live<Task> locationId={locationId} contactId={contactId} part="tasks" empty="No tasks." render={(items) => (
+        {() => <Live<Task> locationId={locationId} contactId={contactId} part="tasks" empty="No tasks." render={(items, _total, reload) => (
           <ul className="divide-y rounded-lg border">{items.map((t, i) => (
-            <li key={t.id ?? i} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 text-[15px]"><span className={`min-w-0 flex-1 truncate ${t.done ? "text-muted-foreground line-through" : "font-medium"}`}>{t.title}</span>{t.by && <span className="text-xs text-muted-foreground">{t.by}</span>}{t.due && <span className="text-xs tabular-nums text-muted-foreground">Due {day(t.due)}</span>}<span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${t.done ? "bg-success/15 text-success" : "bg-primary/15 text-primary"}`}>{t.done ? "Done" : "Open"}</span></li>))}</ul>
+            <li key={t.id ?? i} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 text-[15px]"><span className={`min-w-0 flex-1 truncate ${t.done ? "text-muted-foreground line-through" : "font-medium"}`}>{t.title}</span>{t.by && <span className="text-xs text-muted-foreground">{t.by}</span>}{t.due && <span className="text-xs tabular-nums text-muted-foreground">Due {day(t.due)}</span>}<span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${t.done ? "bg-success/15 text-success" : "bg-primary/15 text-primary"}`}>{t.done ? "Done" : "Open"}</span>{t.id && <TaskActions locationId={locationId} contactId={contactId} taskId={t.id} done={t.done} ours={t.deletable === true} canDelete={t.deletable === true} onDone={reload} />}</li>))}</ul>
         )} />}
       </Section>
       <Section title="Custom fields" testId="record-fields" count={filled.length} defaultOpen tip="Every custom field on this contact, read live from your CRM when the panel opens. Empty ones are hidden until you ask.">
