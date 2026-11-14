@@ -202,6 +202,8 @@ export const FEATURES = [
   "pm_disputes",
   "pm_upcoming",
   "pm_resend",
+  // Money checks (Payments > Money checks): read-only live look at invoices, orders, coupons, products and app charges. ON by default (not in DEFAULT_OFF).
+  "pm_checks",
   "cf_save",
   "cf_recover",
   "cf_deals",
