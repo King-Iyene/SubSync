@@ -1,4 +1,5 @@
 import type { Attendee, Meeting } from "../analytics/meeting-intel.ts";
+import type { Hit } from "./match-suggest.ts";
 import { buildComment, buildFieldUpdate, buildNote, type CrmRequest, type WriteResult } from "../ghl/crm-writes.ts";
 import { isLive } from "../live-flags.ts";
 import { planFieldWrites, type FieldItem, type FieldMapping, type FieldPlan } from "./contact-fields.ts";
@@ -87,6 +88,12 @@ export type IngestStore = {
   releasePart?: (r: PartRef) => Promise<void>;
   /** Meeting notes list: keeps what the call knows about itself next to it (its length, the share of the talking, the contact it was matched to with certainty). Optional and best effort: a store without it, or a database not updated yet, simply keeps nothing. */
   noteDetails?: (meetingId: string, d: { durationMinutes: number | null; talkPct: number | null; matched: { locationId: string; contactId: string } | null }) => Promise<void>;
+  /** Fathom auto-match: keeps the outside invitees' names (to suggest a lead) and counts of what the delivery carried. Best effort: a database not updated yet keeps nothing. Optional. */
+  saveHints?: (meetingId: string, h: { names: string[]; stats: { invitees: number; withEmail: number; outside: number } | null }) => Promise<void>;
+  /** Contacts that look like the call's attendees but are NOT certain (same email on several contacts, same mailbox with a plus tag, same full name), in the given accounts ONLY. Optional. */
+  similarContacts?: (installationId: string, locationIds: string[], q: { emails: string[]; names: string[] }) => Promise<SimilarHit[]>;
+  /** Takes a waiting call for a new look (one winner when two passes run together): true when this pass got it. Optional: a store without it never rematches. */
+  claimWaiting?: (installationId: string, userId: string, id: string, fromReason: string | null) => Promise<boolean>;
   /** Writes what happened to each contact field into the audit log (ids, item names and plain reasons: never a value). Optional. */
   /** Automation pass: tells the person what happened (in-app, and Slack when connected). Optional. */
   notify?: (n: { installationId: string; userId: string; meetingId: string; kind: "added" | "needs_matching"; title: string | null; contactName: string | null; locationId: string | null; contactId: string | null }) => Promise<void>;
@@ -99,7 +106,8 @@ export type Writer = (a: { installationId: string; locationId: string; contactId
  * What the delivery adds to the meeting, for the note's header (all optional: a source that has none leaves the line out). `transcript` is the call's
  * full text and exists only in memory for this one delivery (SubSync never stores a transcript); `callUrl` is the call's page in the meeting tool.
  */
-export type DeliveryExtras = { internalEmails?: string[]; rep?: string | null; withNames?: string[]; durationMinutes?: number | null; transcript?: string | null; callUrl?: string | null; talkPct?: number | null };
+export type SimilarHit = Hit & { phone?: string | null };
+export type DeliveryExtras = { internalEmails?: string[]; rep?: string | null; withNames?: string[]; outsideNames?: string[]; inviteeStats?: { invitees: number; withEmail: number; outside: number }; durationMinutes?: number | null; transcript?: string | null; callUrl?: string | null; talkPct?: number | null };
 
 export type IngestResult =
   | { kind: "duplicate" }
@@ -329,14 +337,19 @@ export async function ingestPersonalMeeting(
     }
     supersedes = decision.supersedes;
   }
-  const details = async (id: string, matched: { locationId: string; contactId: string } | null) => { try { await store.noteDetails?.(id, { durationMinutes: extras.durationMinutes ?? null, talkPct: extras.talkPct ?? null, matched }); } catch { /* the list simply lacks these facts */ } };
+  const details = async (id: string, matched: { locationId: string; contactId: string } | null) => {
+    try { await store.noteDetails?.(id, { durationMinutes: extras.durationMinutes ?? null, talkPct: extras.talkPct ?? null, matched }); } catch { /* the list simply lacks these facts */ }
+    try { await store.saveHints?.(id, { names: extras.outsideNames ?? [], stats: extras.inviteeStats ?? null }); } catch { /* the inbox simply has no name hints */ }
+  };
   const supersede = async () => { if (supersedes.length && store.markDuplicates) await store.markDuplicates(installationId, person.userId, supersedes, "preferred_tool_has_it"); };
 
   const waits = async (reason: InboxReason): Promise<IngestResult> => {
     const id = await store.insertMeeting({ ...base, status: "needs_contact", reason, expiresAt: store.now() + (plan.kind === "inbox" ? plan.retentionDays : waitDays) * DAY });
     if (id === null) return { kind: "duplicate" };
     await supersede();
-    await details(id, null);
+    // A call that was matched with certainty but is held by a rule or a limit still says who it will go to ("Matched to ... , will be added when notes are switched on").
+    const certain = plan.kind === "inbox" ? plan.matched?.[0] : undefined;
+    await details(id, certain ? { locationId: certain.locationId, contactId: certain.contactId } : null);
     await store.bump(conn.id, "skipped");
     return { kind: "inbox", meetingId: id, reason };
   };

@@ -111,7 +111,7 @@ import { MIN_CLOSED_DEALS as MIN_CLOSED, OUTLIER_MIN_DEALS, OUTLIER_SHARE, outli
 import { parsePickedAccounts } from "../design/filters";
 import { myConnectionRemove, myConnectionsView, myConnectionStart, myConnectionTest, policySave, teamConnectionRevoke, teamConnectionsView } from "./connections-api";
 import { bellAction, bellView, copyPreview, copyReset, copySave, destinationAdvanced, destinationRemove, destinationsView, destinationStart, destinationTest, prefSave, prefsView, prefTest } from "./notifications-api";
-import { meetingConfirm, meetingContactSearch, meetingDismiss, meetingIgnore, meetingInboxView, meetingLink, meetingSettingsSave } from "./meetings-api";
+import { meetingConfirm, meetingContactSearch, meetingDismiss, meetingIgnore, meetingInboxView, meetingLink, meetingRecheck, meetingSettingsSave } from "./meetings-api";
 import { meetingLoggedView } from "./meeting-logged-api";
 import { meetingSetupAccountView, meetingSetupFieldsSave, meetingSetupFieldsView, meetingSetupPreview, meetingSetupSaveMine, meetingSetupView } from "./meeting-setup-api";
 import { can, personFromSession } from "../connections/person";
@@ -2529,6 +2529,7 @@ async function dispatch(ctx: Ctx): Promise<Response> {
       if (a === "my-connections" && b && c === "start") return await myConnectionStart(ctx, b);
       if (a === "my-connections" && b && c === "test") return await myConnectionTest(ctx, b);
       if (a === "meeting-inbox" && b === "confirm") return await meetingConfirm(ctx);
+      if (a === "meeting-inbox" && b === "recheck") return await meetingRecheck(ctx);
       if (a === "meeting-setup" && b === "preview" && !c) return await meetingSetupPreview(ctx);
       if (a === "meeting-inbox" && b && c === "link") return await meetingLink(ctx, b);
       if (a === "meeting-inbox" && b && c === "dismiss") return await meetingDismiss(ctx, b);

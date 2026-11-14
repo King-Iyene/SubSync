@@ -1,7 +1,9 @@
 import { installationHasScope } from "../analytics/cleanup-queries";
 import { getSettings } from "../analytics/queries";
 import { sql } from "../db";
-import { alwaysIgnore, confirmAndRelease, daysLeft, type StoredMeeting, dismissMeeting, findContacts, kindOf, linkMeeting, messageFor, noteInputOf, outcomeWords, previewFor } from "../connections/inbox";
+import { alwaysIgnore, confirmAndRelease, daysLeft, type StoredMeeting, dismissMeeting, findContacts, kindOf, linkMeeting, messageFor, noteInputOf, outcomeWords, previewFor, suggestionsFor, withHints } from "../connections/inbox";
+import { plainReason } from "../connections/match-suggest";
+import { rematchMine } from "../connections/rematch-run";
 import { pgInboxStore, listRecent, saveMySettings } from "../connections/inbox-store";
 import { choicesOf, COMMENT_SCOPE } from "../connections/ingest";
 import { composeDelivery, previewText } from "../connections/delivery";
@@ -57,15 +59,32 @@ export async function meetingInboxView(ctx: Ctx): Promise<Response> {
   const policy = effectivePolicy(rules.agency, home ? rules.accounts[home] : null);
   const choice = effectiveChoices(choicesOf(settings), policy).choices;
   const matrix = clipChoices(matrixFor(choice.preset, choice.custom), policy, true, { fieldItems: itemsWithField(mappings), canComment }).items;
+  const links = deepLinks((await getSettings(ctx.installationId)).appDomain);
   const noteFor = (m: StoredMeeting) => previewText(composeDelivery({ input: noteInputOf(m, person.name), items: matrix, template: choice.template }));
   const heldFirst = waiting.find((m) => kindOf(m.reason) === "held") ?? null;
-  const accounts = await accountNames(ctx.installationId, accessibleAccounts(person, installed, await store.provenAccess(ctx.installationId, person.userId)));
+  const accessible = accessibleAccounts(person, installed, await store.provenAccess(ctx.installationId, person.userId));
+  const accounts = await accountNames(ctx.installationId, accessible);
+  // Fathom auto-match: name hints, who a held call was matched to with certainty, and "possible matches" with their evidence (never certain, never written without a click).
+  const withHint = await withHints(store, ctx.installationId, person.userId, waiting);
+  const suggestions = new Map<string, Awaited<ReturnType<typeof suggestionsFor>>>();
+  for (const m of withHint.filter((x) => kindOf(x.reason) === "unmatched").slice(0, 12)) suggestions.set(m.id, await suggestionsFor(store, person, ctx.installationId, m).catch(() => []));
+  const heldReasons = new Set(["writes_off", "provider_not_allowed", "over_daily_cap", "needs_permission", "preview_needed"]);
+  const matchedTo = new Map<string, { name: string | null; accountName: string }>();
+  for (const m of withHint) {
+    if (!m.matchedLocationId || !m.matchedContactId || !accessible.includes(m.matchedLocationId) || !heldReasons.has(m.reason ?? "")) continue;
+    const c = await store.contactIn(ctx.installationId, m.matchedLocationId, m.matchedContactId);
+    if (c) matchedTo.set(m.id, { name: c.name, accountName: accounts.find((a) => a.locationId === c.locationId)?.name ?? "Unnamed account" });
+  }
+  const accountName = new Map(accounts.map((a) => [a.locationId, a.name]));
   return json({
     demo: false, connected: connection !== null, canWrite, writeLive: isLive("WRITE_GHL_LIVE"),
     settings: { masterSwitch: settings.masterSwitch, unmatchedMode: effectiveChoices(choicesOf(settings), policy).choices.unmatchedMode, unmatchedLocked: effectiveChoices(choicesOf(settings), policy).locked.unmatchedMode, previewConfirmed: settings.previewConfirmedAt !== null },
     preview: settings.previewConfirmedAt === null ? { ...previewFor(heldFirst, person, matrix, { template: choice.template }), held: waiting.filter((m) => kindOf(m.reason) === "held").length } : null,
-    waiting: waiting.map((m) => ({
-      id: m.id, title: m.title, startedAt: m.startedAt, attendees: m.attendeeEmails, reason: m.reason, kind: kindOf(m.reason), message: messageFor(m.reason), daysLeft: daysLeft(m.expiresAt, now),
+    waiting: withHint.map((m) => ({
+      id: m.id, title: m.title, startedAt: m.startedAt, attendees: m.attendeeEmails, attendeeNames: m.attendeeNames ?? [], reason: m.reason, kind: kindOf(m.reason), message: messageFor(m.reason), daysLeft: daysLeft(m.expiresAt, now),
+      detail: plainReason(m.reason, m.attendeeEmails.length, suggestions.get(m.id)?.length ?? 0),
+      matchedTo: matchedTo.get(m.id) ?? null,
+      possible: (suggestions.get(m.id) ?? []).map((s) => ({ ...s, accountName: accountName.get(s.locationId) ?? "Unnamed account", url: links.contact(s.locationId, s.contactId) })),
       summary: m.summary, actionItems: m.actionItems, recordingUrl: m.recordingUrl, noteText: kindOf(m.reason) === "unmatched" ? noteFor(m) : null,
     })),
     recent: recent.map((r) => ({ id: r.id, title: r.title, startedAt: r.startedAt, receivedAt: new Date(r.createdAt).toISOString(), status: r.status, outcome: outcomeWords(r.status, r.reason, r.notes) })),
@@ -122,6 +141,16 @@ export async function meetingConfirm(ctx: Ctx): Promise<Response> {
   if (!person) return NEED_SIGN_IN();
   const result = await confirmAndRelease(pgInboxStore(), person, ctx.installationId, crmWriter(person.companyKey));
   return json({ ok: true, ...result, writeLive: isLive("WRITE_GHL_LIVE") });
+}
+
+/** "Check again now": the person's own waiting calls are matched again against their contacts (the same rules as a new call; nothing is guessed). */
+export async function meetingRecheck(ctx: Ctx): Promise<Response> {
+  const person = personOf(ctx);
+  if (!person) return NEED_SIGN_IN();
+  const conn = await pgInboxStore().getConnection(ctx.installationId, person.userId);
+  if (!conn) return json({ error: "Connect Fathom first" }, 409);
+  const out = await rematchMine(ctx.installationId, conn);
+  return json({ ok: true, checked: out.checked, added: out.added, matchedWaiting: out.matchedWaiting, writeLive: isLive("WRITE_GHL_LIVE") });
 }
 
 export async function meetingSettingsSave(ctx: Ctx): Promise<Response> {

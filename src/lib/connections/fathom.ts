@@ -31,6 +31,10 @@ export type FathomDelivery = {
   internalEmails: string[];
   /** Attendees for the note's "With:" line: everybody invited except the recorder. */
   withNames: string[];
+  /** The names of the invitees outside the recorder's company (a hint for suggesting a lead when no email matches; never used to decide). */
+  outsideNames: string[];
+  /** Counts only (never an address): invitees in the delivery, how many had an email, how many were outside the recorder's company. */
+  inviteeStats: { invitees: number; withEmail: number; outside: number };
   durationMinutes: number | null;
   /** The share (0 to 100) of the words the recorder spoke, from counts of the transcript turns of this one delivery. Null unless the transcript was read (the words are never kept). */
   talkPct: number | null;
@@ -134,19 +138,33 @@ export function parseFathomDelivery(input: unknown, options: { transcript?: bool
   const withNames: string[] = [];
   const seen = new Set<string>();
   if (recordedByEmail) internal.add(recordedByEmail);
+  const outsideNames: string[] = [];
+  const stats = { invitees: 0, withEmail: 0, outside: 0 };
   if (Array.isArray(b.calendar_invitees)) {
     for (const raw of b.calendar_invitees.slice(0, 50)) {
       const o = rec(raw);
-      const e = email(o.email);
+      const e = email(o.email ?? o.email_address);
       const name = text(o.name, 120);
+      stats.invitees++;
+      if (e) stats.withEmail++;
       // Fathom says whether an invitee is outside the recorder's company. One that is explicitly NOT external is on the person's own side.
       if (e && o.is_external === false) internal.add(e);
       if (e && e === recordedByEmail) continue;
       const key = e ?? name;
       if (!key || seen.has(key)) continue;
       seen.add(key);
+      if (o.is_external !== false) { stats.outside++; if (name) outsideNames.push(name); }
       attendees.push({ name, email: e });
       withNames.push(name ?? e ?? "");
+    }
+  }
+  // A transcript (only present when the person chose to keep it) names who spoke and, when Fathom matched a speaker to an invitee, that invitee's email: another way to know who was there.
+  // Only as a fallback, when the invitee list gave no email at all.
+  if (stats.withEmail === 0 && Array.isArray(b.transcript)) {
+    for (const raw of b.transcript.slice(0, 2_000)) {
+      const sp = rec(rec(raw).speaker);
+      const e = email(sp.matched_calendar_invitee_email);
+      if (e && e !== recordedByEmail && !internal.has(e) && !seen.has(e)) { seen.add(e); attendees.push({ name: text(sp.display_name, 120), email: e }); }
     }
   }
 
@@ -159,7 +177,7 @@ export function parseFathomDelivery(input: unknown, options: { transcript?: bool
     recordingUrl: httpsUrl(b.share_url) ?? httpsUrl(b.url),
   };
   return {
-    recordingId, meeting, recordedByEmail, recordedByName, internalEmails: [...internal], withNames: withNames.filter(Boolean).slice(0, 12),
+    recordingId, meeting, recordedByEmail, recordedByName, internalEmails: [...internal], withNames: withNames.filter(Boolean).slice(0, 12), outsideNames: outsideNames.slice(0, 12), inviteeStats: stats,
     durationMinutes: minutes !== null && minutes > 0 && minutes < 24 * 60 ? minutes : null,
     talkPct: options.transcript === true ? talkOf(b.transcript, { name: recordedByName, email: recordedByEmail }) : null,
     transcriptText: options.transcript === true ? transcriptOf(b.transcript) : null, callUrl: httpsUrl(b.url),
