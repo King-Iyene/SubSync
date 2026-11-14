@@ -26,7 +26,7 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
   ] },
   { id: "deals", title: "Deals", summary: "Your pipelines and the money in them.", scopes: [
     { scope: "opportunities.readonly", kind: "read", required: true, why: "Deals, pipelines and stages, for open pipeline, stale deals and the account audit." },
-    { scope: "opportunities.write", kind: "change", required: false, why: "Reserved for a later, previewed action on deals. Nothing in SubSync uses it today." },
+    { scope: "opportunities.write", kind: "change", required: false, why: "Only to change a deal (stage, status, value, owner, name) or delete one from the Pipeline screen, after a preview. A delete also needs a typed confirmation. Optional." },
   ] },
   { id: "calls", title: "Conversations and calls", summary: "Who wrote to a lead, when, and whether a person or an automation did.", scopes: [
     { scope: "conversations.readonly", kind: "read", required: true, why: "The conversation list: last message, direction, channel and unread count, for unanswered messages. Message text is never copied." },
@@ -38,14 +38,14 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { scope: "calendars/events.readonly", kind: "read", required: false, why: "Appointments and their status (showed, no-show, never marked), for the appointment checks and the no-show list." },
     { scope: "calendars/groups.readonly", kind: "read", required: false, why: "Calendar groups, so every calendar can be listed under its group, even one with no bookings." },
     { scope: "calendars/resources.readonly", kind: "read", required: false, why: "Reserved for rooms and equipment. Not used yet." },
-    { scope: "calendars/events.write", kind: "change", required: false, why: "Reserved for marking an appointment showed or no-show after a preview. Nothing in SubSync uses it today." },
+    { scope: "calendars/events.write", kind: "change", required: false, why: "Only to create, change (status, time, owner, calendar, title) or delete an appointment from the Appointments screen, after a preview. A delete also needs a typed confirmation. Optional." },
   ] },
   { id: "team", title: "Team", summary: "Your team members' names.", scopes: [
     { scope: "users.readonly", kind: "read", required: false, why: "Team member names, so lists and leaderboards say who, never a raw ID. Without it lists cannot show names, and the feature says: Needs permission, reconnect." },
   ] },
   { id: "tags", title: "Tags, fields and tasks", summary: "How your accounts label and follow up on contacts.", scopes: [
     { scope: "locations/tags.readonly", kind: "read", required: false, why: "Tag names, for hot-lead and cold-list rules." },
-    { scope: "locations/customFields.readonly", kind: "read", required: false, why: "Reserved for lead-source detail. Not used yet." },
+    { scope: "locations/customFields.readonly", kind: "read", required: false, why: "The names of your custom fields, so a field shows its name instead of a code. Names only, never the values." },
   ] },
   { id: "workflows", title: "Workflows and campaigns", summary: "The automations and campaigns in your client accounts, and how they are doing.", scopes: [
     { scope: "workflows.readonly", kind: "read", required: false, why: "The list of workflows in each client account (name, state, last edited), for the Workflows page. Without it the page says: Needs permission, reconnect." },
