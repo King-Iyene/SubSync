@@ -29,7 +29,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         <div className="wrap cols">
           <div>
             <strong>SubSync</strong>
-            <p style={{ maxWidth: "34ch", marginTop: 8 }}>Built in Nigeria for businesses and agencies everywhere. Made and run by {COMPANY.legalName}.</p>
+            <p style={{ maxWidth: "34ch", marginTop: 8 }}>Built in Nigeria for businesses and agencies everywhere. Made and run by <span style={{ whiteSpace: "nowrap" }}>{COMPANY.legalName}</span>.</p>
           </div>
           <div>
             <strong>Product</strong>

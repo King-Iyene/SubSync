@@ -1,8 +1,8 @@
 /* The public site (home, support, trust, privacy, terms). Everything is scoped under .site so the app's own design system is untouched.
    One accent (the blue of the logo). Dark by default, light when the visitor's device asks for light. Contrast is AA for every text pair used here. */
 .site {
-  --s-bg: #0a101c; --s-bg2: #101a2b; --s-card: #131f33; --s-line: #243652; --s-text: #eaf0fb; --s-muted: #a9b8d0;
-  --s-accent: #4db4ea; --s-accent-text: #06121f; --s-accent-link: #6cc4f0; --s-gold: #d9a93a; --s-focus: #ffd166; --s-ok: #6fd3a0;
+  --s-bg: #080f0c; --s-bg2: #0d1813; --s-card: #11201a; --s-line: #234235; --s-text: #eaf5ef; --s-muted: #a7bfb3;
+  --s-accent: #4ac98a; --s-accent-text: #04140c; --s-accent-link: #6fdca6; --s-gold: #d9a93a; --s-focus: #ffd166; --s-ok: #6fd3a0;
   background: var(--s-bg); color: var(--s-text); min-height: 100vh; font-size: 17px; line-height: 1.65; -webkit-font-smoothing: antialiased;
 }
 @media (prefers-color-scheme: light) {
@@ -26,7 +26,7 @@
 .site .hdr { position: sticky; top: 0; z-index: 30; background: color-mix(in srgb, var(--s-bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--s-line); }
 .site .hdr .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; padding-top: 10px; padding-bottom: 10px; flex-wrap: wrap; }
 .site .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--s-text); text-decoration: none; font-weight: 700; font-size: 19px; }
-.site .brand img { height: 36px; width: auto; }
+.site .brand img { height: 36px; width: auto; filter: hue-rotate(-45deg) saturate(1.1); }
 .site .nav { display: flex; align-items: center; gap: 4px 18px; flex-wrap: wrap; font-size: 15px; }
 .site .nav a { color: var(--s-muted); text-decoration: none; padding: 8px 2px; min-height: 40px; display: inline-flex; align-items: center; }
 .site .nav a:hover { color: var(--s-text); }
