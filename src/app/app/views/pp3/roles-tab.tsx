@@ -3,7 +3,8 @@
 import { Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { RoleCounts, RolePerson, RoleLogRow } from "@/lib/analytics/team-roles-queries";
-import { ROLE_IDS, ROLE_LABEL, ROLE_SHORT, SETTER_CLOSER_TIP, type RoleId } from "@/lib/people/roles";
+import { MIN_SUGGEST, ROLE_IDS, ROLE_LABEL, ROLE_SHORT, SETTER_CLOSER_TIP, type RoleId } from "@/lib/people/roles";
+import { suggestionProgress } from "@/lib/people/team-empty";
 import { EmptyState } from "../../ds";
 import { RoleChangeDialog, RolePicker, refreshRoles } from "../../roles";
 import { ApiError, useApiClient, useData } from "../../session";
@@ -118,7 +119,7 @@ export function Roles() {
                     {p.suggestion ? <>
                       <span className="ap-fine" title={p.suggestion.why}>Likely {ROLE_SHORT[p.suggestion.role].toLowerCase()} (an estimate). {p.suggestion.why}</span>
                       <button type="button" className="ap-link" onClick={() => setDlg({ title: `Role for ${p.name}`, ids: [p.userId], role: p.suggestion!.role })} data-testid="roles-use-suggestion">Use {ROLE_SHORT[p.suggestion.role]}</button>
-                    </> : p.role ? null : <span className="ap-fine">{NOT_ENOUGH} to suggest one</span>}
+                    </> : p.role ? null : <span className="ap-fine" data-testid="roles-no-suggestion">{NOT_ENOUGH} to suggest one: {suggestionProgress(p.actions, MIN_SUGGEST)} (appointments booked or taken in 90 days)</span>}
                   </span>
                 </div>
               ))}

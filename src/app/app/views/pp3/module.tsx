@@ -15,7 +15,8 @@ import { Scorecards, Today, Workload, type SecProps } from "./sections";
 import { Roles } from "./roles-tab";
 import { TeamView } from "../people";
 import { Access, Coaching, Leaderboard, Money, Proof } from "./sections2";
-import { ago, Load, money, Pager, RECONNECT, useCursor } from "./shared";
+import { ago, Load, money, Pager, RECONNECT, TeamCtx, useCursor } from "./shared";
+import { noRoleLine, TEAM_START_TAB_KEY } from "@/lib/people/team-empty";
 
 // Team, one screen (the Clients module pattern): Today | Scorecards | Workload | Leaderboard | Money | Coaching | Access | Proof, and a panel for one person.
 // REAL synced data only; "idle" always reads "no activity recorded in your CRM". Reads only here; the actions builder mounts its pieces through actions-slot.tsx.
@@ -34,14 +35,27 @@ const TIPS: Record<TabKey, [string, string]> = {
 const PP_GROUPS = [
   { label: "People", tip: "Who does what, and how they compare.", keys: ["today", "scorecards", "leaderboard", "workload", "owners"] },
   { label: "Money", tip: "Deals won, open and at risk per person.", keys: ["money"] },
-  { label: "Coaching and access", tip: "Coaching notes, roles and who works where.", keys: ["coaching", "roles", "access"] },
+  // Roles has its own tab: it used to sit one level down inside Coaching and access, where nobody found it.
+  { label: "Roles", tip: "Say who is a Setter, a Closer or something else.", keys: ["roles"] },
+  { label: "Coaching and access", tip: "Coaching notes and who works where.", keys: ["coaching", "access"] },
   { label: "Proof", tip: "A summary for a client.", keys: ["proof"] },
 ];
 const FLAG_OF: Record<TabKey, string> = { today: "pp_today", scorecards: "pp_scorecards", workload: "pp_workload", leaderboard: "pp_leaderboard", money: "pp_money", coaching: "pp_coaching", access: "pp_access", proof: "pp_proof", roles: "pp_roles", owners: "pp_module" };
+const PEOPLE_TABS: TabKey[] = ["today", "scorecards", "leaderboard", "workload", "owners", "money"];
 const OWN_TABS: TabKey[] = ["today", "scorecards", "leaderboard", "coaching"];
 const NO_PERIOD: TabKey[] = ["today", "workload", "coaching", "access", "roles", "owners"];
 
-const KIND_WORD = { lead: "Lead waiting", deal: "Deal", appointment: "Appointment" } as const;
+/** Settings (and anything else) can open Team straight on a tab: it leaves the tab's name here once, and the Team screen takes it when it opens. */
+const START_TAB_KEY = TEAM_START_TAB_KEY;
+function takeStartTab(): TabKey {
+  try {
+    const v = window.sessionStorage.getItem(START_TAB_KEY);
+    if (v && (Object.keys(TIPS) as string[]).includes(v)) return v as TabKey;
+  } catch { /* storage not available: start on Today */ }
+  return "today";
+}
+
+const KIND_WORD ={ lead: "Lead waiting", deal: "Deal", appointment: "Appointment" } as const;
 function DrillList({ d, filters, onClose }: { d: Drill; filters: PpParams; onClose: () => void }) {
   const f = { ...filters, reason: d.reason, user: d.userId ?? undefined, location: d.location ?? filters.location, expect: fixturesOn() && d.count !== null ? d.count : undefined }, c = useCursor(JSON.stringify(f));
   const r = usePp<Pp3List>("list", { ...f, after: c.cursor });
@@ -72,15 +86,20 @@ export function TeamModule({ go }: { go: GoFn }) {
     const all = (Object.keys(TIPS) as TabKey[]).filter((k) => !own || OWN_TABS.includes(k));
     return all.filter((k) => flags === null || flags[FLAG_OF[k]] !== false);
   }, [flags, own]);
-  const [tab, setTab] = useState<TabKey>("today"), active = tabs.includes(tab) ? tab : tabs[0] ?? "today";
+  const [tab, setTab] = useState<TabKey>(takeStartTab), active = tabs.includes(tab) ? tab : tabs[0] ?? "today";
   // The dates are the date bar's (one range for the whole app): every read below asks for exactly them, and waits until they are known.
   const filters = useMemo<PpParams>(() => ({ from: bar.ready ? bar.from : undefined, to: bar.ready ? bar.to : undefined, location: location || undefined }), [bar.ready, bar.from, bar.to, location]);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setDrill(null); }, [active]);
+  useEffect(() => { try { window.sessionStorage.removeItem(START_TAB_KEY); } catch { /* nothing stored */ } }, []);
   const accounts = opt.data?.accounts ?? [];
   const open = (d: Drill) => { setPerson(null); setDrill(d); setTimeout(() => document.getElementById("pp-drill")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50); };
   const coach = (id: string) => { setPerson(null); setDrill(null); setCoachId(id); setTab("coaching"); };
   const props: SecProps = { filters, open, pick: setPerson, coach, accounts, viewer };
+  // Roles is one tap away from every People screen: a banner while anyone has no label, and "Set roles" links inside the empty states.
+  const toRoles = tabs.includes("roles") ? () => { setCoachId(undefined); setPerson(null); setTab("roles"); } : null;
+  const roleLine = toRoles && !sample ? noRoleLine(opt.data?.roles?.none ?? 0) : null;
+  const ctx = { usersState: opt.data?.usersState ?? ("unknown" as const), toRoles, anySetterCloser: opt.data?.roles?.anySetterCloser === true };
 
   if (opt.data && !own && accounts.length === 0 && opt.data.usersState === "ok") return <Page title="Team" subtitle="Who is slow, who is overloaded, and who earns the money." actions={null}><EmptyState title="No people to show yet" body="Your team appears here once its first messages and calls have synced, usually within the hour. If this is still empty tomorrow, reconnect SubSync so it can read the list of people in your CRM." /></Page>;
   const body = (() => {
@@ -114,7 +133,11 @@ export function TeamModule({ go }: { go: GoFn }) {
               <span className="ap-fine">Every number below follows these choices{opt.data?.generatedAt ? `. Updated ${opt.data.generatedAt.slice(0, 10)}` : ""}.</span>
             </div>
           )}
-          <div data-testid={`pp-tab-${active}`}>{bar.ready || NO_PERIOD.includes(active) ? body : <p className="ap-fine" role="status">Working out the dates...</p>}</div>
+          {roleLine && PEOPLE_TABS.includes(active) && (
+            <p className="ap-note mb-2 flex flex-wrap items-center gap-2" role="status" data-testid="pp-roles-banner">{roleLine} Roles let you split the scorecards and the leaderboard into Setters and Closers.
+              <button type="button" className="s6-btn" data-kind="primary" onClick={toRoles ?? undefined} data-testid="pp-roles-banner-go">Set roles</button></p>
+          )}
+          <TeamCtx.Provider value={ctx}><div data-testid={`pp-tab-${active}`}>{bar.ready || NO_PERIOD.includes(active) ? body : <p className="ap-fine" role="status">Working out the dates...</p>}</div></TeamCtx.Provider>
           {drill && <DrillList d={drill} filters={filters} onClose={() => setDrill(null)} />}
           <p className="ap-fine mt-6">SubSync reads message and call metadata, never the words. History starts when SubSync first synced; every trend says when its history begins.</p>
         </div>

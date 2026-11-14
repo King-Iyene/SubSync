@@ -1,6 +1,8 @@
 import { atOf } from "../analytics/window-time";
 import { access, accountsIn, coaching, options, personPanel, scorecards, today, workload, peopleCache, ownedUser, type Flags, type Level, type Links, type Scope } from "../analytics/people3-queries";
 import { exportScorecards, handoff, leaderboard, list, money, nextLead, proof } from "../analytics/people3-queries2";
+import { roleCounts } from "../analytics/team-roles-queries";
+import { parseRoleSet } from "../people/team-empty";
 import { clampSize, DAY, parseWindow } from "../analytics/people3-intel";
 import { PP3_FLAGS, PP3_PARTS, PP3_REASONS, PP3_SORTS, type Pp3Part, type Pp3Reason, type Pp3Sort } from "../analytics/people3-types";
 import type { Feature } from "../entitlements";
@@ -66,6 +68,7 @@ export async function handlePeople3(ctx: Ctx, h: People3Helpers): Promise<Respon
   const after = text(sp.get("after"), 400);
   const q = text(sp.get("q"), 60);
   const role = sp.get("role") === "setter" ? "setter" : sp.get("role") === "closer" ? "closer" : null;
+  const roleset = parseRoleSet(sp.get("roleset"));
   const fl: Flags = { idle: flags.pp_idle === true, actions: flags.pp_actions === true };
   const key = JSON.stringify([ctx.installationId, allowed, level, selfId, part, sp.toString()]);
   const hit = peopleCache.get(key);
@@ -75,12 +78,16 @@ export async function handlePeople3(ctx: Ctx, h: People3Helpers): Promise<Respon
 
   try {
     switch (part) {
-      case "options": return done(await options(scope, level === "all"));
+      case "options": {
+        // How many people have no role label yet, so every Team screen can point at the Roles page. Not read for a person looking only at themselves.
+        const o = await options(scope, level === "all"), c = level === "self" ? null : await roleCounts(scope, ids, null);
+        return done({ ...o, roles: c ? { total: c.total, none: c.none, anySetterCloser: c.setter + c.closer + c.both > 0 } : null });
+      }
       case "today": return done(await today(scope, { location: one }, fl));
-      case "scorecards": return done(await scorecards(scope, { ...range, location: one, q, role }, { sort, dir, after, size }, win.days));
+      case "scorecards": return done(await scorecards(scope, { ...range, location: one, q, role, roleset },{ sort, dir, after, size }, win.days));
       case "workload": return done(await workload(scope, { location: one, q, user }, { size, after }, fl));
       case "access": return done(await access(scope, { location: one, q }, { size, after }));
-      case "leaderboard": return done(await leaderboard(scope, { ...range, location: one, role, all: sp.get("all") === "1", admins: sp.get("admins") === "1" }, { after }, win.days));
+      case "leaderboard": return done(await leaderboard(scope, { ...range, location: one, role, roleset, all: sp.get("all") === "1", admins: sp.get("admins") === "1" }, { after }, win.days));
       case "money": return done(await money(scope, { ...range, location: one, q }, { size, after, sort: sortRaw === "won" ? "won" : "risk" }, win.days));
       case "handoff": return done(await handoff(scope, { ...range, location: one }, { size, after }, win.days));
       case "coaching": return done(await coaching(scope, user, { ...range, location: one }, win.days));
@@ -101,7 +108,7 @@ export async function handlePeople3(ctx: Ctx, h: People3Helpers): Promise<Respon
         return done(await list(scope, { reason: reason as Pp3Reason, user, location: one }, { size, after }, links));
       }
       case "export": {
-        const out = await exportScorecards(scope, { ...range, location: one, q, role }, win.days);
+        const out = await exportScorecards(scope, { ...range, location: one, q, role, roleset },win.days);
         return new Response(out.csv, { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="team.csv"', "cache-control": "no-store", "x-subsync-truncated": out.truncated ? "1" : "0" } });
       }
     }
