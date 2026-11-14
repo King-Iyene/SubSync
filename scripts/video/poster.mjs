@@ -18,7 +18,7 @@ h1 em{font-style:normal;color:#e0a23a}
 .shot img{display:block;width:1700px;height:auto;margin-top:-6px}
 .fade{position:absolute;left:0;right:0;bottom:0;height:90px;background:linear-gradient(transparent,#0b100e)}
 </style>
-<h1>Know what is happening in every account you manage <em>before a customer tells you.</em></h1>
+<h1>${process.env.POSTER_H1 || "Know what is happening in every account you manage <em>before a customer tells you.</em>"}</h1>
 <img class="logo" src="data:image/png;base64,${logoData()}">
 <div class="shot"><img src="data:image/png;base64,${crop.toString("base64")}"><div class="fade"></div></div>`;
 const browser = await chromium.launch();
@@ -28,6 +28,6 @@ await page.waitForTimeout(400);
 const buf = await page.screenshot({ type: "png" });
 await browser.close();
 fs.writeFileSync(path.join(work, "poster-1920.png"), buf);
-await sharp(buf).resize(1600, 900, { kernel: "lanczos3" }).png().toFile(path.join(out, "subsync-preview-poster.png"));
-await sharp(buf).resize(1280, 720, { kernel: "lanczos3" }).png().toFile(path.join(out, "subsync-preview-poster-1280.png"));
+await sharp(buf).resize(1600, 900, { kernel: "lanczos3" }).png().toFile(path.join(out, (process.env.POSTER_NAME || "subsync-preview") + "-poster.png"));
+await sharp(buf).resize(1280, 720, { kernel: "lanczos3" }).png().toFile(path.join(out, (process.env.POSTER_NAME || "subsync-preview") + "-poster-1280.png"));
 console.log("poster ok");

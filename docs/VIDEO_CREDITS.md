@@ -29,4 +29,10 @@ Synthesised by `scripts/video/music.py` from sine waves (a soft pad over Am9, Fm
 
 ## On screen
 
-All screens are recorded from the demo company (made-up businesses and people) with the demo and sample labels hidden by `scripts/video/lib.mjs`. The logo is the real SubSync logo (`assets/brand/subsync-logo-main.png`, cut out to `assets/brand/subsync-logo-main-transparent.png` by `scripts/video/logo-cutout.mjs`, colours unchanged). The chat message is King's own real test alert (`assets/video-in/real-slack-alert.png`). The email and the contacts list are drawn in plain HTML with no company marks. The first minute (people, objects, clocks, calendars) is drawn in code by `scripts/video/scenes.mjs`; nothing is borrowed. Music is synthesised for 225 s.
+All screens are recorded from the demo company (made-up businesses and people) with the demo and sample labels hidden by `scripts/video/lib.mjs`. The logo is the real SubSync logo (`assets/brand/subsync-logo-main.png`, cut out to `assets/brand/subsync-logo-main-transparent.png` by `scripts/video/logo-cutout.mjs`, colours unchanged). The chat message is King's own real test alert (`assets/video-in/real-slack-alert.png`). The email and the contacts list are drawn in plain HTML with no company marks. The first minute (people, objects, clocks, calendars) is drawn in code by `scripts/video/scenes.mjs`; nothing is borrowed. Music is synthesised for 262 s (it is trimmed to each video's length).
+
+## v4 and the welcome video
+
+- v4 (`subsync-preview.mp4`, 6:16) adds every sidebar page plus Settings, Getting started, What's new and Guides. The screens are the listing screenshots 19 to 44 (full-frame flow tree, expanded tree, bell, alert settings, getting started, what's new, guide, workflows, overview, settings pages). The tool name in the Meeting notes screen and the Connections card is covered by `scripts/video/mask.mjs`, and the feedback footer is covered on the Team screen.
+- The welcome video (`subsync-welcome.mp4`, about 78 s, script in `scripts/video/script-welcome.json`) reuses the same stills, voice, music and logo treatment. Captions for the web are in `subsync-preview.vtt` and `subsync-welcome.vtt`.
+- Nothing new was downloaded for v4 or the welcome video. No database or demo server was used.

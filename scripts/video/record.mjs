@@ -9,7 +9,6 @@ const WORK = process.argv[2];
 const only = process.argv[3] ? process.argv[3].split(",") : null;
 const FFMPEG = process.env.FFMPEG || "C:/Users/KING/video-tools/ffmpeg/ffmpeg-9.0.2-essentials_build/bin/ffmpeg.exe";
 const plan = JSON.parse(fs.readFileSync(path.join(WORK, "plan.json"), "utf8"));
-const LOGO = fs.readFileSync(new URL("../../public/brand/subsync-logo.svg", import.meta.url), "utf8");
 const shotPlan = (id) => plan.shots.find((s) => s.id === id);
 
 const { browser, ctx } = await launch();
@@ -61,7 +60,7 @@ async function record(id, choreo) {
   const T = { at, lineStart: (lid) => sp.lines.find((l) => l.id === lid).clipStart, lineEnd: (lid) => { const l = sp.lines.find((x) => x.id === lid); return l.clipStart + l.dur; } };
 
   const captions = (async () => {
-    for (const l of (id === "close" ? [] : sp.lines)) { // the closing card carries its own words, so no caption strip
+    for (const l of (id === "close" || id === "w_end" ? [] : sp.lines)) { // the closing card carries its own words, so no caption strip
       const chunks = id === "hook" ? [{ t: plan.lines.find((x) => x.id === l.id).text, kind: "hook" }] : l.chunks.map((t) => ({ t }));
       const total = chunks.reduce((a, c) => a + c.t.length, 0);
       let acc = 0;

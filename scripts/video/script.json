@@ -72,12 +72,17 @@
  {
   "id": "A1",
   "shot": "appts",
-  "text": "Appointments tell the truth. Four have no outcome marked, so your real show rate is fifty-seven percent. Eight no-shows are waiting to be won back, with a list to call. And the flow tree shows which person, or which calendar, is losing your bookings."
+  "text": "Appointments tell the truth. Four have no outcome marked, so your real show rate is fifty-seven percent. Eight no-shows are waiting to be won back, with a list to call. And the flow tree follows every booking, from who booked it, to who took it, to what happened. Expand it to see every branch."
  },
  {
-  "id": "F1",
-  "shot": "funnel",
-  "text": "The funnel shows where every deal sits, step by step, and where the biggest leak is. Replay it day by day. Click any step to open the deals there. And deals with no value still show up, so nothing hides."
+  "id": "M1",
+  "shot": "clients",
+  "text": "Clients puts all your connected accounts on one screen. Five need you now, and two paid plans are past due."
+ },
+ {
+  "id": "Mo1",
+  "shot": "money",
+  "text": "Money lists failed payments and late invoices across every account, with the money at risk, so you chase the right ones first."
  },
  {
   "id": "D1",
@@ -85,29 +90,64 @@
   "text": "Need one lead? Find a lead searches every connected account at once. It shows leads that never had a reply, leads going cold, and ready-made call lists."
  },
  {
-  "id": "C1",
-  "shot": "clean",
-  "text": "Duplicates clog the CRM, and merging by hand is scary. Clean-up found one hundred and sixty-three duplicate groups, sorted by how sure it is: certain, likely, or possible. You preview every change first, bigger changes ask you to type a confirmation, and you can undo. You stay in control."
- },
- {
-  "id": "M1",
-  "shot": "clients",
-  "text": "Clients puts all your connected accounts on one screen. Five need you now, and two paid plans are past due. Payments are right there too, with the money at risk."
- },
- {
   "id": "U1",
   "shot": "audit",
   "text": "The account audit checks every account today. It estimates what you are losing, about two hundred and fifty-eight thousand dollars a month here, with the working one tap away, and lists what to fix first. You can copy a summary, print it, or see a sample to send a client."
  },
  {
+  "id": "C1",
+  "shot": "clean",
+  "text": "Duplicates clog the CRM, and merging by hand is scary. Clean-up found one hundred and sixty-three duplicate groups, sorted by how sure it is: certain, likely, or possible. You preview every change first, bigger changes ask you to type a confirmation, and you can undo. You stay in control."
+ },
+ {
   "id": "Y1",
   "shot": "team",
-  "text": "Team shows who follows up fast, and who is overloaded. Here, three things need you today, and one person has four leads waiting more than two hours."
+  "text": "Team shows who follows up fast, and who is overloaded. Here, three things need you today, and one person has four leads waiting more than two hours. In settings, you give each person a role, setter, closer, or both, and set how fast a reply should be."
+ },
+ {
+  "id": "F1",
+  "shot": "funnel",
+  "text": "The funnel shows where every deal sits, step by step, and where the biggest leak is. Replay it day by day. Click any step to open the deals there. And deals with no value still show up, so nothing hides."
+ },
+ {
+  "id": "Mn1",
+  "shot": "meet",
+  "text": "Your calls are recorded, but the notes never reach the lead. Meeting notes brings in the summary and action items of your own recorded calls, and matches each one to the right contact by the attendee email, when the match is certain. If it is not certain, the call waits in your private inbox. Each person connects their own, and nobody else can see your calls."
+ },
+ {
+  "id": "Wf1",
+  "shot": "workflows",
+  "text": "Workflows watches the workflows in every account. Ninety-five in total here, seventeen failing, and nine that never ran. A health check lists what needs fixing first."
+ },
+ {
+  "id": "Ov1",
+  "shot": "overview",
+  "text": "Overview is your whole operation on one screen: new contacts, revenue won, open pipeline, the value of stale deals, and which accounts need attention, with account health at a glance."
+ },
+ {
+  "id": "St1",
+  "shot": "settings",
+  "text": "Settings keeps everything in one place, in ten sections. Choose when alerts and the daily brief reach you. See every permission SubSync asks for, and why. Give your team roles, and switch off the pages you do not use. Nothing changes in your CRM without a preview and a confirmation."
  },
  {
   "id": "N1",
   "shot": "alerts",
-  "text": "And you do not have to keep checking. Alerts reach you in the app, in Slack, or by email. Each one says what is wrong, what to do next, and links straight to the right account in your CRM."
+  "text": "Alerts reach you where you will see them. In the app, the bell shows the number waiting, and every item can be opened, snoozed or dismissed. In Slack and by email, each one says what is wrong, what to do next, and links straight to the right account in your CRM."
+ },
+ {
+  "id": "G1",
+  "shot": "started",
+  "text": "Getting started is a checklist that ticks itself off from what you really did. Here, fourteen of twenty are done: let the first sync finish, see what needs you today, find the leads still waiting. Every step has a button that takes you there."
+ },
+ {
+  "id": "Nw1",
+  "shot": "news",
+  "text": "What is new lists what went live recently, newest first, and only things you can use today, like the funnel that moves."
+ },
+ {
+  "id": "Gd1",
+  "shot": "guides",
+  "text": "And every screen explains itself in plain words, with a sixty-second guide that says what it shows, how to read it, and what to do next."
  },
  {
   "id": "X1",

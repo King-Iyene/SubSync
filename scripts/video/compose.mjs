@@ -49,6 +49,6 @@ run(["-i", w("music.wav"), "-af", `atrim=0:${total.toFixed(2)},${musicChain(-20)
 
 // 4. Final files.
 const mux = (audio, dest) => run(["-i", w("video.mp4"), "-i", audio, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-t", total.toFixed(3), "-movflags", "+faststart", dest]);
-mux(w("mix-voice.wav"), path.join(OUT, "subsync-preview.mp4"));
-mux(w("mix-silent.wav"), path.join(OUT, "subsync-preview-silent.mp4"));
+mux(w("mix-voice.wav"), path.join(OUT, (process.env.OUT_NAME || "subsync-preview") + ".mp4"));
+mux(w("mix-silent.wav"), path.join(OUT, (process.env.OUT_NAME || "subsync-preview") + "-silent.mp4"));
 console.log("done", total.toFixed(1), "s");

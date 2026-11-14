@@ -6,13 +6,13 @@ import { execFileSync } from "node:child_process";
 
 const WORK = process.argv[2];
 const FFPROBE = process.env.FFPROBE || "C:/Users/KING/video-tools/ffmpeg/ffmpeg-9.0.2-essentials_build/bin/ffprobe.exe";
-const lines = JSON.parse(fs.readFileSync(new URL("./script.json", import.meta.url), "utf8"));
+const lines = JSON.parse(fs.readFileSync(process.env.SCRIPT || new URL("./script.json", import.meta.url), "utf8"));
 const dur = (f) => parseFloat(execFileSync(FFPROBE, ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f]).toString());
 
 const OVERLAP = 0.6, GAP = 0.5;
 // head = quiet time before the first line, tail = hold after the last line (the shot's own end, which also fades into the next shot).
 const order = [...new Set(lines.map((l) => l.shot))];
-const SHOTS = order.map((id) => ({ id, head: id.startsWith("p_") || id === "what" ? 0.5 : 0.6, tail: id === "p_client" ? 1.2 : id.startsWith("p_") ? 0.4 : id === "what" ? 0.9 : id === "close" ? 3.4 : 1.5 }));
+const SHOTS = order.map((id) => ({ id, head: id.startsWith("p_") || id === "what" ? 0.5 : 0.6, tail: id === "p_client" ? 1.2 : id.startsWith("p_") ? 0.4 : id === "what" ? 0.9 : id === "close" ? 3.4 : 1.5 + parseFloat(process.env.TAIL_EXTRA || 0) }));
 
 function chunks(text) {
   // Cut at sentence ends and commas, then split anything still over ~58 characters at a space near the middle.
