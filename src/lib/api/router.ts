@@ -19,7 +19,7 @@ import { checkDomain, extractDomain } from "../dns/email-auth";
 import { deepLinks } from "../links";
 import { isTestName } from "../analytics/test-data";
 import { accountLimit, type Feature } from "../entitlements";
-import { purgeSyncedData } from "../ghl/installations";
+import { getCompanyAccessToken, purgeSyncedData } from "../ghl/installations";
 import { SYNCED_DELETE } from "../tenant-tables";
 import { SHARE_LINK_DAYS } from "../data-inventory";
 import { createKey, listKeys, MAX_KEYS, revokeKey } from "../mcp/store";
@@ -155,6 +155,7 @@ import { handleSettings2 } from "./settings2-routes";
 import { handleCqt, callQueueGuideFacts } from "./cqt-routes";
 import { handleSetupCheck } from "./setup-check-routes";
 import { handleSafeWrites } from "./safe-writes-routes";
+import { handleMoreTools } from "./more-tools-routes";
 import { guideRowState } from "../call-queue-tags/check";
 import { handlePayments } from "./payments-routes";
 import { handleToday3, handleToday3Act } from "./today3-routes";
@@ -2173,7 +2174,7 @@ async function digestPreview(ctx: Ctx) {
 const clientDeps: clientRoutes.Deps = { allowedIds, accountsFor, actorOf: (ctx) => ctx.session.userName ?? null, locationId: LOCATION_ID };
 
 const FEATURE_FOR: Record<string, Feature> = {
-  sw: "safe_writes",
+  sw: "safe_writes", mt: "more_tools",
   "data-health": "data_health", search: "search", onboarding: "onboarding", stale: "stale", inbox: "inbox", pipelines: "pipelines", duplicates: "duplicates", email: "email",
   "meeting-inbox": "meetings", "meeting-setup": "meetings", "meeting-logged": "meetings", "meeting-list": "meetings", "my-connections": "connections", "team-connections": "connections", "meeting-policy": "connections", alerts: "alerts", notifications: "alerts", "notification-prefs": "alerts", "notification-destinations": "alerts", appointments: "appointments", audit: "audit", speed: "speed", "appointment-insights": "appointments", meetings: "meetings", connections: "connections", cleanup: "cleanup", cu: "cleanup", "setup-compare": "setup_compare", playbooks: "playbooks", daily: "overview", today: "overview", team: "team", "deal-events": "pipelines", contact: "search", settings: "settings", export: "exports", digest: "overview", "api-keys": "ai", hygiene: "stale", "pipeline-intel": "pipelines", "contact-intel": "activity", clients: "clients", qbr: "reports", "comms-intel": "inbox", "deal-gaps": "pipelines", "call-queue": "calls", "call-lists": "calls", "call-outcomes": "calls", people: "search", workbench: "search", dial: "calls", workflows: "workflows", "client-onboarding": "onboarding",
 };
@@ -2322,6 +2323,8 @@ async function dispatch(ctx: Ctx): Promise<Response> {
     if (a === "setup-check" && method === "GET" && ctx.segments.length === 1) return await handleSetupCheck(ctx, { allowed: () => allowedIds(ctx) });
     // Safe CRM writes: /api/app/sw/<setup|tag|pipeline|sla|task>. Preview first, then a confirm; every change goes through src/lib/ghl/safe-writes-gateway.ts.
     if (a === "sw" && ctx.segments.length === 2) return await handleSafeWrites(ctx, { allowed: () => allowedIds(ctx), locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });
+    // More tools: /api/app/mt/<setup|templates|installer|pipelines|repeat|draft|stage>. Preview first, then a confirm; every change goes through src/lib/ghl/more-tools-gateway.ts.
+    if (a === "mt" && ctx.segments.length === 2) return await handleMoreTools(ctx, { allowed: () => allowedIds(ctx), locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId), companyToken: () => getCompanyAccessToken(ctx.session.companyId) });
     // Cash features: /api/app/cash?part=... (save this account, recover, deals; read only) and /api/app/cash/act/... (SubSync notes; the one CRM change, an owner change, goes through the safe gateway).
     if (a === "cash" && method === "GET" && !b && ctx.url.searchParams.has("part")) {
       return await handleCash(ctx, { allowed: () => allowedIds(ctx), links: async () => (await scope(ctx)).links, targets: async () => { const st = (await scope(ctx)).settings; return { slaHours: st.slaHours, targetMinutes: st.speedTargetMinutes }; }, locationToken: (locationId) => locationAccessToken(ctx.session.companyId, locationId) });

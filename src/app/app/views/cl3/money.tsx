@@ -7,6 +7,7 @@ import { EmptyState, OpenLeadButton } from "../../ds";
 import { Find, LevelChip, Load, NOT_FROM_PLATFORM } from "./shared";
 import { useCl, type ClParams } from "./data";
 import { PlanMonitor } from "./plan-monitor";
+import { InstallerCard } from "../more-tools-ui";
 import { scopeList } from "@/lib/scope-words";
 
 // Clients, Money: every client account with its plan, payment status, credit balance and whether SubSync is installed. Real data only. Sample rows appear ONLY with ?cl3fx in the address and say
@@ -70,6 +71,7 @@ export function MoneyTab({ onOpen, onPayments, showApps, showHistory }: Props) {
                 <p className="ap-fine">Source: from your platform billing (the plan list). Payments due in the next 7 days and the next payment date: {NOT_FROM_PLATFORM}, so they are not counted or guessed. Defaulters are listed first below.</p>
               </section>
               {!sample && <PlanMonitor onPayments={onPayments} />}
+              {!sample && <InstallerCard />}
               <div className="cl-tiles" aria-label="Money headline">
                 <div className="cl-tile" style={{ cursor: "default" }} title="Estimate: the plan price per month of every paid-up account. A yearly price is divided by 12. It is the price, not what was charged."><b>{s.expectedMonthly.length ? s.expectedMonthly.map((e) => cash(e.currency, e.monthly)).join(" + ") : "Not enough data"}</b><span>Expected each month (estimate)</span></div>
                 <button type="button" className="cl-tile" onClick={() => setBucket("unpaid")} title="Estimate: the monthly plan price of accounts that are not paid up."><b>{s.atRisk.length ? s.atRisk.map((e) => cash(e.currency, e.monthly)).join(" + ") : "$0"}</b><span>At risk each month (estimate)</span></button>

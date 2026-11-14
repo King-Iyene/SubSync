@@ -777,3 +777,7 @@ Choices: read live with the account's own key and store nothing (no migration; e
 
 ## 14 Nov 2026: SubSync is a read and write app
 Who: agency owners, setters, client admins. What they do next: preview and confirm a change, or press Send. Missing: they could not act from SubSync. The old 'read-only by default' wording in CLAUDE.md section 1A is replaced.
+
+## 14 Nov 2026: More tools (nine permissions get a screen)
+Who: agency owners and account admins (templates, stage rename, quotes, install record) and any setter (repeating follow-up). What they do next: add a follow-up that repeats and ends by itself, save an unsent estimate or invoice, tidy a pipeline's stage names, see what email templates exist, check the plan the platform has on record. Missing: they would do it in the CRM, one account at a time.
+Choices: one gateway (`more-tools-gateway.ts`) on the same guarded door as the safe writes (practice mode until the server switch and the account opt-in), flag `more_tools` on by default; nothing is ever sent to a contact; stage rename re-reads the pipeline just before and sends every stage back unchanged except one name; locations/tasks.write removed (79 permissions). Real-account testing: none yet (see docs/SCOPE_COVERAGE.md).

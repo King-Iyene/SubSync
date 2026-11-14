@@ -4,6 +4,7 @@ import { useState } from "react";
 import { STATUS_WORDS, type Group, type Row, type SetupCheckResult, type Status } from "@/lib/setup-check/model";
 import { useData } from "../session";
 import { Badge, Btn, Card, Empty, ErrorBox, Loading, PageHeader, timeAgo } from "../ui";
+import { EmailTemplatesCard, StageRenameCard } from "./more-tools-ui";
 
 // Account setup: what is set up in one account, one row per thing, with a count and one line on what to do next (docs/features/ACCOUNT_SETUP.md).
 // Read only. Counts only: no names, no text, phone numbers only as their last four digits. A row that needs a permission says so in the same words everywhere.
@@ -71,6 +72,8 @@ export function AccountSetupView() {
           if (rows.length === 0) return null;
           return <Card key={g} title={g}><ul className="divide-y">{rows.map((r) => <RowLine key={r.id} r={r} />)}</ul></Card>;
         })}
+        <EmailTemplatesCard locationId={selected.id} />
+        <StageRenameCard locationId={selected.id} />
       </div>
     </div>
   );

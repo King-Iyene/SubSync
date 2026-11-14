@@ -6,6 +6,7 @@ import { useData } from "../../session";
 import { InfoTip } from "../info-tip";
 import { NoteToSelf } from "../lead-parts";
 import { TaskActions } from "../../views/safe-writes-ui";
+import { FollowUpTools } from "../../views/more-tools-ui";
 
 // The rest of the contact record in one wide tab, in collapsible sections. Each part is read live from the CRM only when it is opened (notes, tasks, orders) or comes from the
 // panel's own live read (custom fields). Nothing is stored. A part that needs a permission says "Needs permission: reconnect"; nothing is ever faked.
@@ -70,6 +71,9 @@ export function RecordTab({ locationId, contactId, name, account, fields }: { lo
           <ul className="divide-y rounded-lg border">{items.map((t, i) => (
             <li key={t.id ?? i} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 text-[15px]"><span className={`min-w-0 flex-1 truncate ${t.done ? "text-muted-foreground line-through" : "font-medium"}`}>{t.title}</span>{t.by && <span className="text-xs text-muted-foreground">{t.by}</span>}{t.due && <span className="text-xs tabular-nums text-muted-foreground">Due {day(t.due)}</span>}<span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${t.done ? "bg-success/15 text-success" : "bg-primary/15 text-primary"}`}>{t.done ? "Done" : "Open"}</span>{t.id && <TaskActions locationId={locationId} contactId={contactId} taskId={t.id} done={t.done} ours={t.deletable === true} canDelete={t.deletable === true} onDone={reload} />}</li>))}</ul>
         )} />}
+      </Section>
+      <Section title="Follow-up and quotes" testId="record-followup" tip="Set a follow-up that repeats on a schedule, or save an unsent estimate or invoice for this contact. Each one shows a preview first.">
+        {() => <FollowUpTools locationId={locationId} contactId={contactId} canBill />}
       </Section>
       <Section title="Custom fields" testId="record-fields" count={filled.length} defaultOpen tip="Every custom field on this contact, read live from your CRM when the panel opens. Empty ones are hidden until you ask.">
         {() => fields.length === 0 ? <p className="text-sm text-muted-foreground">No custom fields on this contact.</p> : (

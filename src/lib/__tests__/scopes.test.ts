@@ -5,7 +5,7 @@ import { buildInstallUrl, GHL_SCOPES } from "../ghl/scopes.ts";
 // The list of permissions an install asks for is pinned here on purpose: adding one makes every installed
 // agency approve again, and asking for one the listing does not have makes the install fail. Changing the
 // list means changing this test too, which makes the change a decision rather than an accident.
-test("the permissions requested are exactly the agreed list (the 80 saved in the portal draft: 7 required, 73 optional)", () => {
+test("the permissions requested are exactly the agreed list (the 79 saved in the portal draft: 7 required, 72 optional)", () => {
   const required = [
     "locations.readonly",
     "oauth.readonly",
@@ -52,7 +52,6 @@ test("the permissions requested are exactly the agreed list (the 80 saved in the
     "locations/customValues.readonly",
     "locations/customValues.write",
     "locations/tasks.readonly",
-    "locations/tasks.write",
     "recurring-tasks.readonly",
     "recurring-tasks.write",
     "locations/tags.readonly",
@@ -92,9 +91,9 @@ test("the permissions requested are exactly the agreed list (the 80 saved in the
   ];
   assert.deepEqual([...GHL_SCOPES].sort(), [...required, ...optional].sort());
   assert.equal(new Set(GHL_SCOPES).size, GHL_SCOPES.length, "no duplicates");
-  assert.equal(GHL_SCOPES.length, 80);
+  assert.equal(GHL_SCOPES.length, 79);
   assert.equal(required.length, 7);
-  assert.equal(optional.length, 73);
+  assert.equal(optional.length, 72);
 });
 
 test("change access is limited to the agreed list, and nothing can manage people", () => {
@@ -102,7 +101,7 @@ test("change access is limited to the agreed list, and nothing can manage people
   assert.deepEqual(writes, [
     "calendars/events.write", "contacts.write", "conversations.write", "conversations/livechat.write", "conversations/message.write",
     "invoices.write", "invoices/estimate.write", "invoices/schedule.write", "invoices/template.write",
-    "locations/customValues.write", "locations/tags.write", "locations/tasks.write", "notes.write", "oauth.write", "opportunities.write",
+    "locations/customValues.write", "locations/tags.write", "notes.write", "oauth.write", "opportunities.write",
     "pipelines.create", "pipelines.write", "recurring-tasks.write",
     "workflows.delete", "workflows.publish", "workflows.write",
   ].sort());

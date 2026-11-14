@@ -274,6 +274,8 @@ export const FEATURES = [
   "as_check",
   // Safe CRM writes (tag, standard pipeline, reply-target value, task done or delete), each behind a preview and a confirm. On by default; the writes themselves stay in practice mode until WRITE_GHL_LIVE and the account opt-in.
   "safe_writes",
+  // More tools (repeating follow-ups, unsent estimate and invoice drafts, email template list, install record, pipeline stage rename), each change behind a preview and a confirm. On by default; writes stay in practice mode until WRITE_GHL_LIVE and the account opt-in.
+  "more_tools",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
