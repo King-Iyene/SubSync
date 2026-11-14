@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { HUB_SECTIONS, isHubSection, searchSettings, type HubSectionId } from "@/lib/settings2";
 import { SETTINGS_SECTION_KEY } from "@/lib/settings-sections";
+import { TEAM_START_TAB_KEY } from "@/lib/people/team-empty";
 import { remember, remembered } from "../ds/remember";
 import type { GoFn } from "../nav";
 import { useData } from "../session";
@@ -47,7 +48,7 @@ export function SettingsHub({ go, features, openOld }: { go: GoFn; features: Rec
       {section.id === "permissions" && <PermissionsSection />}
       {section.id === "modules" && <ModulesSection features={features} />}
       {section.id === "safety" && <SafetySection />}
-      {section.id === "team" && <Card title="Roles"><p className="text-sm text-muted-foreground">Give each person a label (Setter, Closer, Both, Support, Manager). Labels are kept only in SubSync and are never sent to your CRM.</p><div className="mt-2"><Btn onClick={() => go("team")}>Open Team</Btn></div></Card>}
+      {section.id === "team" && <Card title="Roles"><p className="text-sm text-muted-foreground">Give each person a label (Setter, Closer, Both, Support, Manager). Labels are kept only in SubSync and are never sent to your CRM.</p><div className="mt-2"><Btn onClick={() => { try { window.sessionStorage.setItem(TEAM_START_TAB_KEY, "roles"); } catch { /* opens on Today instead */ } go("team"); }}>Set roles in Team</Btn></div></Card>}
       {section.id === "data" && (
         <Card title="History">
           <p className="text-sm" data-testid="history-start">{home.since ? `SubSync has kept history for you since ${new Date(home.since).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}.` : "History starts with your first sync."}</p>

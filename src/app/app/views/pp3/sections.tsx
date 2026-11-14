@@ -1,23 +1,33 @@
 "use client";
 
-import { useState } from "react";
-import type { Pp3AccountRef, Pp3Handoff, Pp3NextLead, Pp3Options, Pp3Scorecard, Pp3Scorecards, Pp3Today, Pp3Workload } from "@/lib/analytics/people3-types";
+import { useContext, useState, type ReactNode } from "react";
+import { hasNoActivity, noPeopleReason, NO_ACTIVITY_YET, ROLE_CHIPS } from "@/lib/people/team-empty";import type { Pp3AccountRef, Pp3Handoff, Pp3NextLead, Pp3Options, Pp3Scorecard, Pp3Scorecards, Pp3Today, Pp3Workload } from "@/lib/analytics/people3-types";
 import { RoleChip } from "../../roles";
 import { AssignSlot, MoveLeadsSlot } from "./actions-slot";
 import type { PpParams } from "./data";
 import { usePp } from "./data";
 import type { Drill } from "./panel";
-import { ago, Find, Initials, Load, money, NO_ACTIVITY, NOT_ENOUGH, Note, Pager, secs, share, Spark, Status, subline, Trend, useCursor, useDebounced } from "./shared";
+import { ago, Find, Initials, Load, money, NO_ACTIVITY, NOT_ENOUGH, Note, Pager, RoleChips, RolesLink, secs, share, Spark, Status, subline, TeamCtx, Trend, useCursor, useDebounced } from "./shared";
 
 // The first four sections of Team: Today, Scorecards (with Handoffs), Workload (with the next-lead suggestion). Every count opens exactly its rows. Nothing here messages anyone or changes the CRM.
 export type SecProps = { filters: PpParams; open: (d: Drill) => void; pick: (id: string) => void; coach: (id: string) => void; accounts: Pp3AccountRef[]; viewer: Pp3Options["viewer"] };
 
 export function Today({ filters, open, pick }: Pick<SecProps, "filters" | "open" | "pick">) {
-  const r = usePp<Pp3Today>("today", filters);
+  const r = usePp<Pp3Today>("today", filters), ctx = useContext(TeamCtx);
   return (
     <Load r={r} empty={(t) => !t.headline && t.lines.length === 0}>
       {(t) => {
-        const b = t.button;
+        const b = t.button, why = t.lines.length === 0 ? noPeopleReason({ usersState: t.usersState ?? ctx.usersState, people: t.people }) : null;
+        if (why) return (
+          <div className="pp-stack" data-testid="pp-today">
+            <section className="pp-card" aria-label="What to do today">
+              <h2 className="pp-h">What to do today</h2>
+              <p className="pp-sentence" data-testid="pp-today-sentence">{why.title}</p>
+              <p className="ap-fine" data-testid="pp-today-why">{why.body}</p>
+              <RolesLink text="Set roles for your team" />
+            </section>
+          </div>
+        );
         return (
           <div className="pp-stack" data-testid="pp-today">
             <section className="pp-card" aria-label="What to do today">
@@ -35,6 +45,7 @@ export function Today({ filters, open, pick }: Pick<SecProps, "filters" | "open"
                 </ul>
               )}
               {t.lines.length === 0 && <p className="ap-fine">Nothing is waiting, and nobody has gone quiet while leads wait.</p>}
+              {t.lines.length === 0 && <p className="ap-fine"><RolesLink text="Set who is a Setter and who is a Closer" /></p>}
             </section>
             <p className="ap-fine">{NO_ACTIVITY} means nothing was recorded there. It does not mean someone is not working: calls on a personal phone are not visible to SubSync.</p>
           </div>
@@ -45,12 +56,14 @@ export function Today({ filters, open, pick }: Pick<SecProps, "filters" | "open"
 }
 
 const SORTS: Array<[string, string]> = [["", "Default order"], ["name", "Name"], ["won", "Money won"], ["answered", "Leads answered first"], ["reply", "Fastest first reply"], ["in_time", "Replied in time"], ["appts", "Appointments set"], ["showed", "Showed up"], ["waiting", "Most waiting"]];
+/** Everyone on the team is listed; someone with nothing in this period says so in words instead of looking like a missing row. */
+const noActivity = (s: Pp3Scorecard): boolean => hasNoActivity({ touches: s.touches.sms + s.touches.email + s.touches.call + s.touches.other, answered: s.answeredFirst.current, appts: s.apptsSet.current, won: s.wonCount, lost: s.lostCount, held: s.showed.n, noShow: s.showed.of - s.showed.n }) && s.waiting === 0;
 function Person({ s, onPick }: { s: Pp3Scorecard; onPick: () => void }) {
   const p = s.person;
   return (
     <span className="pp-cell"><Initials p={p} />
       <span><button type="button" className="pp-name" onClick={(e) => { e.stopPropagation(); onPick(); }}>{p.name}</button><RoleChip userId={p.userId} />{p.isAdmin && <span className="ap-fine"> Admin, not ranked</span>}
-        <br /><span className="ap-fine">{subline(p)}<span className="pp-hide-sm">{p.lastActivityAt ? `, last activity ${ago(p.lastActivityAt)}` : ""}</span></span></span>
+        <br /><span className="ap-fine">{subline(p)}<span className="pp-hide-sm">{p.lastActivityAt ? `, last activity ${ago(p.lastActivityAt)}` : ""}</span>{noActivity(s) ? <span data-testid="pp-no-activity">. {NO_ACTIVITY_YET}</span> : null}</span></span>
     </span>
   );
 }
@@ -77,33 +90,47 @@ function Handoffs({ filters, pick }: { filters: PpParams; pick: (id: string) => 
   );
 }
 
+type Col = { h: string; num?: boolean; sm?: boolean; stop?: boolean; cell: (s: Pp3Scorecard, x: { open: SecProps["open"]; filters: PpParams }) => ReactNode };
+const C_ANSWERED: Col = { h: "Leads answered first", num: true, sm: true, cell: (s) => <>{s.answeredFirst.current.toLocaleString("en-US")}<Trend d={s.answeredFirst} /></> };
+const C_REPLY: Col = { h: "First reply", num: true, cell: (s) => (s.enough ? secs(s.typicalReplySeconds) : NOT_ENOUGH) };
+const C_INTIME: Col = { h: "In time", num: true, sm: true, cell: (s) => share(s.inTime) };
+const C_SET: Col = { h: "Appts set", num: true, sm: true, cell: (s) => <>{s.apptsSet.enough ? s.apptsSet.current : NOT_ENOUGH}{s.apptsSetEstimated > 0 && s.apptsSet.enough && <span className="ap-sub"> +{s.apptsSetEstimated} est.</span>}<Trend d={s.apptsSet} /></> };
+const C_SHOWED: Col = { h: "Showed", num: true, sm: true, cell: (s) => share(s.showed) };
+const C_WON: Col = { h: "Won", num: true, cell: (s) => <>{s.wonValue.enough ? <>{money(s.wonValue.current)}<span className="ap-sub"> ({s.wonCount})</span></> : NOT_ENOUGH}<Trend d={s.wonValue} /></> };
+const C_WAIT: Col = { h: "Waiting", num: true, sm: true, stop: true, cell: (s, x) => (s.waiting > 0 ? <button type="button" className="ap-link" onClick={() => x.open({ title: `${s.person.name}: waiting for a reply`, reason: "waiting", userId: s.person.userId, location: x.filters.location ? String(x.filters.location) : null, count: s.waiting })}>{s.waiting}</button> : 0) };
+const C_SPARK: Col = { h: "8 weeks", sm: true, cell: (s) => <Spark values={s.enough ? s.spark : []} label={`${s.person.name}, first replies, last 8 weeks`} /> };
+// What each role is judged on. Setters: speed to the first reply, appointments booked, and whether those people turned up. Closers: appointments taken, show rate, and deals won against lost.
+const SCORE_COLS: Record<"all" | "setters" | "closers", Col[]> = {
+  all: [C_ANSWERED, C_REPLY, C_INTIME, C_SET, C_SHOWED, C_WON, C_WAIT, C_SPARK],
+  setters: [C_ANSWERED, C_REPLY, C_INTIME, C_SET, { h: "Showed (of those they booked)", num: true, cell: (s) => share(s.setShowed) }, C_WAIT, C_SPARK],
+  closers: [{ h: "Appointments taken", num: true, cell: (s) => s.showed.of.toLocaleString("en-US") }, C_SHOWED, C_WON, { h: "Lost", num: true, sm: true, cell: (s) => s.lostCount.toLocaleString("en-US") },
+    { h: "Deals won (share)", num: true, sm: true, cell: (s) => (s.wonCount + s.lostCount >= 5 ? `${Math.round((s.wonCount / (s.wonCount + s.lostCount)) * 100)}%` : NOT_ENOUGH) }, C_WAIT],
+};
+
 export function Scorecards({ filters, pick, viewer, open }: SecProps) {
-  const own = viewer.level === "self", [view, setView] = useState<"people" | "handoffs">("people"), [q, setQ] = useState(""), [sort, setSort] = useState(""), [admins, setAdmins] = useState(false), dq = useDebounced(q);
-  const f = { ...filters, q: dq, sort: sort || undefined, dir: sort === "name" || sort === "reply" ? "asc" : sort ? "desc" : undefined, admins: admins ? 1 : undefined }, c = useCursor(JSON.stringify(f)), r = usePp<Pp3Scorecards>("scorecards", { ...f, after: c.cursor }, view !== "people");
+  const own = viewer.level === "self", [view, setView] = useState<"people" | "handoffs">("people"), [q, setQ] = useState(""), [sort, setSort] = useState(""), [admins, setAdmins] = useState(false), [rs, setRs] = useState("all"), dq = useDebounced(q);
+  const f = { ...filters, q: dq, sort: sort || undefined, dir: sort === "name" || sort === "reply" ? "asc" : sort ? "desc" : undefined, admins: admins ? 1 : undefined, roleset: rs === "all" ? undefined : rs }, c = useCursor(JSON.stringify(f)), r = usePp<Pp3Scorecards>("scorecards", { ...f, after: c.cursor }, view !== "people");
+  const cols = SCORE_COLS[rs === "setters" ? "setters" : rs === "closers" ? "closers" : "all"];
   return (
     <div data-testid="pp-scorecards">
       {!own && <div className="pp-sub" role="group" aria-label="Scorecard views"><button type="button" className="s6-btn" aria-pressed={view === "people"} onClick={() => setView("people")}>People</button><button type="button" className="s6-btn" aria-pressed={view === "handoffs"} onClick={() => setView("handoffs")}>Booked by one, closed by another</button></div>}
       {view === "handoffs" ? <Handoffs filters={filters} pick={pick} /> : (
         <>
+          {!own && <RoleChips value={rs} onChange={setRs} />}
           {!own && <Find q={q} setQ={setQ}>
             <select className="ap-field" aria-label="Sort by" value={sort} onChange={(e) => setSort(e.target.value)}>{SORTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
             <label className="ap-fine inline-flex min-h-11 items-center gap-2"><input type="checkbox" checked={admins} onChange={(e) => setAdmins(e.target.checked)} />Include owners and admins</label>
           </Find>}
-          <Load r={r} empty={(x) => x.rows.length === 0 && (dq ? "No one matches that search." : true)}>
+          <Load people r={r} empty={(x) => x.rows.length === 0 && (dq ? "No one matches that search." : rs !== "all" ? `Nobody is labelled ${ROLE_CHIPS.find(([k]) => k === rs)?.[1].toLowerCase() ?? "that"} yet. Choose Everyone, or give people a role first.` : true)}>
             {(x) => (
               <>
-                <div className="ap-scroll"><table className="ap-t" data-testid="pp-table"><thead><tr><th>Person</th><th data-num data-sm="hide">Leads answered first</th><th data-num>First reply</th><th data-num data-sm="hide">In time</th><th data-num data-sm="hide">Appts set</th><th data-num data-sm="hide">Showed</th><th data-num>Won</th><th data-num data-sm="hide">Waiting</th><th data-sm="hide">8 weeks</th></tr></thead>
+                {rs === "setters" && <p className="ap-fine mb-2" data-testid="pp-role-note">Setters: how fast they answer new leads, the appointments they book, and how many of those people show up.</p>}
+                {rs === "closers" && <p className="ap-fine mb-2" data-testid="pp-role-note">Closers: the appointments they take, how many show up, and the deals they win and lose.</p>}
+                <div className="ap-scroll"><table className="ap-t" data-testid="pp-table"><thead><tr><th>Person</th>{cols.map((c) => <th key={c.h} data-num={c.num ? true : undefined} data-sm={c.sm ? "hide" : undefined}>{c.h}</th>)}</tr></thead>
                   <tbody>{x.rows.map((s) => (
                     <tr key={s.person.userId} tabIndex={0} onClick={() => pick(s.person.userId)} onKeyDown={(e) => { if (e.key === "Enter") pick(s.person.userId); }} data-testid="pp-row" data-former={s.person.deleted ? "1" : undefined}>
                       <td className="pp-wrap"><Person s={s} onPick={() => pick(s.person.userId)} /></td>
-                      <td data-num data-sm="hide">{s.answeredFirst.current.toLocaleString("en-US")}<Trend d={s.answeredFirst} /></td>
-                      <td data-num>{s.enough ? secs(s.typicalReplySeconds) : NOT_ENOUGH}</td>
-                      <td data-num data-sm="hide">{share(s.inTime)}</td>
-                      <td data-num data-sm="hide">{s.apptsSet.enough ? s.apptsSet.current : NOT_ENOUGH}{s.apptsSetEstimated > 0 && s.apptsSet.enough && <span className="ap-sub"> +{s.apptsSetEstimated} est.</span>}<Trend d={s.apptsSet} /></td>
-                      <td data-num data-sm="hide">{share(s.showed)}</td>
-                      <td data-num>{s.wonValue.enough ? <>{money(s.wonValue.current)}<span className="ap-sub"> ({s.wonCount})</span></> : NOT_ENOUGH}<Trend d={s.wonValue} /></td>
-                      <td data-num data-sm="hide" onClick={(e) => e.stopPropagation()}>{s.waiting > 0 ? <button type="button" className="ap-link" onClick={() => open({ title: `${s.person.name}: waiting for a reply`, reason: "waiting", userId: s.person.userId, location: filters.location ? String(filters.location) : null, count: s.waiting })}>{s.waiting}</button> : 0}</td>
-                      <td data-sm="hide"><Spark values={s.enough ? s.spark : []} label={`${s.person.name}, first replies, last 8 weeks`} /></td>
+                      {cols.map((c) => <td key={c.h} data-num={c.num ? true : undefined} data-sm={c.sm ? "hide" : undefined} onClick={c.stop ? (e) => e.stopPropagation() : undefined}>{c.cell(s, { open, filters })}</td>)}
                     </tr>
                   ))}</tbody></table></div>
                 <Pager c={c} next={x.next} total={x.total} noun="people" />
@@ -151,7 +178,7 @@ export function Workload({ filters, open, pick }: SecProps) {
     <div data-testid="pp-workload">
       <NextLead loc={loc} />
       <Find q={q} setQ={setQ}><select className="ap-field" aria-label="Sort by" value={sort} onChange={(e) => setSort(e.target.value)}>{WSORTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Find>
-      <Load r={r} empty={(x) => x.rows.length === 0 && (dq ? "No one matches that search." : true)}>
+      <Load people r={r} empty={(x) => x.rows.length === 0 && (dq ? "No one matches that search." : true)}>
         {(x) => (
           <>
             <p className="ap-fine mb-2">{x.over} heavy, {x.under} light{x.idleCount > 0 ? `, ${x.idleCount} with ${NO_ACTIVITY.toLowerCase()} for ${x.idleHours} hours or more while leads wait` : ""}.</p>

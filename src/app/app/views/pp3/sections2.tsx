@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useContext, useState } from "react";
 import type { Pp3Access, Pp3AccessRow, Pp3Board, Pp3Coaching, Pp3Leaderboard, Pp3Money, Pp3Proof } from "@/lib/analytics/people3-types";
 import { RoleChip } from "../../roles";
 import { PersonActionsSlot, ProofActionsSlot } from "./actions-slot";
 import { CoachNoteCard } from "../ai-team/team-notes";
 import { fixturesOn, usePp } from "./data";
 import type { SecProps } from "./sections";
-import { ago, Find, Initials, Load, minutes, money, NOT_ENOUGH, NO_ACTIVITY, Note, Pager, RECONNECT, ROLE_LABEL, share, Status, subline, useCursor, useDebounced } from "./shared";
+import { ago, Find, Initials, Load, minutes, money, NOT_ENOUGH, NO_ACTIVITY, Note, Pager, RECONNECT, RoleChips, ROLE_LABEL, RolesLink, share, Status, subline, TeamCtx, useCursor, useDebounced } from "./shared";
 
 // The other four sections of Team: Leaderboard, Money, Coaching, Access, Proof.
 
@@ -33,12 +33,17 @@ function BoardTable({ b, pick }: { b: Pp3Board; pick: (id: string) => void }) {
 }
 
 export function Leaderboard({ filters, pick, viewer }: SecProps) {
-  const [role, setRole] = useState<"setter" | "closer">("setter"), [all, setAll] = useState(false), f = { ...filters, role, all: all ? 1 : undefined }, c = useCursor(JSON.stringify(f)), r = usePp<Pp3Leaderboard>("leaderboard", { ...f, after: c.cursor });
+  // The chips say who is shown. Setters rank on speed to the first reply, Closers on deals won; the other chips show both boards for the people with that label.
+  // Until anyone has a Setter or Closer label the two boards are built from behaviour (who answers first, who closes), as before, and the page says so.
+  const { anySetterCloser } = useContext(TeamCtx), [rs, setRs] = useState("all"), [all, setAll] = useState(false);
+  const board = rs === "setters" ? "setter" : rs === "closers" ? "closer" : undefined, byLabel = rs !== "all" && (rs !== "setters" && rs !== "closers" ? true : anySetterCloser);
+  const f = { ...filters, role: board, roleset: byLabel ? rs : undefined, all: all ? 1 : undefined }, c = useCursor(JSON.stringify(f)), r = usePp<Pp3Leaderboard>("leaderboard", { ...f, after: c.cursor });
   return (
     <div data-testid="pp-leaderboard">
-      <div className="pp-sub" role="group" aria-label="Board"><button type="button" className="s6-btn" aria-pressed={role === "setter"} onClick={() => setRole("setter")}>Setters</button><button type="button" className="s6-btn" aria-pressed={role === "closer"} onClick={() => setRole("closer")}>Closers</button>
-        {viewer.canRankAll && <label className="ap-fine inline-flex min-h-11 items-center gap-2"><input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />Show the whole ranking</label>}</div>
-      <Load r={r} empty={(x) => x.boards.length === 0 && "Nobody can be ranked fairly yet. People are ranked only against others in the same account with enough leads."}>
+      <RoleChips value={rs} onChange={setRs} />
+      {viewer.canRankAll && <label className="ap-fine inline-flex min-h-11 items-center gap-2"><input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />Show the whole ranking</label>}
+      {(rs === "setters" || rs === "closers") && !anySetterCloser && <p className="ap-note mb-2" data-testid="pp-role-first">Split by Setters and Closers: <RolesLink text="set roles first" />. Until then this board is built from what people do: who answers new leads first, and who closes deals.</p>}
+      <Load people r={r} empty={(x) => x.boards.length === 0 && "Nobody can be ranked fairly yet. People are ranked only against others in the same account with enough leads."}>
         {(x) => (
           <>
             <p className="ap-fine mb-3">Ranked only among people in the same account, and compared on the same sources of leads. Under {x.minLeads} leads or {x.minDays} days of history, a person is shown but not ranked. Owners and admins are left out.</p>
@@ -55,7 +60,7 @@ export function Money({ filters, open, pick }: SecProps) {
   const [q, setQ] = useState(""), [tip, setTip] = useState(false), dq = useDebounced(q), f = { ...filters, q: dq }, c = useCursor(JSON.stringify(f)), r = usePp<Pp3Money>("money", { ...f, after: c.cursor });
   return (
     <div data-testid="pp-money">
-      <Load r={r} empty={(x) => x.rows.length === 0 && (dq ? "No one matches that search." : true)}>
+      <Load people r={r} empty={(x) => x.rows.length === 0 && (dq ? "No one matches that search." : true)}>
         {(x) => {
           const tile = (label: string, n: number, on?: () => void, est?: boolean) => (on
             ? <button type="button" className="pp-tile" aria-expanded={tip} onClick={on}><b>{money(n)}</b><span>{label}{est ? " (estimate)" : ""}</span></button>

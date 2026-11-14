@@ -3,6 +3,8 @@ import {
   boardView, decodeCursor, encodeCursor, fairRank, MAX_ROWS, MIN_DAYS, WAIT_HOURS, MIN_LEADS, normaliseSource, proofLines, rate, suggestNextLead, DAY, median, REASON_TEXT, type RankInput, type NextCandidate,
 } from "./people3-intel";
 import { dailyFrom, NO_OWNER, openDealsFrom, ownerAt, staleDeal, waitingFrom, waitingOwner, needsOutcomeFrom, upcomingFrom, oldWait, workItems, type Frag } from "./people3-rollup";
+import { inRoleSet, roleIndexFor } from "./people3-roleset";
+import type { RoleFilter } from "../people/roles";
 import { accountsIn, awayMap, dayStr, iso, like, loadPeople, n, pageOf, refOf, scorecards, type Acct, type Links, type Scope, type CardFilters } from "./people3-queries";
 import type {
   Pp3Board, Pp3Handoff, Pp3HandoffRow, Pp3Leaderboard, Pp3List, Pp3ListRow, Pp3Money, Pp3MoneyRow, Pp3NextLead, Pp3Person, Pp3Proof, Pp3Ranked, Pp3Reason,
@@ -51,7 +53,7 @@ async function boardData(s: Scope, ids: string[], f: Window, kind: "setters" | "
 }
 
 export async function leaderboard(
-  s: Scope, f: Window & { location?: string | null; role?: "setter" | "closer" | null; all?: boolean; admins?: boolean }, o: { after?: string | null; accounts?: number }, days: number, now = Date.now(),
+  s: Scope, f: Window & { location?: string | null; role?: "setter" | "closer" | null; /** Only people the agency labelled this way. */ roleset?: RoleFilter | null; all?: boolean; admins?: boolean }, o: { after?: string | null; accounts?: number }, days: number, now = Date.now(),
 ): Promise<Pp3Leaderboard> {
   const db = sql();
   const accts = await accountsIn(s, f.location);
@@ -79,10 +81,12 @@ export async function leaderboard(
     const everyone = new Set<string>();
     for (const m of data.values()) for (const loc of m.values()) for (const u of loc.keys()) everyone.add(u);
     const people = await loadPeople(s, accts, [...everyone].slice(0, 200), now);
+    // "Only Setters" and the like: ranked among the people the agency gave that label, in that account (its own label, else the default).
+    const labels = f.roleset ? await roleIndexFor(s.inst, [...everyone].slice(0, 200)) : null;
     for (const a of pageAccts) for (const kind of kinds) {
       const per = data.get(kind)?.get(a.id);
       if (!per || per.size < 2) continue;
-      const inputs: RankInput[] = [...per].map(([userId, v]) => ({
+      const inputs: RankInput[] = [...per].filter(([userId]) => !labels || inRoleSet(labels, userId, a.id, f.roleset ?? null)).map(([userId, v]) => ({
         userId, name: people.get(userId)?.name ?? "", isAdmin: roleBy.get(userId) === "agency_admin" || roleBy.get(userId) === "account_admin",
         daysOfHistory: v.first ? Math.floor((f.to.getTime() - v.first.getTime()) / DAY) : 0, bySource: v.bySource,
       }));
