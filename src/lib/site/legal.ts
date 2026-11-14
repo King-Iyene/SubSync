@@ -1,5 +1,5 @@
 // Facts the three legal pages share. Wording that needs a lawyer or a fact check is listed in docs/LEGAL_REVIEW_TODO.md, not on the pages.
-export const LEGAL_UPDATED = "13 November 2026";
+export const LEGAL_UPDATED = "14 November 2026";
 
 /**
  * Governing law and where disputes are heard. NOT decided: it must be confirmed by a lawyer. While this is null the Terms page leaves the clause out entirely

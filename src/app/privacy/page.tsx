@@ -27,7 +27,7 @@ export default function Privacy() {
       intro={`This policy explains what ${COMPANY.product} handles when a business installs it, why, for how long, and what you can do about it. It is written in plain words. The Trust page shows the same facts with the proof behind them.`}>
       <section id="who" style={{ scrollMarginTop: 90 }}>
         <h2>Who we are</h2>
-        <p>{COMPANY.product} is made and run by {COMPANY.legalName}. It is built in Nigeria and used by businesses and agencies in other countries. For the contact data SubSync reads from your CRM, you (the business that installs it) decide why it is processed and we process it for you, only to run SubSync. For account and usage information about your use of SubSync itself, we decide. Email <a href={`mailto:${COMPANY.supportEmail}`}>{COMPANY.supportEmail}</a> for anything in this policy.</p>
+        <p>{COMPANY.product} is made and run by {COMPANY.legalName}. It is built in Nigeria and used by businesses in other countries. For the contact data SubSync reads from your CRM, you (the business that installs it) decide why it is processed and we process it for you, only to run SubSync. For account and usage information about your use of SubSync itself, we decide. Email <a href={`mailto:${COMPANY.supportEmail}`}>{COMPANY.supportEmail}</a> for anything in this policy.</p>
       </section>
 
       <section id="collect" style={{ scrollMarginTop: 90 }}>

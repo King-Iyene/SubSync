@@ -18,7 +18,7 @@ export const PROCESSORS: readonly Processor[] = [
   { id: "hosting", name: "Vercel", role: "Runs the SubSync app and its scheduled jobs.", whenUsed: "Always." },
   { id: "database", name: "Supabase", role: "Holds the database (everything listed under what we store).", whenUsed: "Always." },
   { id: "email", name: "Resend", role: "Sends the emails SubSync sends (alerts, the Monday summary, the test emails).", whenUsed: "Only when an email address is set and email sending is switched on." },
-  { id: "crm", name: "Your CRM", role: "The source of the data. SubSync reads from it with the permissions you approved, and adds notes to a contact only with the add-notes permission.", whenUsed: "Always." },
+  { id: "crm", name: "Your CRM", role: "The source of the data. SubSync reads from it with the permissions you approved. It changes something in it (for example a note, tag, task, deal, appointment or workflow) only for a feature you use, with the optional permission, after a preview and your confirmation. It sends a message to a contact only when a person presses Send.", whenUsed: "Always." },
   { id: "slack", name: "Slack", role: "Receives the alerts and the daily brief, in the channel you choose.", whenUsed: "Only if you connect it." },
   { id: "fathom", name: "Fathom", role: "Sends meeting summaries to SubSync.", whenUsed: "Only if you connect it." },
   { id: "ai", name: "Your own AI provider", role: "Receives the short summary of counts that SubSync sends to write the 7 am brief wording, under your own account and terms.", whenUsed: "Only if an administrator connects their own AI account (OpenRouter, Anthropic, OpenAI, Google or a compatible service)." },
