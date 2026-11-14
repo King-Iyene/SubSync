@@ -127,6 +127,8 @@ export async function refreshInsights(installationId: string): Promise<{ account
   // Data quality (stage DQ): duplicate groups, the lead-intake record and the quality score, written whether or not the screens are on, so the history starts now. Before the migration it does nothing.
   const dq = await import("./dq-queries");
   await dq.dqSweep(installationId, 15_000).catch(() => undefined);
+  // Lead intake health: today's measurement per form, survey and funnel goes into the history. Before the migration it does nothing.
+  await (await import("./dq-health-queries")).recordHealth(installationId).catch(() => undefined);
   // Stage SPEED5: each account is judged against its OWN reply target, and the escalation ladder decides how far a breach climbs.
   const { applyBreaches } = await import("./speed5-queries");
   const sp5 = await applyBreaches(installationId, accounts, settings.speedTargetMinutes ?? 15).catch(() => ({ accounts, ladder: undefined }));
