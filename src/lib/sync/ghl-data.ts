@@ -518,3 +518,45 @@ export async function fetchSubmissions(token: string, locationId: string, kind: 
   }
   return out;
 }
+
+// ---- Lead intake health: funnel pages, funnel redirects and trigger links. Read only. Paths and versions VERIFIED in the published OpenAPI files (apps/funnels.json, apps/links.json):
+//   GET /funnels/page?locationId&funnelId&limit&offset (funnels/page.readonly, version 2021-07-28), GET /funnels/page/count?locationId&funnelId (funnels/pagecount.readonly),
+//   GET /funnels/lookup/redirect/list?locationId&limit&offset (funnels/redirect.readonly, 2021-07-28), GET /links/?locationId (links.readonly, 2021-07-28).
+// NOT VERIFIED LIVE: no real account has answered these yet. The redirect item fields are not documented, so they are read defensively (a missing field is null, never invented). The platform has no
+// page-view or visit endpoint and no such field in any of these answers, so views are never read.
+export type FunnelPageRow = { id: string; name: string; stepId: string | null; updatedAt: string | null };
+export type LinkItem = { id: string; name: string; target: string | null };
+
+export async function fetchFunnelPages(token: string, locationId: string, funnelId: string, maxPages = 5): Promise<FunnelPageRow[]> {
+  const out: FunnelPageRow[] = [];
+  for (let page = 0; page < maxPages; page++) {
+    const raw = await getJson("/funnels/page", { locationId, funnelId, limit: "100", offset: String(page * 100) }, token, "2021-07-28");
+    const list = Array.isArray(raw) ? raw : Array.isArray(rec(raw).pages) ? (rec(raw).pages as unknown[]) : Array.isArray(rec(raw).data) ? (rec(raw).data as unknown[]) : [];
+    for (const x of list) { const r = rec(x); const id = str(r._id) ?? str(r.id); if (id && r.deleted !== true) out.push({ id, name: (str(r.name) ?? "Untitled page").slice(0, 120), stepId: str(r.stepId), updatedAt: toIso(r.updatedAt) }); }
+    if (list.length < 100) break;
+  }
+  return out;
+}
+export async function fetchFunnelPageCount(token: string, locationId: string, funnelId: string): Promise<number | null> {
+  const n = Number(rec(await getJson("/funnels/page/count", { locationId, funnelId }, token, "2021-07-28")).count);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+}
+export async function fetchRedirects(token: string, locationId: string, maxPages = 5): Promise<LinkItem[]> {
+  const out: LinkItem[] = [];
+  for (let page = 0; page < maxPages; page++) {
+    const body = rec(rec(await getJson("/funnels/lookup/redirect/list", { locationId, limit: "100", offset: String(page * 100) }, token, "2021-07-28")).data);
+    const list = Array.isArray(body.data) ? (body.data as unknown[]) : [];
+    for (const x of list) {
+      const r = rec(x); const id = str(r.id) ?? str(r._id);
+      // The target field name is not documented. null = the item had none of the names we know (shown as "not shown by the platform", never flagged); "" = a known name was there but blank (flagged).
+      const key = (["target", "redirectTo", "url"] as const).find((k) => k in r);
+      if (id) out.push({ id, name: (str(r.pathName) ?? str(r.name) ?? str(r.path) ?? "Untitled redirect").slice(0, 120), target: key ? (str(r[key]) ?? "").slice(0, 500) : null });
+    }
+    if (list.length < 100) break;
+  }
+  return out;
+}
+export async function fetchTriggerLinks(token: string, locationId: string): Promise<LinkItem[]> {
+  const list = rec(await getJson("/links/", { locationId }, token, "2021-07-28")).links;
+  return (Array.isArray(list) ? list : []).map((x): LinkItem | null => { const r = rec(x); const id = str(r.id) ?? str(r._id); return id ? { id, name: (str(r.name) ?? "Untitled link").slice(0, 120), target: (str(r.redirectTo) ?? "").slice(0, 500) } : null; }).filter((x): x is LinkItem => x !== null);
+}

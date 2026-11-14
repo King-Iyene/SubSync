@@ -8,6 +8,7 @@ import { useApiClient } from "../../session";
 import { fmtInt, timeAgo } from "../../ui";
 import { sampleOn, SAMPLE, useDq, type AlertRow, type Counts, type FormRow, type IntakeRes, type Opts, type SourceDetail, type SourceRow } from "./dq-data";
 import { Sheet, type LeadsPick } from "./dq-leads";
+import { HealthSection } from "./dq-health";
 
 // LEAD INTAKE: where leads come from and which source is worth it. A leaderboard of sources (and forms, surveys and funnels), ranked by leads, bookings, sales or quality; a per-source drawer with its
 // trend; low-rate and dead-source alerts against each source's OWN history; a "best and worst" line. Every count opens exactly its people. Money is counted only from won deals linked to the person.
@@ -89,6 +90,7 @@ export function IntakeTab({ opts, account, setAccount, pick }: { opts: Opts; acc
       </section>
 
       <FormsSection data={data} range={range} pick={pick} />
+      {data.health && <HealthSection health={data.health} reload={d.reload} />}
       {drawer && <SourceDrawer srcKey={drawer} range={range} account={account} onClose={() => setDrawer(null)} pick={pick} />}
     </div>
   );
