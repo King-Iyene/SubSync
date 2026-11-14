@@ -23,6 +23,14 @@ export async function recordTouchEvents(installationId: string, events: readonly
           as x(location_id text, contact_id text, conversation_id text, event_key text, direction text, channel text, kind text, at timestamptz, user_id text, automated boolean, source text, outcome text)
         on conflict (installation_id, location_id, event_key) do nothing`;
     }
+    // The business line (a number, never content) is kept by a separate best-effort update, so a database without the column still keeps every event. Also fills rows seen before.
+    const withLine = events.filter((e) => e.line);
+    for (let i = 0; i < withLine.length; i += 200) {
+      const rows = withLine.slice(i, i + 200).map((e) => ({ k: e.key, l: e.locationId, v: e.line }));
+      await db`
+        update touch_events t set line = x.v from jsonb_to_recordset(${JSON.stringify(rows)}::text::jsonb) as x(k text, l text, v text)
+        where t.installation_id = ${installationId} and t.location_id = x.l and t.event_key = x.k and t.line is distinct from x.v`.catch(() => undefined);
+    }
     return events.length;
   } catch { return 0; }
 }

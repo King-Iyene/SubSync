@@ -19,6 +19,7 @@ import { LeadRows, useLeadActions, waitWords, type LeadRow } from "./speed-rows"
 import { FilterProvider } from "./speed-filter";
 import { RaceTab } from "./speed-race";
 import { CoverageTab, JourneyCard, RulesTab } from "./speed-coverage";
+import { MissedTab } from "./speed-missed";
 import { IgnoredTab } from "./speed-ignored";
 import { DialMode } from "./dial-mode";
 import { ColdCard } from "./ai-lead-cards";
@@ -51,6 +52,7 @@ type Home = PictureData & {
   next: { key: string; text: string };
   measuring: { targetMinutes: number; countAutomated: boolean; businessHours: boolean; canChange: boolean };
   ignoredOn?: boolean;
+  missedOn?: boolean;
   truncated: boolean;
 };
 type ListSpec = { title: string; params: Record<string, string>; noun?: string };
@@ -58,9 +60,9 @@ type ListSpec = { title: string; params: Record<string, string>; noun?: string }
 const MORE_TRIGGER = "ds-press inline-flex h-8 items-center gap-1 rounded-md border bg-card px-2.5 text-sm font-medium hover:border-primary/40 hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]";
 
 /** The tabs the lead filters can change (Race, Pace, Coverage, People). Call mode, Capture, Rules and Log do not use them, so the control is not shown there. */
-const FILTER_TABS = new Set(["race", "pace", "coverage", "people", "ignored"]);
+const FILTER_TABS = new Set(["race", "pace", "coverage", "missed", "people", "ignored"]);
 
-export type SpeedTabId = "race" | "pace" | "coverage" | "ignored" | "unanswered" | "call" | "people" | "capture" | "rules" | "log";
+export type SpeedTabId = "race" | "pace" | "coverage" | "missed" | "ignored" | "unanswered" | "call" | "people" | "capture" | "rules" | "log";
 /** The Unanswered tab: who is waiting right now. Race and Pace time how fast NEW leads get a first reply; this tab lists everyone waiting, so it sits next to Coverage (the other "who is not being answered" tab). */
 const UNANSWERED_TIP = "Race and Pace measure how fast NEW leads get a first reply. This tab lists everyone who is waiting for a reply right now: new leads and existing customers.";
 
@@ -84,7 +86,7 @@ export function SpeedView({ go, unanswered = false, start }: { go: GoFn; unanswe
   if (error) return <div data-testid="page"><ErrorState error={error} onRetry={reload} /></div>;
   if (!data || !r) return <div data-testid="page"><SkeletonRows rows={6} label="Timing first replies..." /></div>;
 
-  const order: SpeedTabId[] = ["race", "pace", "coverage", ...(data.ignoredOn ? (["ignored"] as const) : []), ...(unanswered ? (["unanswered"] as const) : []), "call", "people", "capture", "rules", "log"];
+  const order: SpeedTabId[] = ["race", "pace", "coverage", ...(data.missedOn ? (["missed"] as const) : []), ...(data.ignoredOn ? (["ignored"] as const) : []), ...(unanswered ? (["unanswered"] as const) : []), "call", "people", "capture", "rules", "log"];
   const d = data;
   const w = d.waiting;
   const multi = d.access.total > 1;
@@ -139,6 +141,7 @@ export function SpeedView({ go, unanswered = false, start }: { go: GoFn; unanswe
           { label: "Race", icon: ic(Zap), node: <RaceTab multi={multi} onCall={() => goTab("call")} /> },
           { label: "Pace", icon: ic(Gauge), node: <PaceTab6 multi={multi} slow={slow} old={<><SourceCard showAccount={multi} /><JourneyCard multi={multi} /><BookingCard /><PaceTab multi={multi} /></>} /> },
           { label: "Coverage", icon: ic(PhoneMissed), node: <Fold keep={3} testId="coverage-fold"><CoverageTab multi={multi} /></Fold> },
+          ...(d.missedOn ? [{ label: "Missed", tip: "Missed calls and missed replies, each with how long they have waited. An automatic text does not count as a person.", icon: ic(PhoneMissed), node: <MissedTab multi={multi} /> }] : []),
           ...(d.ignoredOn ? [{ label: "Waiting on the client", tip: "Client accounts that are not answering the leads sent to them: leads nobody answered, customers who got no reply, and missed calls nobody returned.", icon: ic(UserX), node: <IgnoredTab multi={multi} /> }] : []),
           ...(unanswered ? [{ label: "Unanswered", tip: UNANSWERED_TIP, icon: ic(MessageSquareWarning), node: <InboxView go={go} embedded={{ onRace: () => goTab("race") }} /> }] : []),
           { label: "Call mode", icon: ic(PhoneCall), badge: seenCall ? undefined : <span className="spd-new rounded-full px-1.5 py-0.5 text-[0.65rem] font-bold uppercase leading-none tracking-wide" data-testid="call-new">New</span>, node: <DialMode /> },

@@ -9,9 +9,11 @@ export type TouchEvent = {
   direction: "inbound" | "outbound"; channel: Channel; kind: EventKind; at: number; userId: string | null; automated: boolean; source: string | null;
   /** What the platform reported (delivered, failed, no-answer...): one word, never content. */
   outcome: string | null;
+  /** The business number it came in on, when known. */
+  line?: string | null;
 };
 /** The fields we read from a stored message or a webhook payload. Never the body. */
-export type RawTouch = { id?: string | null; at: number; direction: "inbound" | "outbound" | null; userId: string | null; source: string | null; type: string | null; status?: string | null };
+export type RawTouch = { id?: string | null; line?: string | null; at: number; direction: "inbound" | "outbound" | null; userId: string | null; source: string | null; type: string | null; status?: string | null };
 
 export function channelOf(type: string | null): Channel {
   const t = (type ?? "").toLowerCase();
@@ -34,7 +36,7 @@ export function toEvent(r: RawTouch, ids: { locationId: string; contactId: strin
   const kind: EventKind = isMissedCall(r) ? "missed_call" : isFailedSend(r) ? "failed" : channel === "call" ? "call" : "message";
   const automated = r.direction === "outbound" && !(r.userId && (r.source === "app" || channel === "call"));
   const key = r.id ? `m:${r.id}` : `x:${ids.conversationId ?? ""}:${r.at}:${r.direction}:${channel}`;
-  return { key, ...ids, direction: r.direction, channel, kind, at: r.at, userId: r.direction === "outbound" ? r.userId : null, automated, source: r.source, outcome: r.status ?? null };
+  return { key, ...ids, direction: r.direction, channel, kind, at: r.at, userId: r.direction === "outbound" ? r.userId : null, automated, source: r.source, outcome: r.status ?? null, line: r.line ?? null };
 }
 
 /** A call keeps its length in the same metadata word ("completed:134"), so a rep's call can be recognised as a real conversation. Never any content. */
@@ -51,7 +53,7 @@ export function eventFromWebhook(body: unknown, type: string | null): TouchEvent
   const at = typeof t === "number" ? (t < 1e11 ? t * 1000 : t) : typeof t === "string" ? Date.parse(t) : Date.now();
   return toEvent({
     id: str(pick("messageId"), 80) ?? str(pick("id"), 80), at, direction: type === "InboundMessage" ? "inbound" : "outbound", userId: str(pick("userId")),
-    source: str(pick("source"))?.toLowerCase() ?? null, type: str(pick("messageType")), status: withDuration(str(pick("status")), str(pick("messageType")), pick("duration") ?? (((pick("meta") as Record<string, unknown> | undefined)?.call ?? {}) as Record<string, unknown>).duration),
+    line: type === "InboundMessage" ? str(pick("to"), 40) : null, source: str(pick("source"))?.toLowerCase() ?? null, type: str(pick("messageType")), status: withDuration(str(pick("status")), str(pick("messageType")), pick("duration") ?? (((pick("meta") as Record<string, unknown> | undefined)?.call ?? {}) as Record<string, unknown>).duration),
   }, { locationId, contactId, conversationId: str(pick("conversationId")) });
 }
 

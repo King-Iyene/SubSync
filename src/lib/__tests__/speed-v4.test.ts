@@ -23,7 +23,7 @@ test("an event keeps who, which way, which channel and when, never the words", (
   assert.ok(e);
   assert.equal(e.channel, "sms"); assert.equal(e.automated, false);
   assert.ok(!JSON.stringify(e).includes("secret"), "the text never reaches an event");
-  assert.deepEqual(Object.keys(e).sort(), ["automated", "at", "channel", "contactId", "conversationId", "direction", "key", "kind", "locationId", "outcome", "source", "userId"].sort());
+  assert.deepEqual(Object.keys(e).sort(), ["automated", "at", "channel", "contactId", "conversationId", "direction", "key", "kind", "line", "locationId", "outcome", "source", "userId"].sort());
 });
 test("the same message twice has the same key (idempotent), and a message without an id still has a stable key", () => {
   const a = toEvent({ id: "m1", at: NOW, direction: "inbound", userId: null, source: null, type: "TYPE_SMS" }, ids), b = toEvent({ id: "m1", at: NOW, direction: "inbound", userId: null, source: null, type: "TYPE_SMS" }, ids);

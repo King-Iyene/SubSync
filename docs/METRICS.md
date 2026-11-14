@@ -1086,3 +1086,14 @@ One row per client account for the SubSync plan. A client account session gets o
 - **History.** Each day's measurement (last 7 days, usual week, drop percent, verdict) is written to dq_health_daily, one row per form, survey or funnel per day (idempotent, same day twice is one row). Funnels record pages and steps only.
 - **Funnels.** Pages and steps per funnel, from the funnel list and the page endpoints. The platform has no page view or visit endpoint and no such field, so views are never shown, never estimated, and there is no funnel alert. The screen says "Page views are not available from the platform". Leads whose source carries the funnel's name remain a separate, labelled count.
 - **Redirects and trigger links.** Name and target as the platform returns them. A target that is empty or only spaces is flagged ("No target: it goes nowhere"). The count of flagged links uses the same rule in SQL and in code. The redirect item fields are not documented: if an item has none of the field names we know, its target is "not said" and it is never flagged (no false alarm from a wrong guess).
+
+## Missed calls and missed replies (Speed to lead > Missed, 14 Nov 2026)
+Code: `src/lib/analytics/missed-board.ts` (SQL), `missed-board-rules.ts` (the same rules, pure, unit tested in `src/lib/__tests__/missed-board.test.ts`). Flag `missed_board`. Two separate lists on the same rule.
+- **Missed call (one row per caller, account + contact):** the caller's latest recorded inbound call that nobody answered (voicemail, no answer, busy, missed, cancelled) inside the Speed page's date range.
+- **Missed reply (one row per person):** the person's latest inbound text, email, WhatsApp or chat message inside the range (calls are not messages).
+- **What came after decides the row.** A **person** followed up = an outbound call or message after it that is not automatic and did not fail, or a call result logged in Call mode. **Only an automatic message** (text-back, workflow) = "auto". Nothing = "none". An automatic text-back is NOT a person.
+- **Waiting for a person** = none + auto. Aging buckets count only those, by now minus the call or message time: under 1 hour, 1 to 4 hours, 4 to 24 hours, over 24 hours (the edge belongs to the older bucket). The four buckets add up to the Waiting number.
+- **Owner** = the contact's assigned user. Client staff only see people assigned to them (decided in the SQL). **Channel filter** (replies only). **Line** = the business number the call came in on, when the platform said (older calls: "not recorded").
+- A row's name opens the contact in the CRM using the account's own white-label address.
+- Differs from Coverage's "Missed calls nobody called back", which counts any outbound touch (including an automatic text) as a callback. Both are shown; this tab is the strict one.
+- Counts are SQL aggregates over the whole range (no row cap); the list is one page (20, 50 or 100) at a time, oldest wait first.
