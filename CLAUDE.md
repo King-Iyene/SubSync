@@ -58,7 +58,7 @@ SubSync is a GoHighLevel (GHL) Marketplace app that shows agencies, and the busi
 4. **Learn** from the account's own history: personalized insights, shown only when there is enough data.
 
 **Build rules:**
-- Read-only by default. We do not send messages to leads. Native workflows and specialist tools do that better, and it creates consent and compliance risk. At most, optional write scopes to create internal tasks or record appointment outcomes, always behind preview and confirm.
+- SubSync reads AND writes (King, 14 Nov 2026; supersedes the old read-only rule). It changes CRM data (notes, tags, deals, appointments, workflows, custom values) only after a preview and confirm, with audit and undo, and sends a message only when a person presses Send. Never call it read-only in the listing, videos, site or review form.
 - Outcome-based, not workflow-based. The Workflows API is limited availability, so we infer failures from conversation and appointment data instead.
 - Record every measurement and alert in the event store from day one. History cannot be rebuilt later and is the long-term moat.
 - Push, do not pull: a short daily brief by email first, Slack and WhatsApp later.

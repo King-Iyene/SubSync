@@ -17,11 +17,11 @@ test("every permission the install link asks for has a reason, in exactly one gr
   for (const g of SCOPE_GROUPS) for (const s of g.scopes) {
     assert.ok(s.why.length >= 40, `${s.scope}: a real reason, not a label`);
     assert.equal(groupOf(s.scope)?.id, g.id);
-    assert.ok(s.kind === (/\.(write|publish|delete)$/.test(s.scope) || s.scope === "oauth.write" ? "change" : "read"), `${s.scope}: kind`);
+    assert.ok(s.kind === (/\.(write|publish|delete|create)$/.test(s.scope) || s.scope === "oauth.write" ? "change" : "read"), `${s.scope}: kind`);
   }
 });
 
-test("required and optional match the marketplace listing (7 required, then 14 optional), and every change permission is optional except the platform's own token one", () => {
+test("required and optional match the marketplace listing (7 required, then 73 optional), and every change permission is optional except the platform's own token one", () => {
   const all = SCOPE_GROUPS.flatMap((g) => g.scopes);
   assert.equal(all.filter((s) => s.required).length, 7);
   assert.equal(all.filter((s) => !s.required).length, GHL_SCOPES.length - 7);
