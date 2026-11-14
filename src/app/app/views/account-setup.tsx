@@ -49,7 +49,7 @@ export function AccountSetupView() {
     <div data-testid="account-setup">
       <PageHeader
         title="Account setup"
-        subtitle="What is set up in this account, with a count and one thing to do next. SubSync only reads counts: no names, no message or note text, and phone numbers only by their last four digits."
+        subtitle="What is set up in this account, with a count and one thing to do next. SubSync keeps counts only: no names, no message or note text, and phone numbers only by their last four digits."
         actions={<Btn onClick={recheck} disabled={loading}>{loading ? "Checking..." : "Check again"}</Btn>}
       />
       {data.accounts.length > 1 && (
