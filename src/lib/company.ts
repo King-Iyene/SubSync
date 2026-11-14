@@ -13,7 +13,7 @@ export const COMPANY = {
 } as const;
 
 /** The outside services that process data, and why. The Trust page lists exactly these; a test checks each one against the code or the config. */
-export type Processor = { id: "hosting" | "database" | "email" | "slack" | "fathom" | "crm" | "ai"; name: string; role: string; whenUsed: string };
+export type Processor = { id: "hosting" | "database" | "email" | "slack" | "fathom" | "crm" | "ai" | "video"; name: string; role: string; whenUsed: string };
 export const PROCESSORS: readonly Processor[] = [
   { id: "hosting", name: "Vercel", role: "Runs the SubSync app and its scheduled jobs.", whenUsed: "Always." },
   { id: "database", name: "Supabase", role: "Holds the database (everything listed under what we store).", whenUsed: "Always." },
