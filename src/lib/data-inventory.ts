@@ -393,6 +393,7 @@ export const INVENTORY: Record<string, TableInfo> = {
   feature_flags: { noun: "feature switches", line: "records", notPersonal: ["key", "note"] },
   plan_entitlements: { noun: "plan settings", line: "records", notPersonal: ["note"] },
   webhook_events: { noun: "a list of notification ids already handled", line: "records" },
+  webhook_inbox: { noun: "notifications waiting to be handled (kept only until handled, at most 3 days)", line: "records", personal: { body: "the notification exactly as the platform sent it (a person's name, email or phone can be in it); emptied as soon as it is handled" } },
 };
 
 /** Columns that look as if they could hold personal data. A column like this must be declared above. */

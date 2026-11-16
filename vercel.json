@@ -6,6 +6,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/webhook-inbox",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/daily",
       "schedule": "0 * * * *"
     },

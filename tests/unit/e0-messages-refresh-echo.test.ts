@@ -210,7 +210,7 @@ describe("our writes and their echoes", () => {
     expect(sync).toMatch(/w\.undone_at is null/);
   });
   it("the webhook handler drops an echo of our own write before it queues any work", () => {
-    const route = readFileSync(join(process.cwd(), "src/app/api/webhooks/ghl/route.ts"), "utf8");
+    const route = readFileSync(join(process.cwd(), "src/lib/ghl/webhook-process.ts"), "utf8"); // the handling the route and the inbox worker share
     expect(route).toMatch(/isEchoOfOurWrite\(target\.id, parsed\)/);
     expect(route.indexOf("isEchoOfOurWrite")).toBeLessThan(route.indexOf("enqueueAreaSync(target.id"));
   });

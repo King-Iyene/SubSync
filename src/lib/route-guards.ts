@@ -17,6 +17,7 @@ export const ROUTE_GUARDS: RouteGuard[] = [
   { route: "api/oauth/install", kind: "redirect_only", guard: "Redirects to the platform's install screen. Reads and returns no data." },
   { route: "api/email/unsubscribe", kind: "token", guard: "A signed token naming the installation and the address the email went to; a damaged or forged token returns 400. A GET only shows a button and changes nothing; the POST removes that one address, and says the same thing whether or not it was still there." },
   { route: "api/mcp", kind: "api_key", guard: "A per-installation API key, stored hashed; every tool is scoped to that installation." },
+  { route: "api/cron/webhook-inbox", kind: "secret", guard: "Bearer CRON_SECRET; refuses when the secret is missing or wrong. Handles the platform events the webhook route queued (same code as the route, per account, idempotent). Does nothing while the kill switch is on." },
   { route: "api/cron/sync", kind: "secret", guard: "Bearer CRON_SECRET; refuses when the secret is missing or wrong. Does nothing while the kill switch is on." },
   { route: "api/cron/daily", kind: "secret", guard: "Bearer CRON_SECRET. Does nothing while the kill switch is on." },
   { route: "api/cron/digest", kind: "secret", guard: "Bearer CRON_SECRET." },

@@ -102,3 +102,6 @@ Flags: over 1,000 ms warm or over 3,000 ms cold. The 100,000 column was taken be
 - Cross-screen tiles (Clients waiting/unmarked vs the screens they come from) can differ by 1 to 3 at 100,000 leads because bookings and replies pass their time limit between two slow reads; the check allows 5.
 - `pg_timezone_names` is joined by every appointment and coverage query; on this Windows build each use costs about 150 ms (that is why coverage is about 1 s even with 120 leads). Not an issue measured on Linux; check on Supabase.
 - 100,000 leads is a 166 s seed and about 3 GB of disk; the CI workflow is for 5,000 (about 3 minutes).
+
+## Webhook burst test (15 Nov 2026)
+`node --env-file=scripts/scale.env --import tsx scripts/check-webhook-load.ts` (throwaway database only, same guard as the scale scripts) signs 5,000 events with its own key, sends them at the webhook route 100 at once, prints p50/p95/p99 and any non-2xx, drains the inbox and checks nothing was lost or left pending. Env: `WEBHOOK_LOAD_N`, `WEBHOOK_LOAD_CONCURRENCY`, `DB_POOL_MAX` (4 by default, as in production), `BASE_URL` to send over HTTP to a running server.

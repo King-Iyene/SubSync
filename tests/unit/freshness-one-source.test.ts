@@ -69,7 +69,7 @@ describe("freshness has one source and one place on screen", () => {
   });
 
   it("the webhook route turns the real INSTALL and UNINSTALL names into the documented ones before it decides", () => {
-    const route = read("src/app/api/webhooks/ghl/route.ts");
+    const route = read("src/app/api/webhooks/ghl/route.ts") + read("src/lib/ghl/webhook-process.ts");
     expect(route.indexOf("canonicalType(event.type)")).toBeGreaterThan(0);
     expect(route.indexOf("canonicalType(event.type)")).toBeLessThan(route.indexOf("actionFor(event.type)"));
   });
