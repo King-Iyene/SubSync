@@ -3,6 +3,7 @@ import { bearerMatches } from "@/lib/secret-compare";
 import { safeError } from "@/lib/safe-log";
 import { maintenanceOn } from "@/lib/runtime-guards";
 import { sql } from "@/lib/db";
+import { drainWebhookInbox } from "@/lib/ghl/webhook-inbox";
 import { runSlice, scheduleDailyRefresh, scheduleFastRefresh } from "@/lib/sync/engine";
 
 // Called by Vercel Cron every five minutes. Each run works for up to four minutes, so a large account finishes in a few runs.
@@ -18,13 +19,15 @@ export async function GET(request: Request) {
   if (maintenanceOn(process.env)) return NextResponse.json({ skipped: "maintenance" });
   try {
     const scheduled = (await scheduleDailyRefresh()) + (await scheduleFastRefresh());
-    const slice = await runSlice(240_000);
+    // Queued platform events first (the minute cron does the same; this is the backstop if it is late). A short budget: the sync below keeps its own.
+    const inbox = await drainWebhookInbox({ budgetMs: 20_000 }).catch((e) => { console.error("inbox drain in sync failed", safeError(e)); return null; });
+    const slice = await runSlice(220_000);
     const callQueue = await import("@/lib/dial/callqueue-run").then((m) => m.runAutoCallQueues()).catch(() => null);
     // Fathom auto-match: calls waiting in a person's private inbox are looked at again once their accounts' contacts have synced (counts only; never fails the sync).
     const rematch = await import("@/lib/connections/rematch-run").then((m) => m.runRematch({ onlyIfSynced: true, maxPeople: 20 })).catch(() => null);
     // Keep the de-duplication table small.
     await sql()`delete from webhook_events where received_at < now() - interval '3 days'`;
-    return NextResponse.json({ scheduled, ...slice, callQueue, rematch });
+    return NextResponse.json({ scheduled, ...slice, callQueue, rematch, inbox });
   } catch (error) {
     console.error("Cron sync failed", safeError(error));
     return NextResponse.json({ error: "Sync failed" }, { status: 500 });

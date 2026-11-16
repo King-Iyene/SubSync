@@ -51,6 +51,7 @@ A person in one client account never sees another client account's data. An agen
 | `api/oauth/install` | redirect_only | Redirects to the platform's install screen; returns no data |
 | `api/email/unsubscribe` | token | Signed token naming the installation and the address the email went to; a GET only shows a button, the POST removes that one address |
 | `api/mcp` | api_key | Per-installation API key stored hashed; every tool scoped to that installation |
+| `api/cron/webhook-inbox` | secret | Bearer CRON_SECRET; handles queued platform events with the same code as the webhook route; idle while the kill switch is on |
 | `api/cron/sync` | secret | Bearer CRON_SECRET; idle while the kill switch is on |
 | `api/cron/daily` | secret | Bearer CRON_SECRET; idle while the kill switch is on |
 | `api/cron/digest` | secret | Bearer CRON_SECRET |

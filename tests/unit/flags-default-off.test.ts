@@ -19,6 +19,8 @@ const REVIEWED_ALWAYS_ON_BASELINE = new Set([
   "safe_writes",
   "more_tools",
   "missed_board",
+  // Webhook inbox: burst safety for the platform's webhook (13 Nov 2026 incident). ON by default; a database row switches it off and the old path returns.
+  "webhook_inbox",
 ]);
 
 describe("new features default off", () => {

@@ -9,6 +9,13 @@ export const GHL_WEBHOOK_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAi2HR1srL4o18O8BRa7gVJY7G7bupbN3H9AwJrHCDiOg=
 -----END PUBLIC KEY-----`;
 
+// The load test (scripts/check-webhook-load.ts) signs its own events with a key of its own. That key is honoured ONLY when DATABASE_SSL=off, the marker of the throwaway
+// local/CI database, which is never set in production (src/lib/db.ts). Everywhere else the platform key above is the only one.
+function signingKey(): string {
+  const test = process.env.WEBHOOK_TEST_PUBLIC_KEY;
+  return test && process.env.DATABASE_SSL === "off" ? test : GHL_WEBHOOK_PUBLIC_KEY;
+}
+
 function check(payload: string, signatureBase64: string, publicKeyPem: string): boolean {
   try {
     return verify(null, Buffer.from(payload, "utf8"), createPublicKey(publicKeyPem), Buffer.from(signatureBase64, "base64"));
@@ -24,7 +31,7 @@ function check(payload: string, signatureBase64: string, publicKeyPem: string): 
 export function verifyWebhook(
   rawBody: string,
   signatureBase64: string | null,
-  publicKeyPem: string = GHL_WEBHOOK_PUBLIC_KEY,
+  publicKeyPem: string = signingKey(),
 ): boolean {
   if (!signatureBase64 || signatureBase64 === "N/A") return false;
   if (check(rawBody, signatureBase64, publicKeyPem)) return true;

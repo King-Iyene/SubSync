@@ -192,7 +192,7 @@ test("scope list parity: code, plain words, permission groups, release doc and s
 });
 
 test("install hook wiring: the INSTALL webhook runs automatic setup, and the cron runs the daily check", () => {
-  const hook = readFileSync(new URL("../../app/api/webhooks/ghl/route.ts", import.meta.url), "utf8");
+  const hook = readFileSync(new URL("../ghl/webhook-process.ts", import.meta.url), "utf8"); // the handling the route and the inbox worker share
   assert.match(hook, /action\.kind === "install"[\s\S]{0,600}autoSetupOnInstall\(target\.id, target\.companyId, event\.locationId\)/);
   const cron = readFileSync(new URL("../../app/api/cron/workflows/route.ts", import.meta.url), "utf8");
   assert.match(cron, /runCallQueueDailyCheck/);

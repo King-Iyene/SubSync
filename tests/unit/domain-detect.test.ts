@@ -68,7 +68,7 @@ describe.skipIf(!HAS_DB)("login domain: found automatically, typed only as an ov
 describe("the install event and sign-in both feed it (read of the code)", () => {
   const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
   it("the webhook route keeps the domain from an install event, for the install it belongs to", () => {
-    const route = read("src/app/api/webhooks/ghl/route.ts");
+    const route = read("src/app/api/webhooks/ghl/route.ts") + read("src/lib/ghl/webhook-process.ts"); // the handling lives in webhook-process.ts, called by the route
     expect(route).toMatch(/event\.type === "AppInstall" && event\.whitelabelDomain && target/);
     expect(route).toMatch(/captureWhitelabelDomain\(target\.id, event\.whitelabelDomain, "install"\)/);
   });

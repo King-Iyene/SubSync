@@ -278,6 +278,8 @@ export const FEATURES = [
   "more_tools",
   // Speed to lead > Missed: missed calls and missed replies, each with aging buckets, from SubSync's own history. Read only. On by default.
   "missed_board",
+  // Webhook inbox: bursts of platform events are written to a table in one statement and handled by a worker, so the route always answers fast. On by default; off keeps the old in-request handling.
+  "webhook_inbox",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
